@@ -7,7 +7,8 @@
 <a href="https://youtu.be/7zNsNnao8KU" target="_blank"><img src="https://github.com/user-attachments/assets/4a117a9a-d802-4c1e-a0e2-9471290d4ece"></a>  
 </div>
 
-[**Click here**](https://www.youtube.com/@Psynapster/videos) to access pre-rendered high-resolution (8k 60fps) visualizations of some popular estim audio files.
+
+[**Click here**](https://www.youtube.com/@Psynapster/videos) to access a library of pre-rendered high-resolution (8k 60fps) visualizations of some popular estim audio files.
 
 ## Motivation
 
