@@ -1,0 +1,16 @@
+---
+visualization:
+  image:
+    display:
+      title:
+        enabled: False
+    export:
+      title:
+        enabled: False
+  video:
+    display:
+      title:
+        enabled: False
+    export:
+      title:
+        enabled: False

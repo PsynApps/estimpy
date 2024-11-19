@@ -1,0 +1,8 @@
+flatdict
+matplotlib>=3.7.2
+mutagen
+numpy
+pydub
+pygame
+pyyaml
+scipy

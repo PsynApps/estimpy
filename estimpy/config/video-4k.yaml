@@ -1,0 +1,8 @@
+---
+visualization:
+  video:
+    export:
+      size: 3840x2160
+      ffmpeg-extra-args:
+        '-tile-columns': 2
+        '-tile-rows': 1

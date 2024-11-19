@@ -1,0 +1,215 @@
+---
+analysis:
+  spectrogram:
+    # The minimum frequency to show on the spectrogram
+    frequency-min: 0
+    # The maximum frequency to show on the spectrogram. If None, will autoscale using the method from frequency-max-method.
+    frequency-max: ~
+    # The method to use to determine the 
+    frequency-max-method: spectral_edge
+    # The factor by which to multiply the autoscaled frequency max value (for visual padding)
+    frequency-max-padding-factor: 1.1
+    # Length of the FFT. If None, defaults to analysis.window-size.
+    nfft: ~
+    # Window function to use when generating spectrogram. See scipy.signal.get_window documentation for available options.
+    window-function: hann
+  # Window size to use when processing audio data (in number of samples)
+  window-size: 2048
+  # Window overlap to use when processing audio data (in mumber of samples). Must be less than analysis.window-size. Defaults to analysis.window-size // 2
+  window-overlap: ~
+files:
+  input:
+    # Search input file patterns recursively
+    recursive: False
+  output:
+    # Path in which to save exported files
+    path: ./
+metadata:
+  default-genre: Estim
+  # Pattern to extract metadata from file name
+  file-path-pattern: (?P<artist>[^\\\/]*?) - (?P<title>.*)
+player:
+  # Start playback immediately
+  autoplay: False
+  # Repeat the file from the beginning upon completion
+  repeat: False
+  # Amount of time to skip (in seconds)
+  skip-length: 60
+  # The amount of latency that is required to render the video (in seconds)
+  video-render-latency: 0.5
+  # The volume at which to start playback (0 to 100)
+  volume-start: 50
+  # The amount to change the volume when up or down arrow are pressed (0 to 100)
+  volume-step: 1
+  # Minimum amount of time to smoothly transition to a new volume (i.e. with a volume change of 1)
+  volume-ramp-min-length: 1
+  # Maximum amount of time to smoothly transition to a new volume (i.e. with a volume change of 100)
+  volume-ramp-max-length: 5
+visualization:
+  # Configuration for image visualizations
+  image:
+    # Configuration for displaying image interactively
+    display:
+      # Size of image (in pixels)
+      size: 1080x1080
+      # Configuration for the time display
+      time:
+        enabled: True
+      # Configuration for the title panel
+      title:
+        enabled: False
+    # Configuration for exporting image
+    export:
+      # File format of image
+      format: png
+      # Size of image (in pixels)
+      size: 1080x1080
+      # Configuration for the time display
+      time:
+        enabled: True
+      # Configuration for the title panel
+      title:
+        enabled: True
+  style:
+    # Configuration for the amplitude panels
+    amplitude:
+      # First channel is mono/left, second is right (if stereo)
+      channels: [{
+        # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
+        background-color: ~,
+        # The color to use for the peak amplitude envelope
+        peak-color: '#4dbeee',
+        # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
+        rms-color: ~,
+      }, {
+        # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
+        background-color: ~,
+        # The color to use for the peak amplitude envelope
+        peak-color: '#b54dee',
+        # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
+        rms-color: ~ ,
+      }]
+      # Configuration for the axes of the amplitude panel
+      axes:
+        # Show the amplitude axis ticks and scale text
+        enabled: True
+      # The alpha level for the background of the amplitude envelopes.
+      # Based on the color defined for the peak envelope. Applies to both channels.
+      # Not used if background colors are explicitly defined in channel config.
+      background-alpha: 0.15
+      # The amount of visual padding to add above and below the amplitude envelopes (0.2 = 20%)
+      padding: 0.1
+      # The alpha level for the RMS amplitude envelope.
+      # Based on the color defined for the peak envelope. Applies to both channels.
+      # Not used if RMS colors are explicitly defined in channel config.
+      rms-alpha: 0.5
+      # Show the RMS amplitude envelope superimposed on the peak amplitude envelope
+      show-rms: True
+    # Configuration for axes
+    axes:
+      # Color of the axis ticks and scale text
+      color: '#ffffff'
+      # Font size of the scale text
+      font-size: 8
+      # Padding to add to text between edge of panel
+      text-padding: 1
+      # Length of axis ticks
+      tick-length: 5
+      # Width of axis ticks
+      tick-width: 1
+    # Font configuration
+    font:
+      # Configuration for symbol fonts
+      symbols:
+        # The font family name to use for symbols. Accepts multiple comma-delimited names and will use the first font found.
+        family: Segoe UI Symbol, DejaVu Sans
+      # Configuration for text fonts
+      text:
+        # The font family name to use for text. Accepts multiple comma-delimited names and will use the first font found.
+        family: Helvetica Neue, Helvetica, Arial, sans-serif
+        # The font weight to use for text
+        weight: bold
+    # Configuration for the spectrogram panels
+    spectrogram:
+      # First channel is mono/left, second is right (if stereo)
+      channels: [{
+        # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
+        color-map: jet
+      }, {
+        # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
+        # If not defined will use color-map from first channel.
+        color-map: turbo
+      }]
+      # Configuration for the axes of the spectrogram
+      axes:
+        # Configuration for the frequency axis of the spectrogram
+        frequency:
+          # Show the frequency axis ticks and scale text
+          enabled: True
+      # The dynamic range to use when rendering spectrograms (in decibels)
+      dynamic-range: 90
+    # Height ratios of panels
+    subplot-height-ratios:
+      title: 1
+      amplitude:
+        mono: 3
+        stereo: 1.25
+      spectrogram:
+        mono: 6
+        stereo: 3.25
+      controls: 0.75
+    # Configuration for the title panel
+    title:
+      color: '#ffffff'
+      font-size: 24
+      max-width-factor: 0.9
+    video:
+      # Time position line color
+      position-line-color: '#ffffff'
+  # Configuration for saving videos
+  video:
+    # Configuration for displaying video interactively
+    display:
+      # Size of video (in pixels)
+      size: 1920x1080
+      # Configuration for the time display
+      time:
+        enabled: False
+      # Configuration for the title panel
+      title:
+        enabled: False
+    # Configuration for exporting video
+    export:
+      # Codec to encode the video (passed to ffmpeg)
+      codec: libx265
+      # Base FFmpeg command
+      ffmpeg: ffmpeg -y -hide_banner -loglevel error
+      # FFmpeg extra arguments (keys are argument name, values are argument values)
+      ffmpeg-extra-args:
+        '-crf': 26
+        '-preset': slow
+        '-tune': animation
+      # Container format of the video
+      format: mp4
+      # Frames per second of the video
+      fps: 30
+      # Maximum number of frames to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur)
+      frames-per-segment: 5000
+      # Size of video (in pixels)
+      size: 1920x1080
+      # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
+      window-length: 20
+      # Show a preview image of the entire video at the beginning of the video
+      preview:
+        # Enable the preview image
+        enabled: True
+        # Number of seconds to show the preview image (including fade)
+        length: 2
+        # Number of seconds to fade from the preview image into the video
+        fade-length: 1
+      # Configuration for the time display
+      time:
+        enabled: True
+      # Configuration for the title panel for videos
+      title:
+        enabled: False

@@ -1,0 +1,12 @@
+---
+visualization:
+  video:
+    export:
+      codec: libaom-av1
+      # Use crf argument value from default configuration
+      ffmpeg-extra-args:
+        '-preset': ~
+        '-tune': ~
+        '-b:v': 0
+        '-cpu-used': 3
+        '-row-mt': 1

@@ -1,0 +1,10 @@
+---
+visualization:
+  video:
+    export:
+      codec: hevc_nvenc
+      ffmpeg-extra-args:
+        '-crf': ~
+        '-cq': 26
+        '-preset': slow
+        '-tune': hq

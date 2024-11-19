@@ -1,0 +1,10 @@
+---
+visualization:
+  video:
+    export:
+      codec: av1_nvenc
+      ffmpeg-extra-args:
+        '-crf': ~
+        '-cq': 26
+        '-preset': p6
+        '-tune': hq
