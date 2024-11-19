@@ -1,4 +1,5 @@
 
+
 # EstimPy
 
 **EstimPy** is a Python library that generates visualizations of Estim audio files.
@@ -7,7 +8,7 @@
 <a href="https://youtu.be/7zNsNnao8KU" target="_blank"><img src="https://github.com/user-attachments/assets/4a117a9a-d802-4c1e-a0e2-9471290d4ece"></a>  
 </div>
 
-
+## Visualization library
 [**Click here**](https://www.youtube.com/@Psynapster/videos) to access a library of pre-rendered high-resolution (8k 60fps) visualizations of some popular estim audio files.
 
 ## Motivation
@@ -17,8 +18,6 @@ Estim is a hobby which uses specialized signal generators to produce powerful se
 Many commercial Estim units support custom stimulation signals using audio input in addition to an included small library of simple stimulation patterns. Over time, the Estim enthusiast community has created a large repository of custom sessions distributed as basic audio files. While this format is convenient because it is non-proprietary and easy to use, it does not provide an easy mechanism to understand the nuances of a session.
 
 EstimPy helps users understand the flow, intensity, and texture of Estim audio sessions by generating intuitive visualizations from the audio data.
-
----
 
 ## Features
 - **Visualization analyses**: Visualizations are generated for each channel of audio data
@@ -41,13 +40,9 @@ EstimPy helps users understand the flow, intensity, and texture of Estim audio s
   - **Playlists**: Multiple files can be queued to play sequentially
 - **Highly configurable**: Nearly all parameters related to the rendering and export of visualizations are determined from an easily customizable configuration file
 
----
-
 ## Disclaimer
 
 **EstimPy** is provided on an **experimental basis**, and it should **not** be assumed to be safe or fully functional. **Estim (electrical stimulation)** can be dangerous if proper safety precautions are not followed or if unreliable equipment is used. This package is offered strictly for experimental and research purposes. The creators of this package assume **no responsibility** for any adverse effects, injury, or harm that may result from the use of EstimPy or any Estim-related activities.
-
----
 
 ## Visualization examples
 
@@ -129,7 +124,6 @@ cd EstimPy
 pip install -r requirements.txt
 ```
 
----
 ## Usage
 
 EstimPy provides two command-line tools for generating visualizations.
