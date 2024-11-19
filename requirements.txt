@@ -1,3 +1,4 @@
+python>=3.11
 flatdict
 matplotlib>=3.7.2
 mutagen
