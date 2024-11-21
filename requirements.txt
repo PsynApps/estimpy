@@ -1,6 +1,6 @@
 # Python >= 3.11 is required
 # FFMpeg and FFProbe must be installed and available on the system PATH
-
+audioop-lts; python_version>="3.13"
 flatdict
 matplotlib>=3.7.2
 mutagen

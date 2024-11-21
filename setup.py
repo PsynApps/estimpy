@@ -14,8 +14,9 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/PsyApps/EstimPy',
     license='MIT',
-    python_requires='>=3.11,<3.13',
+    python_requires='>=3.11',
     install_requires=[
+        'audioop-lts; python_version >= "3.13"',
         'flatdict',
         'matplotlib>=3.7.2',
         'mutagen',

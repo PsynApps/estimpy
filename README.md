@@ -124,6 +124,12 @@ cd EstimPy
 pip install -r requirements.txt
 ```
 
+#### Windows error
+
+On Windows while installing from requirements.txt, you may get an error like: ```Microsoft Visual C++ 14.0 or greater is required. Get it with "Microsoft C++ Build Tools"```. This error occurs when you are using the latest version of python because prebuilt package wheels are only included for earlier versions of Python. To fix this, you can either:
+* Install the ["C++ development tools"](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (requires ~9 GB) from Microsoft Visual Studio
+* Downgrade your python version by one minor revision (e.g. 3.12 when 3.13 is the latest minor release)
+
 ## Usage
 
 EstimPy provides two command-line tools for generating visualizations.
