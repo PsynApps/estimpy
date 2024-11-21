@@ -182,10 +182,11 @@ visualization:
     export:
       # Codec to encode the video (passed to ffmpeg)
       codec: libx265
-      # Base FFmpeg command
-      ffmpeg: ffmpeg -y -hide_banner -loglevel error
       # FFmpeg extra arguments (keys are argument name, values are argument values)
       ffmpeg-extra-args:
+        '-y': ''
+        '-hide_banner': ''
+        '-loglevel': 'error'
         '-crf': 26
         '-preset': slow
         '-tune': animation
@@ -194,7 +195,7 @@ visualization:
       # Frames per second of the video
       fps: 30
       # Maximum number of frames to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur)
-      frames-per-segment: 5000
+      frames-per-segment: 5400
       # Size of video (in pixels)
       size: 1920x1080
       # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)

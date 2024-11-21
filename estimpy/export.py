@@ -4,6 +4,7 @@ import math
 import matplotlib
 import matplotlib.pyplot
 import os
+import subprocess
 import tempfile
 import time
 
@@ -13,7 +14,7 @@ _DPI = 8
 
 
 def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format: str = None,
-                width: int = None, height: int = None) -> str:
+                width: int = None, height: int = None) -> str | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     output_file_base = ''
     image_format = es.cfg['visualization.image.export.format'] if image_format is None else image_format
@@ -53,7 +54,7 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
 
 def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format: str = None,
                 fps: float = None, width: int = None, height: int = None, frame_start: int = None,
-                segment_start: int = None, image_file: str = None) -> str:
+                segment_start: int = None, image_file: str = None) -> str | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     output_file_base = ''
     video_format = video_format if video_format is not None else es.cfg['visualization.video.export.format']
@@ -86,6 +87,15 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     height = es.cfg['visualization.video.export.height'] if height is None else height
     image_format = es.cfg['visualization.image.export.format']
 
+    frames_total = math.floor(es_audio.length * es.cfg['visualization.video.export.fps'])
+    segments_total = math.floor(frames_total / es.cfg['visualization.video.export.frames-per-segment']) + 1
+    time_per_segment = es.cfg['visualization.video.export.frames-per-segment'] / es.cfg['visualization.video.export.fps']
+
+    preview_seconds = min(es.cfg['visualization.video.export.preview.length'], es_audio.length)
+    fade_seconds = min(es.cfg['visualization.video.export.preview.fade-length'], es_audio.length)
+
+    print('')
+
     if image_file is None:
         image_file = write_image(es_audio=es_audio, output_path=tempfile.gettempdir())
         es.utils.add_temp_file(image_file)
@@ -93,15 +103,16 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     preview_image_file = None
     if es.cfg['visualization.video.export.preview.enabled']:
+        if time_per_segment < preview_seconds:
+            print(f'Error: Video segment length ({es.cfg["visualization.video.export.frames-per-segment"]} frames, {time_per_segment} seconds) must be longer than the preview length ({preview_seconds} seconds).')
+            return None
+
         preview_image_file = write_image(
             es_audio=es_audio,
             output_path=tempfile.gettempdir() + f'/{output_file_base}-videopreview.{image_format}',
             width=width,
             height=height)
         es.utils.add_temp_file(preview_image_file)
-
-    frames_total = math.floor(es_audio.length * es.cfg['visualization.video.export.fps'])
-    segments_total = math.floor(frames_total / es.cfg['visualization.video.export.frames-per-segment']) + 1
 
     if frame_start is not None:
         segment_start = math.floor(frame_start / es.cfg['visualization.video.export.frames-per-segment']) + 1
@@ -125,14 +136,13 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             arg_name = arg_name_key[len(ffmpeg_extra_args_cfg_prefix):]
             # Add the argument name and value to the argument list if it is not None
             if arg_value is not None:
-                ffmpeg_extra_args.extend([arg_name, str(arg_value)])
-
-    # Convert extra arguments into string for use by subsequent system calls to ffmpeg
-    ffmpeg_extra_args_string = ' '.join(str(arg) for arg in ffmpeg_extra_args)
+                ffmpeg_extra_args.append(arg_name)
+                if arg_value != '':
+                    ffmpeg_extra_args.append(str(arg_value))
 
     # Create animation
     for i_video_file in range(segment_start, segments_total + 1):
-        print(f'Preparing video file {i_video_file}/{segments_total}:')
+        print(f'Preparing video segment {i_video_file}/{segments_total}:')
 
         i_time_start = time.time()
         frame_count = min(frames_total - segment_start_frame, es.cfg['visualization.video.export.frames-per-segment'])
@@ -161,69 +171,100 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         i_time_length = time.time() - i_time_start
         i_fps = frame_count / i_time_length
 
-        print(f"Wrote {frame_count} frames in {es.utils.seconds_to_string(seconds=i_time_length)} ({i_fps:.1f} FPS).")
+        print(f'Wrote {frame_count} frames in {es.utils.seconds_to_string(seconds=i_time_length)} ({i_fps:.1f} FPS).')
 
         if i_video_file < segments_total:
             print(
-                f"Estimated time remaining: {es.utils.seconds_to_string(seconds=(frames_total - segment_start_frame) / i_fps)}")
+                f'Estimated time remaining: {es.utils.seconds_to_string(seconds=(frames_total - segment_start_frame) / i_fps)}')
 
-        print("")
+        print('')
 
-    if segments_total > 1:
-        print(f"Combining {segments_total} segments into single video file.")
-        ffmpeg_concat_inputs = ''
-        ffmpeg_concat_filter = ''
+    ffmpeg_command = ['ffmpeg']
+
+    if segments_total > 1 or preview_image_file:
+        # Prepare inputs for segments
+        ffmpeg_inputs = []
+        ffmpeg_input_count = 0
+        ffmpeg_filter = ''
+
+        # Add each video segment as an input
         for i_video_file in range(1, segments_total + 1):
             video_file_temp = tempfile.gettempdir() + f'/{output_file_base}_{i_video_file}.{video_format}'
+            ffmpeg_inputs.extend(['-i', video_file_temp])
+            ffmpeg_input_count += 1
 
-            video_file_temp_escaped = video_file_temp.replace('"', '\"')
-            ffmpeg_concat_inputs += f'-i "{video_file_temp_escaped}" '
-            ffmpeg_concat_filter += f'[{i_video_file - 1}:v] '
+        # Start concatenation with the first input by default
+        concat_segment_start = 0
 
-        video_file_noaudio = tempfile.gettempdir() + f'/{output_file_base}_noaudio.{video_format}'
-        video_file_noaudio_escaped = video_file_noaudio.replace('"', '\"')
+        # Prepare preview image overlay
+        if preview_image_file:
+            # Add preview image input
+            ffmpeg_inputs.extend(['-loop', '1', '-t', str(preview_seconds), '-i', preview_image_file])
+            ffmpeg_input_count += 1
 
-        os.system(
-            f'{es.cfg["visualization.video.export.ffmpeg"]} {ffmpeg_concat_inputs} {ffmpeg_extra_args_string} -c:v {es.cfg["visualization.video.export.codec"]} -filter_complex "{ffmpeg_concat_filter} concat=n={segments_total}:v=1 [v]" -map "[v]" "{video_file_noaudio_escaped}"')
-        print("")
+            # Apply fade to the preview image
+            ffmpeg_filter += f'[{segments_total}:v]fade=t=out:st={preview_seconds - fade_seconds}:d={fade_seconds}:alpha=1[faded]; '
 
-        es.utils.add_temp_file(video_file_noaudio)
+            # Overlay faded preview on the first video segment
+            ffmpeg_filter += f'[0:v][faded]overlay=0:0:enable=\'between(t,0,{preview_seconds})\'[first_with_preview]; '
+
+            # Add the modified first segment
+            ffmpeg_filter += f'[first_with_preview]'  # Include modified first segment
+
+            # The first segment will be produced by this complex filter, so don't include the raw first input
+            concat_segment_start = 1
+
+        # Concatenate segments
+        for i in range(concat_segment_start, segments_total):
+            ffmpeg_filter += f'[{i}:v]'
+
+        ffmpeg_filter += f'concat=n={segments_total}:v=1:a=0[outv]; '
+
+        # Add audio as last input
+        ffmpeg_inputs.extend(['-i', es_audio.file])
+        ffmpeg_input_count += 1
+
+        # Prepare ffmpeg command
+        ffmpeg_command.extend([
+            *ffmpeg_inputs,
+            *ffmpeg_extra_args,
+            '-filter_complex', ffmpeg_filter,
+            '-map', '[outv]',
+            '-map', f'{ffmpeg_input_count - 1}:a',  # Map the audio stream
+            '-c:v', es.cfg['visualization.video.export.codec']
+        ])
     else:
-        video_file_noaudio_escaped = tempfile.gettempdir() + f'/{output_file_base}_1.{video_format}'
+        # Nothing to concatenate, just copy the video without re-encoding and add the audio stream the inputs
+        video_file_noaudio = tempfile.gettempdir() + f'/{output_file_base}_1.{video_format}'
+        ffmpeg_command.extend([
+            '-i', video_file_noaudio,
+            '-i', es_audio.file,
+            *ffmpeg_extra_args,
+            '-c:v', 'copy'
+        ])
 
-    if preview_image_file:
-        print(f"Adding preview image to beginning of video.")
-        video_preview_image_file_escaped = preview_image_file.replace('"', '\"')
-        preview_seconds = min(es.cfg['visualization.video.export.preview.length'], es_audio.length)
-        fade_seconds = min(es.cfg['visualization.video.export.preview.fade-length'], es_audio.length)
+    # Add audio stream, -strict -2 allows for non-standard sample rates
+    ffmpeg_command.extend(['-c:a', 'copy', '-strict', '-2'])
 
-        video_file_preview = tempfile.gettempdir() + f'/{output_file_base}_withpreview.{video_format}'
-        video_file_preview_escaped = video_file_preview.replace('"', '\"')
+    # Add output video file
+    ffmpeg_command.append(video_file)
 
-        os.system(
-            f'{es.cfg["visualization.video.export.ffmpeg"]} -i "{video_file_noaudio_escaped}" -loop 1 -t {preview_seconds} -i "{video_preview_image_file_escaped}" {ffmpeg_extra_args_string} -c:v {es.cfg["visualization.video.export.codec"]} -filter_complex "[1:v]fade=t=out:st={preview_seconds - fade_seconds}:d={fade_seconds}:alpha=1[i]; [0:v][i]overlay=0:0:enable=\'between(t,0,{preview_seconds})\'" "{video_file_preview_escaped}"')
-        print("")
+    print(f'Encoding final video file.')
 
-        es.utils.add_temp_file(video_file_preview)
+    # Debug print for constructed command
+    #print("FFmpeg command:", ' '.join(ffmpeg_command))
 
-        # Change the file reference to use as the input to merge with the audio file
-        video_file_noaudio_escaped = video_file_preview_escaped
+    subprocess.run(ffmpeg_command, check=True)
 
-    print(f"Adding audio track to video file.")
-    file_escaped = es_audio.file.replace('"', '\"')
-    video_file_escaped = video_file.replace('"', '\"')
+    print('')
 
-    os.system(
-        f'{es.cfg["visualization.video.export.ffmpeg"]} -i "{video_file_noaudio_escaped}" -i "{file_escaped}" -c:v copy -c:a copy "{video_file_escaped}"')
-    print("")
-
-    print("Saving video metadata.")
+    print('Saving video metadata.')
     video_metadata = es.metadata.Metadata(file=video_file)
     video_metadata.set_metadata(es_audio.metadata.get_metadata())
     video_metadata.set_tag('image', image_data)
     video_metadata.save()
 
-    print("Deleting temporary files.")
+    print('Deleting temporary files.')
     es.utils.delete_temp_files()
 
     return video_file
