@@ -1,9 +1,12 @@
-python>=3.11
+# Python >= 3.11 is required
+# FFMpeg and FFProbe must be installed and available on the system PATH
+
 flatdict
 matplotlib>=3.7.2
 mutagen
 numpy
 pydub
 pygame
+pyqt6
 pyyaml
 scipy

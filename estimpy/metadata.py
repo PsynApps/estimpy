@@ -191,18 +191,18 @@ class Metadata:
         if not os.path.isfile(file):
             return metadata
 
-        # Get the full absolute file path without the extension in case it's useful to match against directory names
-        file_path, _ = os.path.splitext(os.path.abspath(file))
+        # Get the file name without the extension to match against a tag regular expression
+        file_name, _ = os.path.splitext(os.path.basename(file))
 
         # Use regular expressions to parse the pattern and extract metadata fields
         regex = es.cfg['metadata.file-path-pattern']
-        matches = re.search(regex, file_path)
+        matches = re.search(regex, file_name)
 
         if matches is not None:
             return matches.groupdict()
         else:
             # Fallback plan is to just treat the whole title of the file (without the extension) as the title
-            return {'title': os.path.splitext(file)[0]}
+            return {'title': file_name}
 
 
 class MetadataFormat(abc.ABC):
@@ -281,8 +281,11 @@ class MetadataFormatMP3(MetadataFormat, abc.ABC):
         return image
 
     @classmethod
-    def _load_file_tags(cls, file: str) -> mutagen.id3.ID3:
-        return mutagen.id3.ID3(file)
+    def _load_file_tags(cls, file: str) -> mutagen.id3.ID3 | None:
+        try:
+            return mutagen.id3.ID3(file)
+        except:
+            return None
 
     @classmethod
     def _set_file_tag_value(cls, file_tags: mutagen.id3.ID3, tag: str, value):

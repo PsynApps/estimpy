@@ -14,7 +14,7 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/PsyApps/EstimPy',
     license='MIT',
-    python_requires='>=3.11',
+    python_requires='>=3.11,<3.13',
     install_requires=[
         'flatdict',
         'matplotlib>=3.7.2',
