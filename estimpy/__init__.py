@@ -3,6 +3,19 @@
 import os
 import subprocess
 import typing
+import sys
+
+MIN_VERSION = (3, 11)
+MAX_VERSION = (3, 13)
+
+# Must use Python >=3.11,<3.13.
+if sys.version_info < MIN_VERSION or sys.version_info >= MAX_VERSION:
+    raise RuntimeError(
+        'Python version incompatibility\n'
+        f'This package requires Python version >= {".".join(map(str, MIN_VERSION))} and < {".".join(map(str, MAX_VERSION))}.\n'
+        f'You are using Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}.\n'
+        f'You will need to install a new Python environment with a compatible version to use this package.'
+    )
 
 import flatdict
 import matplotlib
