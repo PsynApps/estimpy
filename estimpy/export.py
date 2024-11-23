@@ -52,7 +52,9 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
         file_format=image_format
     )
 
-    # Spinner thread setup
+    print()
+
+    # Use a thread to indicate to the user that we haven't crashed
     stop_event = threading.Event()
     spinner_thread = threading.Thread(target=spinner, args=(stop_event,))
     spinner_thread.start()  # Start the spinner
@@ -60,16 +62,16 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
     width = es.cfg['visualization.image.export.width'] if width is None else width
     height = es.cfg['visualization.image.export.height'] if height is None else height
 
-    # Use a thread to indicate to the user that we haven't crashed as this is pretty slow
     try:
         visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
         visualization.make_figure()
         visualization.resize_figure(width=width, height=height, dpi=_DPI)
         matplotlib.pyplot.savefig(image_file, dpi=_DPI, pil_kwargs={'optimize': True})
     finally:
-        stop_event.set()                                           # Stop the spinner
-        spinner_thread.join()                                      # Wait for spinner thread to exit
-        sys.stdout.write("\rPreparing preview image... Done! \n\n\r")  # Clear the spinner line
+        stop_event.set()                                            # Stop the spinner
+        spinner_thread.join()                                       # Wait for spinner thread to exit
+        sys.stdout.write("\rPreparing preview image... Done! \r") # Clear the spinner line
+        print()
 
     return image_file
 
