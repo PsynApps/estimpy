@@ -182,11 +182,13 @@ visualization:
     export:
       # Codec to encode the video (passed to ffmpeg)
       codec: libx265
-      # FFmpeg extra arguments (keys are argument name, values are argument values)
+      # FFmpeg extra arguments (keys are argument name, values are argument values, empty string value will just include the argument name)
       ffmpeg-extra-args:
-        '-y': ''
         '-hide_banner': ''
         '-loglevel': 'error'
+        '-y': ''
+        '-pix_fmt': 'yuv420p'
+        '-colorspace': 'bt709'
         '-crf': 26
         '-preset': slow
         '-tune': animation
@@ -194,8 +196,12 @@ visualization:
       format: mp4
       # Frames per second of the video
       fps: 30
-      # Maximum number of frames to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur)
-      frames-per-segment: 5400
+      # Maximum number of seconds between keyframes (longer intervals will produce smaller files but can cause motion artifacts)
+      keyframe-interval: ~
+      # Re-encode final video when concatenating segments. Takes more time but will result in a smaller file. May also improve compatibility or performance with players.
+      reencode-segments: False
+      # Number of seconds to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur). Smaller values will result in larger video files. Must be an integer to ensure seamless concatenation.
+      segment-length: 3600
       # Size of video (in pixels)
       size: 1920x1080
       # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)

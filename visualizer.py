@@ -26,7 +26,7 @@ if __name__ == '__main__':
                         help='Frame on which to resume video encoding. Only relevant for the write-video action. Useful if script crashes during a large encoding.')
 
     parser.add_argument('-rs', '--resume-segment', default=None, type=int,
-                        help='Segment on which to resume video encoding. Only relevant for the write-video action. Useful if script crashes during a large encoding. Will not work correctly if frames-per-segment configuration value is changed between runs.')
+                        help='Segment on which to resume video encoding. Only relevant for the write-video action. Useful if script crashes during a large encoding. Will not work correctly if segment-length configuration value is changed between runs.')
 
     args = vars(parser.parse_args())
 

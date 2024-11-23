@@ -4,6 +4,7 @@ import argparse
 import glob
 import numpy as np
 import os
+import tempfile
 import typing
 
 import estimpy as es
@@ -77,6 +78,33 @@ def get_file_list(file_patterns: typing.Iterable, recursive: bool = None) -> lis
         else:
             files += glob.glob(input_file_pattern)
     return files
+
+
+def get_output_file(output_path: str, input_file_name: str, file_format: str) -> str:
+    output_file_base_name = None
+
+    if os.path.isdir(output_path):
+        output_dir = output_path
+    else:
+        output_dir = os.path.dirname(output_path)
+
+        if not output_dir:
+            output_dir = '.'
+
+        output_file_base_name, _ = os.path.splitext(os.path.basename(output_path))
+
+    if not output_file_base_name:
+        output_file_base_name, _ = os.path.splitext(os.path.basename(input_file_name))
+
+    return f'{output_dir}{os.sep}{output_file_base_name}.{file_format}'
+
+
+def get_temp_file_path(temp_file_name: str = None) -> str:
+    temp_file_path = tempfile.gettempdir()
+    if temp_file_name is not None:
+        temp_file_path += f'{os.sep}{temp_file_name}'
+    return temp_file_path
+
 
 def handle_parser_arguments(args: dict) -> None:
     """Handles shared parser arguments

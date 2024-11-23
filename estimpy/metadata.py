@@ -2,7 +2,6 @@ import abc
 import enum
 import os
 import re
-import tempfile
 import typing
 
 import estimpy as es
@@ -351,7 +350,7 @@ class MetadataFormatMP4(MetadataFormat, abc.ABC):
 def write_metadata(es_audio, image_file: str = None):
     # If image_file is specified, assume that is the file name to a freshly-generated image file
     if image_file is None:
-        image_file = es.export.write_image(es_audio=es_audio, output_path=tempfile.gettempdir())
+        image_file = es.export.write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path())
         es.utils.add_temp_file(image_file)
 
     image_data = open(image_file, 'rb').read()

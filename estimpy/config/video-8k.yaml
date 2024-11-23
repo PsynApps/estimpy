@@ -2,7 +2,8 @@
 visualization:
   video:
     export:
-      size: 7680x4320
       ffmpeg-extra-args:
         '-tile-columns': 4
         '-tile-rows': 2
+      segment-length: 300
+      size: 7680x4320
