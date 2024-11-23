@@ -1,5 +1,6 @@
 import datetime
 import math
+import sys
 
 import matplotlib
 import matplotlib.pyplot
@@ -149,12 +150,15 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 if arg_value != '':
                     ffmpeg_extra_args.append(str(arg_value))
 
+    total_start_time = time.time()
+    global callback_time
+
     # Create animation
     for video_segment_id in video_segment_ids:
         segment_time_start = time.time()
 
         if video_segment_id == 'preview':
-            print(f'Preparing preview segment')
+            # print(f'Preparing preview segment')
 
             # Generate preview image file
             preview_image_file = write_image(
@@ -163,7 +167,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                     temp_file_name=f'{video_file_base}-videopreview.{image_format}'
                 ),
                 width=width,
-                height=height
+                height=height,
             )
 
             if not preview_image_file:
@@ -175,10 +179,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             segment_frame_start = 0
 
             # Value of preview frames already accounts for case where preview is longer than the file
-            frame_count = preview_frames
-
-            def progress_callback(i, n):
-                return
+            segment_frame_count = preview_frames
         else:
             # Numeric video segment id
             try:
@@ -187,20 +188,79 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 print(f'Error: Unknown segment id "{video_segment_id}"')
                 return None
 
-            print(f'Preparing video segment {len(video_segment_files)}/{numeric_segments_total}:')
+            # print(f'Preparing video segment {len(video_segment_files)}/{numeric_segments_total}:')
 
             segment_frame_start = (video_segment_number - 1) * frames_per_segment + preview_frames
-            frame_count = min(frames_total - segment_frame_start, frames_per_segment)
+            segment_frame_count = min(frames_total - segment_frame_start, frames_per_segment)
 
-            def progress_callback(i, n):
-                if i % es.cfg['visualization.video.export.fps'] == 0:
-                    print(
-                        f" Saving frame: {segment_frame_start + i}/{frames_total} ({i}/{n} in segment {current_segment}/{numeric_segments_total})")
 
+
+        def progress_callback(i, n):
+            global callback_time
+            if i == 1:
+                callback_time = time.time() - callback_time
+            if i > 2:
+                # Smoothly update callback_time with a moving average
+                callback_time = ((callback_time * (i - 1)) + (time.time() - segment_time_start) / i) / i
+
+            # Estimate remaining time (ETA)
+            remaining_frames = segment_frame_count - i
+            segment_eta = "..." if i < 2 else f"{es.utils.seconds_to_string(callback_time * remaining_frames)}"
+            total_eta = "..." if i < 2 else f"{es.utils.seconds_to_string(callback_time * (frames_total - segment_frame_start - i))}"
+            time_elapsed = f"{es.utils.seconds_to_string(time.time() - total_start_time)}"
+
+            frame_width = len(f"{segment_frame_start + segment_frame_count}/{frames_total}")
+            eta_width = len(segment_eta)
+            elapsed_width = len(time_elapsed)
+            fps_width = len(f"{(1 / callback_time):2.1f}")
+
+            # Frame progress formatting
+            # if video_segment_id == 'preview':
+            #     frame = f'{segment_frame_start + i:>3}/{segment_frame_count}{len(f'({i:>3}/{n:>3} in segment {current_segment}/{numeric_segments_total})')*' '+' '}'
+            # else:
+            #     frame = f'{segment_frame_start + i:>3}/{frames_total} ({i:>3}/{n:>3} in segment {current_segment}/{numeric_segments_total})'
+            frame = f'{segment_frame_start + i:>3}/{frames_total} ({i:>3}/{n:>3} in segment)'
+
+            # Calculate progress percentage
+            percent = int((i / segment_frame_count) * 100) if i < segment_frame_count else 100
+
+            # Create progress bar using Unicode blocks
+            bar_length = 50
+            filled_length = percent * bar_length // 100
+            bar = '█' * filled_length + '░' * (bar_length - filled_length)
+
+            # In-place update with a carriage return
+            #sys.stdout.write(f"\rFrame: {frame: <7}: {bar} {percent: >3}%,  Segment ETA: {segment_eta:>8},  Total ETA: {total_eta:>8},  Time elapsed: {time_elapsed:>8},  FPS: {(1/callback_time):2.1f}")
+            sys.stdout.write(
+                f"\r"
+                f"{'Preview segment' if video_segment_id == 'preview' else f'Segment {current_segment}/{numeric_segments_total}': <20}"
+                f"Frame: {frame: <{frame_width}}: "
+                f"{bar} "
+                f"{percent: >3}%, "
+                f"Time elapsed: {time_elapsed: >{elapsed_width}}, "
+                f"Segment ETA: {segment_eta: >{eta_width}}, "
+                f"Total ETA: {total_eta: >{eta_width}}, "
+                f"FPS: {(1 / callback_time): >{fps_width}.1f} "
+            )
+            # sys.stdout.write(
+            #     f"\r"
+            #     f"Frame: {frame: <{frame_width}}: "
+            #     f"{bar} "
+            #     f"{percent: >3}%, "
+            #     f"Time elapsed: {time_elapsed: >{elapsed_width}}, "
+            #     f"Segment ETA: {segment_eta: >{eta_width}}, "
+            #     f"Total ETA: {total_eta: >{eta_width}}, "
+            #     f"FPS: {(1 / callback_time): >{fps_width}.1f} "
+            # )
+            sys.stdout.flush()
+            if i == frames_total:
+                sys.stdout.write("\n")
+
+        # print('Preparing animation for next segment...')
         visualization = es.visualization.VideoVisualization(
             es_audio=es_audio,
             fps=fps,
-            frames=range(segment_frame_start, segment_frame_start + frame_count))
+            frames=range(segment_frame_start, segment_frame_start + segment_frame_count))
 
         visualization.make_figure()
         visualization.resize_figure(width=width, height=height, dpi=_DPI)
@@ -209,13 +269,15 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             temp_file_name=f'{video_file_base}_{video_segment_id}.{video_format}'
         )
 
-        segment_length = frame_count * es.cfg["visualization.video.export.fps"]
+        segment_length = segment_frame_count * es.cfg["visualization.video.export.fps"]
 
         # The last frame of the segment must be a keyframe to allow concatenation without re-encoding
         ffmpeg_keyframe_args = [
             '-force_key_frames',
             f'expr:gte(t,{segment_length - 1 / es.cfg["visualization.video.export.fps"]})'
         ]
+
+        callback_time = time.time()
 
         visualization.animation.save(
             video_segment_file,
@@ -224,6 +286,9 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             codec=es.cfg['visualization.video.export.codec'],
             extra_args=ffmpeg_extra_args + ffmpeg_keyframe_args,
             progress_callback=progress_callback)
+
+        # Call one last time to update progress bar to 100%
+        progress_callback(segment_frame_count, segment_frame_count)
 
         video_segment_files.append(video_segment_file)
         es.utils.add_temp_file(video_segment_file)
@@ -260,17 +325,18 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             current_segment += 1
 
         segment_time_length = time.time() - segment_time_start
-        segment_time_fps = frame_count / segment_time_length
-
-        print(
-            f'Wrote {frame_count} frames in {es.utils.seconds_to_string(seconds=segment_time_length)} ({segment_time_fps:.1f} FPS).')
-
-        # If not the preview or last segment, show estimated time remaining
-        if video_segment_id != 'preview' and video_segment_id != video_segment_ids[-1]:
-            print(
-                f'Estimated time remaining: {es.utils.seconds_to_string(seconds=(frames_total - segment_frame_start) / segment_time_fps)}')
+        segment_time_fps = segment_frame_count / segment_time_length
 
         print('')
+        # print(
+        #     f'Wrote {segment_frame_count} frames in {es.utils.seconds_to_string(seconds=segment_time_length)} ({segment_time_fps:.1f} FPS).')
+
+        # If not the preview or last segment, show estimated time remaining
+        # if video_segment_id != 'preview' and video_segment_id != video_segment_ids[-1]:
+        #     print(
+        #         f'Estimated time remaining: {es.utils.seconds_to_string(seconds=(frames_total - segment_frame_start) / segment_time_fps)}')
+
+        # print('')
 
     # Prepare final video file
 
@@ -302,6 +368,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         video_file
     ]
 
+    print('')
     print(f'Combining segments into final video file.')
 
     # Debug print for constructed command
