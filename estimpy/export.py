@@ -7,11 +7,24 @@ import matplotlib.pyplot
 import os
 import subprocess
 import time
+import threading
+import itertools
 
 import estimpy as es
 
 _DPI = 8
 
+
+def spinner(stop_event):
+    spinner  = ["|", "/", "-", "\\"]
+    # bouncing = ['  o   ', ' o    ', 'o     ', ' o    ', '  o   ', '   o  ', '    o ', '   o  ']
+    # ballspin = ['◐', '◓', '◑', '◒']
+    # periods = ['   ', '.  ', '.. ', '...']
+    spinner_symbols = itertools.cycle(spinner)
+    while not stop_event.is_set():
+        sys.stdout.write(f"\rPreparing preview image... {next(spinner_symbols)} ")  # Overwrite line
+        sys.stdout.flush()
+        time.sleep(0.1)  # Adjust speed of spinner
 
 def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format: str = None,
                 width: int = None, height: int = None) -> str | None:
@@ -24,16 +37,26 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
         file_format=image_format
     )
 
+    # Spinner thread setup
+    stop_event = threading.Event()
+    spinner_thread = threading.Thread(target=spinner, args=(stop_event,))
+    spinner_thread.start()  # Start the spinner
+
     width = es.cfg['visualization.image.export.width'] if width is None else width
     height = es.cfg['visualization.image.export.height'] if height is None else height
 
-    visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
-    visualization.make_figure()
-    visualization.resize_figure(width=width, height=height, dpi=_DPI)
-
-    matplotlib.pyplot.savefig(image_file, dpi=_DPI, pil_kwargs={'optimize': True})
+    try:
+        visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
+        visualization.make_figure()
+        visualization.resize_figure(width=width, height=height, dpi=_DPI)
+        matplotlib.pyplot.savefig(image_file, dpi=_DPI, pil_kwargs={'optimize': True})
+    finally:
+        stop_event.set()  # Stop the spinner
+        spinner_thread.join()  # Wait for spinner thread to exit
+        sys.stdout.write("\rPreparing preview image... Done! \n")  # Clear the spinner line
 
     return image_file
+
 
 
 def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format: str = None,
@@ -215,10 +238,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             fps_width = len(f"{(1 / callback_time):2.1f}")
 
             # Frame progress formatting
-            # if video_segment_id == 'preview':
-            #     frame = f'{segment_frame_start + i:>3}/{segment_frame_count}{len(f'({i:>3}/{n:>3} in segment {current_segment}/{numeric_segments_total})')*' '+' '}'
-            # else:
-            #     frame = f'{segment_frame_start + i:>3}/{frames_total} ({i:>3}/{n:>3} in segment {current_segment}/{numeric_segments_total})'
             frame = f'{segment_frame_start + i:>3}/{frames_total} ({i:>3}/{n:>3} in segment)'
 
             # Calculate progress percentage
@@ -230,7 +249,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             bar = '█' * filled_length + '░' * (bar_length - filled_length)
 
             # In-place update with a carriage return
-            #sys.stdout.write(f"\rFrame: {frame: <7}: {bar} {percent: >3}%,  Segment ETA: {segment_eta:>8},  Total ETA: {total_eta:>8},  Time elapsed: {time_elapsed:>8},  FPS: {(1/callback_time):2.1f}")
             sys.stdout.write(
                 f"\r"
                 f"{'Preview segment' if video_segment_id == 'preview' else f'Segment {current_segment}/{numeric_segments_total}': <20}"
@@ -242,16 +260,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 f"Total ETA: {total_eta: >{eta_width}}, "
                 f"FPS: {(1 / callback_time): >{fps_width}.1f} "
             )
-            # sys.stdout.write(
-            #     f"\r"
-            #     f"Frame: {frame: <{frame_width}}: "
-            #     f"{bar} "
-            #     f"{percent: >3}%, "
-            #     f"Time elapsed: {time_elapsed: >{elapsed_width}}, "
-            #     f"Segment ETA: {segment_eta: >{eta_width}}, "
-            #     f"Total ETA: {total_eta: >{eta_width}}, "
-            #     f"FPS: {(1 / callback_time): >{fps_width}.1f} "
-            # )
             sys.stdout.flush()
             if i == frames_total:
                 sys.stdout.write("\n")
