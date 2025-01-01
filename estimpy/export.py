@@ -6,6 +6,7 @@ import matplotlib.pyplot
 import os
 import subprocess
 import time
+import tqdm
 
 import estimpy as es
 
@@ -13,7 +14,7 @@ _DPI = 8
 
 
 def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format: str = None,
-                width: int = None, height: int = None) -> str | None:
+                width: int = None, height: int = None, overwrite: bool = None) -> str | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     image_format = es.cfg['visualization.image.export.format'] if image_format is None else image_format
 
@@ -23,26 +24,40 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
         file_format=image_format
     )
 
+    # Make sure output file is valid. Will prompt user for overwrite if appropriate.
+    try:
+        output_valid = es.utils.validate_output_file(output_file=image_file, overwrite=overwrite)
+        if not output_valid:
+            return None
+    except Exception as e:
+        print(e)
+        return None
+
     width = es.cfg['visualization.image.export.width'] if width is None else width
     height = es.cfg['visualization.image.export.height'] if height is None else height
 
+    spinner = es.utils.Spinner(f'Preparing image visualization... ')
     visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
     visualization.make_figure()
     visualization.resize_figure(width=width, height=height, dpi=_DPI)
+    spinner.stop()
 
+    spinner = es.utils.Spinner(f'Saving image file... ')
     matplotlib.pyplot.savefig(image_file, dpi=_DPI, pil_kwargs={'optimize': True})
+    spinner.stop()
+
+    print('Done!')
 
     return image_file
 
 
 def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format: str = None,
-                fps: float = None, width: int = None, height: int = None, frame_start: int = None,
-                segment_start: int = None, image_file: str = None) -> str | None:
+                fps: float = None, width: int = None, height: int = None,
+                frame_start: int = None, segment_start: int = None,
+                image_file: str = None, overwrite: bool = None) -> str | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     video_format = video_format if video_format is not None else es.cfg['visualization.video.export.format']
-    frame_start = frame_start if frame_start is not None else es.cfg['visualization.video.frame-start']
-    segment_start = segment_start if segment_start is not None else \
-        es.cfg['visualization.video.segment-start'] if es.cfg['visualization.video.segment-start'] is not None else 1
+    segment_start = segment_start if segment_start is not None else 1
 
     # Determine the number of frames per segment
     frames_per_segment = es.cfg['visualization.video.export.segment-length'] * es.cfg['visualization.video.export.fps']
@@ -52,22 +67,36 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         input_file_name=es_audio.file,
         file_format=video_format
     )
+
+    # Make sure output file is valid. Will prompt user for overwrite if appropriate.
+    try:
+        output_valid = es.utils.validate_output_file(output_file=video_file, overwrite=overwrite)
+        if not output_valid:
+            return None
+    except Exception as e:
+        print(e)
+        return None
+
     video_file_base, _ = os.path.splitext(os.path.basename(video_file))
 
     width = es.cfg['visualization.video.export.width'] if width is None else width
     height = es.cfg['visualization.video.export.height'] if height is None else height
     image_format = es.cfg['visualization.image.export.format']
 
+    # Set the total length of the video
+    seconds_total = float(es.cfg['visualization.video.export.video-length-max']) if \
+        es.cfg['visualization.video.export.video-length-max'] is not None else es_audio.length
+
     # Set the total number of frames
-    frames_total = math.floor(es_audio.length * es.cfg['visualization.video.export.fps'])
+    frames_total = math.floor(seconds_total * es.cfg['visualization.video.export.fps'])
 
     # Set preview parameters
     preview_seconds = (
-        min(es.cfg['visualization.video.export.preview.length'], es_audio.length) if es.cfg['visualization.video.export.preview.enabled']
+        min(es.cfg['visualization.video.export.preview.length'], seconds_total) if es.cfg['visualization.video.export.preview.enabled']
         else 0
     )
     preview_frames = preview_seconds * es.cfg['visualization.video.export.fps']
-    fade_seconds = min(es.cfg['visualization.video.export.preview.fade-length'], es_audio.length)
+    fade_seconds = min(es.cfg['visualization.video.export.preview.fade-length'], seconds_total)
 
     # If a starting frame is specified rather than a segment, determine the starting segment based upon the frame
     if frame_start is not None:
@@ -91,8 +120,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     # Initialize list of video segment files
     video_segment_files = []
-
-    print('')
 
     # Gather previously processed files if resuming (not starting with the first segment)
     if segment_start > 1:
@@ -149,12 +176,15 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 if arg_value != '':
                     ffmpeg_extra_args.append(str(arg_value))
 
+    # Store start time of encoding
+    encoding_time_start = time.time()
+
     # Create animation
     for video_segment_id in video_segment_ids:
-        segment_time_start = time.time()
+        #segment_time_start = time.time()
 
         if video_segment_id == 'preview':
-            print(f'Preparing preview segment')
+            print(f'Creating video preview image...')
 
             # Generate preview image file
             preview_image_file = write_image(
@@ -163,7 +193,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                     temp_file_name=f'{video_file_base}-videopreview.{image_format}'
                 ),
                 width=width,
-                height=height
+                height=height,
+                overwrite=True
             )
 
             if not preview_image_file:
@@ -177,8 +208,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             # Value of preview frames already accounts for case where preview is longer than the file
             frame_count = preview_frames
 
-            def progress_callback(i, n):
-                return
+            # Define the segment number and label to use for the progress bar
+            segment_label = 'Preview segment'
         else:
             # Numeric video segment id
             try:
@@ -187,15 +218,14 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 print(f'Error: Unknown segment id "{video_segment_id}"')
                 return None
 
-            print(f'Preparing video segment {len(video_segment_files)}/{numeric_segments_total}:')
-
+            # Calculate the starting frame and frame count
             segment_frame_start = (video_segment_number - 1) * frames_per_segment + preview_frames
             frame_count = min(frames_total - segment_frame_start, frames_per_segment)
 
-            def progress_callback(i, n):
-                if i % es.cfg['visualization.video.export.fps'] == 0:
-                    print(
-                        f" Saving frame: {segment_frame_start + i}/{frames_total} ({i}/{n} in segment {current_segment}/{numeric_segments_total})")
+            # Define the segment number and label to use for the progress bar
+            segment_label = f'Segment {video_segment_number}/{numeric_segments_total}'
+
+        spinner = es.utils.Spinner(f'Preparing video visualization for {segment_label.lower()}... ')
 
         visualization = es.visualization.VideoVisualization(
             es_audio=es_audio,
@@ -204,7 +234,14 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
         visualization.make_figure()
         visualization.resize_figure(width=width, height=height, dpi=_DPI)
+        spinner.stop()
 
+        # Get temporary file name to use during encoding
+        # This is necessary to ensure proper handling of resuming if encoding is stopped or crashes
+        video_segment_encoding_file = es.utils.get_temp_file_path(
+            temp_file_name=f'{video_file_base}_{video_segment_id}-encoding.{video_format}'
+        )
+        # Get file name to use for segment once encoding is complete (still a temporary file)
         video_segment_file = es.utils.get_temp_file_path(
             temp_file_name=f'{video_file_base}_{video_segment_id}.{video_format}'
         )
@@ -217,13 +254,35 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             f'expr:gte(t,{segment_length - 1 / es.cfg["visualization.video.export.fps"]})'
         ]
 
+        # Initialize progress bar
+        frames_progress_bar = tqdm.tqdm(total=frame_count, desc=segment_label, unit='frame')
+
+        def progress_callback(i, n):
+            frames_progress_bar.update(i - frames_progress_bar.n)  # Update based on the difference from the current count
+
         visualization.animation.save(
-            video_segment_file,
+            video_segment_encoding_file,
             writer='ffmpeg',
             fps=es.cfg['visualization.video.export.fps'],
             codec=es.cfg['visualization.video.export.codec'],
             extra_args=ffmpeg_extra_args + ffmpeg_keyframe_args,
             progress_callback=progress_callback)
+
+        # Update the progress bar for the last frame since the callback is not called when save() completes.
+        frames_progress_bar.update(1)
+        frames_progress_bar.close()
+
+        # Move the temporary encoding file to the segment file name
+        if os.path.exists(video_segment_file):
+            os.remove(video_segment_file)
+        os.rename(video_segment_encoding_file, video_segment_file)
+
+        encoded_frames = segment_frame_start + frame_count
+        encoded_time = time.time() - encoding_time_start
+        encoding_fps = frame_count / (time.time() - frames_progress_bar.start_t)
+        estimated_time_remaining = (frames_total - encoded_frames) / encoding_fps
+
+        print(f'{encoded_frames}/{frames_total} frames encoded in {es.utils.seconds_to_string(encoded_time)}. Estimated time remaining: {es.utils.seconds_to_string(seconds=estimated_time_remaining)}')
 
         video_segment_files.append(video_segment_file)
         es.utils.add_temp_file(video_segment_file)
@@ -256,21 +315,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
             # Replace the first segment with the updated version
             os.replace(src=video_file_temp_with_preview, dst=video_segment_file)
-        else:
-            current_segment += 1
-
-        segment_time_length = time.time() - segment_time_start
-        segment_time_fps = frame_count / segment_time_length
-
-        print(
-            f'Wrote {frame_count} frames in {es.utils.seconds_to_string(seconds=segment_time_length)} ({segment_time_fps:.1f} FPS).')
-
-        # If not the preview or last segment, show estimated time remaining
-        if video_segment_id != 'preview' and video_segment_id != video_segment_ids[-1]:
-            print(
-                f'Estimated time remaining: {es.utils.seconds_to_string(seconds=(frames_total - segment_frame_start) / segment_time_fps)}')
-
-        print('')
 
     # Prepare final video file
 
@@ -290,6 +334,10 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         else 'copy'
     )
 
+    # Only apply length arguments if the desired duration is shorter than the total audio file.
+    # This could avoid rounding errors with the argument potentially resulting in unintended truncation of the audio
+    length_args = [] if seconds_total == es_audio.length else ['-t', str(seconds_total)]
+
     ffmpeg_command = [
         'ffmpeg',
         '-f', 'concat', '-safe', '0',  # "-safe 0" allows for absolute paths to files
@@ -298,6 +346,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         '-c:v', concat_video_codec,
         '-c:a', 'copy', '-strict', '-1',  # "-strict -1" allows for non-standard sample rates
         '-movflags', 'faststart',  # Improves playback and seeking efficiency
+        *length_args,
         *ffmpeg_extra_args,
         video_file
     ]
@@ -309,22 +358,25 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     subprocess.run(ffmpeg_command, check=True)
 
-    print('')
+    print(f'Preparing metadata for video file... ')
 
-    print('Saving video metadata.')
     video_metadata = es.metadata.Metadata(file=video_file)
     video_metadata.set_metadata(es_audio.metadata.get_metadata())
 
     # Render an image to use as album art in the video metadata
     if image_file is None:
+        print(f'Creating album art image... ')
         image_file = write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path())
         es.utils.add_temp_file(image_file)
     image_data = open(image_file, 'rb').read()
-    
+
     video_metadata.set_tag('image', image_data)
+
+    print(f'Saving metadata to video file... ')
     video_metadata.save()
 
     print('Deleting temporary files.')
+
     es.utils.delete_temp_files()
 
     return video_file

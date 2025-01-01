@@ -4,7 +4,7 @@ import typing
 import estimpy as es
 
 
-class Player():
+class Player:
     def __init__(self, audio_files: list, width: int = None, height: int = None):
         self._current_file = 0
         self._audio_files = audio_files

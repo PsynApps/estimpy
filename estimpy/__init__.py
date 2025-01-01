@@ -1,5 +1,6 @@
-"""A python package for estim (estimpy)."""
+"""A python package for Estim (EstimPy)."""
 
+import ast
 import os
 import subprocess
 import typing
@@ -17,14 +18,23 @@ if sys.version_info < MIN_VERSION:
     )
 
 import flatdict
+import yaml
+
+os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'  # Necessary to prevent forced DPI scaling on high DPI displays
 import matplotlib
 matplotlib.use('QtAgg')
-import yaml
 
 _config_path = os.path.dirname(__file__) + '/config'
 _config_file_default = f'{_config_path}/default.yaml'
 
+# base_cfg stores the keys and values loaded from .yaml profiles, but does not store
+# derived keys or updated values from the command line
+base_cfg = {}
+
+# cfg stores the current working configuration values for all keys
 cfg = {}
+
+# listeners stores event listeners
 listeners = {}
 
 def add_event_listener(event: str, listener: typing.Callable):
@@ -64,6 +74,50 @@ def load_configs(files: list):
         trigger_event('config.updated')
 
 
+def update_config_values(values: dict):
+    for key, value in values.items():
+        if key not in cfg:
+            raise Exception(f'Configuration key "{key}" is not valid.')
+
+        key_type = type(cfg[key])
+
+        try:
+            if str(value).lower() in ['none', '~']:
+                # Special case for None value which should skip type casting
+                cfg[key] = None
+            elif cfg[key] is None:
+                # Current configuration value is None, so type can't be known (in current implementation)
+                cfg[key] = value
+            elif key_type == bool:
+                # Normalize boolean values from strings and other types
+                str_value = str(value).lower()
+
+                if str_value in ['false', '0', '']:
+                    cfg[key] = False
+                elif str_value in ['true', '1']:
+                    cfg[key] = True
+                else:
+                    raise ValueError()
+            elif key_type == int:
+                # Special case to allow float values for integer configuration options
+                try:
+                    # First try to cast value to integer
+                    cfg[key] = key_type(value)
+                except ValueError:
+                    # If integer cast fails, try casting value to float
+                    cfg[key] = float(value)
+            elif key_type in [list, dict]:
+                cfg[key] = ast.literal_eval(value)
+            else:
+                # Cast value to type of configuration option
+                cfg[key] = key_type(value)
+        except ValueError:
+            # value is an incompatible type for configuration option
+            raise Exception(f'Cannot cast {value} to {key_type}.')
+
+    trigger_event('config.updated')
+
+
 def _check_ffmpeg():
     try:
         subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
@@ -101,7 +155,14 @@ def _load_config(file: str) -> None:
 
     with open(file, 'r') as file_handle:
         try:
-            cfg.update(flatdict.FlatDict(yaml.safe_load(file_handle), delimiter='.'))
+            file_cfg = flatdict.FlatDict(yaml.safe_load(file_handle), delimiter='.')
+
+            # Store base configuration (without derived values from config.updated handlers)
+            # Needed to show which configuration options can be effectively updated from the command line
+            base_cfg.update(file_cfg)
+
+            # Update the main configuration
+            cfg.update(file_cfg)
         except yaml.YAMLError as exc:
             raise Exception(f'Error loading default configuration file "{file}": {exc}')
 

@@ -1,0 +1,17 @@
+---
+visualization:
+  image:
+    export:
+      size: 320x240
+  style:
+    axes:
+      font-size: 32
+    time:
+      font-size: 48
+  video:
+    export:
+      codec: libx264
+      preview:
+        enabled: False
+      size: 320x240
+    window-length: 6

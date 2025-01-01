@@ -6,11 +6,11 @@ import estimpy as es
 import functools
 import matplotlib
 import matplotlib.animation
+import matplotlib.patheffects
 import matplotlib.pyplot
 import matplotlib.widgets
 
 _DPI = 100
-
 
 class AxisScaleText(enum.Enum):
     BOTTOM = {
@@ -65,6 +65,9 @@ class Visualization:
         self._handles = {}
 
         self._initialize_handles()
+
+        # Store text border width to allow proper rescaling when figure is resized
+        self._text_border_width = es.cfg['visualization.style.font.text.border-width']
 
     @property
     def es_audio(self):
@@ -154,8 +157,15 @@ class Visualization:
         width_scale_factor = width / current_width * current_dpi / dpi
         height_scale_factor = height / current_height * current_dpi / dpi
 
+        # Update text border width to use for path effects
+        self._text_border_width = self._text_border_width * current_dpi / dpi
+
         for text_element in self._handles['text']:
             text_element.set_fontsize(text_element.get_fontsize() * height_scale_factor)
+
+            # Rescale text path effects
+            if len(text_element.get_path_effects()) > 0:
+                self._set_text_path_effects(text_element)
 
         for i_axis in self._handles['axes']:
             self._handles['axes'][i_axis].tick_params(
@@ -225,8 +235,11 @@ class Visualization:
         # Add the time text to the figure
         self._handles['time'] = self._handles['figure'].text(
             x=1, y=0, s=time_string, ha='right', va='bottom',
-            fontsize=es.cfg['visualization.style.axes.font-size'],
+            fontsize=es.cfg['visualization.style.time.font-size'],
             color=es.cfg['visualization.style.axes.color'])
+
+        # Set text path effects
+        self._set_text_path_effects(self._handles['time'])
 
         # Add the time text handle to the list of text handles
         self._handles['text'].append(self._handles['time'])
@@ -267,8 +280,9 @@ class Visualization:
                 * es.cfg['visualization.style.title.font-size'])
             title_text_handle.set_fontsize(title_text_font_size)
 
-        ax.set_facecolor('black')
+        ax.set_facecolor(es.cfg['visualization.style.title.background-color'])
         self._handles['text'].append(title_text_handle)
+        self._set_text_path_effects(title_text_handle)
 
     def _format_spectrogram_axes(self, ax, invert=False):
         ax.set_facecolor('black')
@@ -276,7 +290,7 @@ class Visualization:
         ax.set_xlim([0, self.es_audio.length])
         ax.set_ylim([self.spectrogram.frequency_min, self.spectrogram.frequency_max])
 
-        if es.cfg['visualization.style.spectrogram.axes.frequency.enabled']:
+        if es.cfg['visualization.style.spectrogram.axes.enabled']:
             spectrogram_yticks = self._get_spectrogram_yticks(self.spectrogram.frequency_max)
             ax.tick_params(axis='y', direction='in',
                            length=es.cfg['visualization.style.axes.tick-length'],
@@ -291,19 +305,26 @@ class Visualization:
                 axis_label_data_min = AxisScaleText.TOP.value
                 axis_label_data_max = AxisScaleText.BOTTOM.value
 
-            self._handles['text'].append(ax.annotate(
-                text=self._get_spectrogram_scale_text(self.spectrogram.frequency_max),
-                xy=axis_label_data_max['xy'], xycoords='axes fraction', va=axis_label_data_max['va'],
-                xytext=axis_label_data_max['xytext'], textcoords='offset points',
-                fontsize=es.cfg['visualization.style.axes.font-size'],
-                color=es.cfg['visualization.style.axes.color']))
+            axes_text = [
+                ax.annotate(
+                    text=self._get_spectrogram_scale_text(self.spectrogram.frequency_min),
+                    xy=axis_label_data_min['xy'], xycoords='axes fraction', va=axis_label_data_min['va'],
+                    xytext=axis_label_data_min['xytext'], textcoords='offset points',
+                    fontsize=es.cfg['visualization.style.axes.font-size'],
+                    color=es.cfg['visualization.style.axes.color']),
+                ax.annotate(
+                    text=self._get_spectrogram_scale_text(self.spectrogram.frequency_max),
+                    xy=axis_label_data_max['xy'], xycoords='axes fraction', va=axis_label_data_max['va'],
+                    xytext=axis_label_data_max['xytext'], textcoords='offset points',
+                    fontsize=es.cfg['visualization.style.axes.font-size'],
+                    color=es.cfg['visualization.style.axes.color'])]
 
-            self._handles['text'].append(ax.annotate(
-                text=self._get_spectrogram_scale_text(self.spectrogram.frequency_min),
-                xy=axis_label_data_min['xy'], xycoords='axes fraction', va=axis_label_data_min['va'],
-                xytext=axis_label_data_min['xytext'], textcoords='offset points',
-                fontsize=es.cfg['visualization.style.axes.font-size'],
-                color=es.cfg['visualization.style.axes.color']))
+            for text in axes_text:
+                # Set text path effects
+                self._set_text_path_effects(text)
+
+                # Add to axes text list to support rescaling
+                self._handles['text'].append(text)
 
         if invert:
             ax.invert_yaxis()
@@ -329,12 +350,18 @@ class Visualization:
             else:
                 axis_label_data = AxisScaleText.BOTTOM.value
 
-            self._handles['text'].append(ax.annotate(
+            axes_text = ax.annotate(
                 text='0 dB',
                 xy=axis_label_data['xy'], xycoords='axes fraction',
                 xytext=axis_label_data['xytext'], textcoords='offset points', va=axis_label_data['va'],
                 fontsize=es.cfg['visualization.style.axes.font-size'],
-                color=es.cfg['visualization.style.axes.color']))
+                color=es.cfg['visualization.style.axes.color'])
+
+            # Set text path effects
+            self._set_text_path_effects(axes_text)
+
+            # Add to axes text list to support rescaling
+            self._handles['text'].append(axes_text)
 
         if invert:
             ax.invert_yaxis()
@@ -399,6 +426,14 @@ class Visualization:
             else:
                 handle.remove()
 
+    def _set_text_path_effects(self, text_handle):
+        if hasattr(text_handle, 'set_path_effects') and callable(getattr(text_handle, 'set_path_effects')):
+            text_handle.set_path_effects([
+                matplotlib.patheffects.withStroke(
+                    linewidth=self._text_border_width,
+                    foreground=es.cfg['visualization.style.font.text.border-color'])
+            ])
+
     @classmethod
     def _get_amplitude_style_cfg(cls, channel_id: int) -> typing.Dict:
         return es.cfg['visualization.style.amplitude.channels'][channel_id] \
@@ -460,8 +495,11 @@ class VideoVisualization(Visualization):
         # Length of video windows
         # Padding ensures there sufficient data to fill the window without glitches (does not need to be configurable)
         self._window_padding_factor = 1.1
-        self.__amplitude_window_size = None
-        self.__spectrogram_window_size = None
+        self._window_length = es.cfg['visualization.video.export.window-length']
+
+        self.__amplitude_window_length = None
+        self.__spectrogram_window_length = None
+
 
     @property
     def animation(self) -> matplotlib.animation.FuncAnimation | None:
@@ -479,20 +517,20 @@ class VideoVisualization(Visualization):
         return self._frames
 
     @property
-    def _amplitude_window_size(self):
-        if self.__amplitude_window_size is None:
-            self.__amplitude_window_size = self.i_amplitude(
-                self._window_padding_factor * es.cfg['visualization.video.export.window-length'])
+    def _amplitude_window_length(self):
+        if self.__amplitude_window_length is None:
+            self.__amplitude_window_length = self.i_amplitude(
+                self._window_padding_factor * self._window_length)
 
-        return self.__amplitude_window_size
+        return self.__amplitude_window_length
 
     @property
-    def _spectrogram_window_size(self):
-        if self.__spectrogram_window_size is None:
-            self.__spectrogram_window_size = self.i_spectrogram(
-                self._window_padding_factor * es.cfg['visualization.video.export.window-length'])
+    def _spectrogram_window_length(self):
+        if self.__spectrogram_window_length is None:
+            self.__spectrogram_window_length = self.i_spectrogram(
+                self._window_padding_factor * self._window_length)
 
-        return self.__spectrogram_window_size
+        return self.__spectrogram_window_length
 
     def load(self, es_audio: es.audio.Audio):
         if es_audio is None:
@@ -523,12 +561,12 @@ class VideoVisualization(Visualization):
         axes_xlim = self._get_window_range(
             t=t,
             total_length=self.es_audio.length,
-            window_length=es.cfg['visualization.video.export.window-length'])
+            window_length=self._window_length)
 
         i_amplitude_min, i_amplitude_max = self._get_window_range(
             t=self.i_amplitude(t),
             total_length=len(self.peak_envelope.times) - 1,
-            window_length=self._amplitude_window_size,
+            window_length=self._amplitude_window_length,
             round_bounds=True)
 
         # Update the amplitude
@@ -556,7 +594,7 @@ class VideoVisualization(Visualization):
         i_spectrogram_min, i_spectrogram_max = self._get_window_range(
             t=self.i_spectrogram(t),
             total_length=len(self.spectrogram.times) - 1,
-            window_length=self._spectrogram_window_size,
+            window_length=self._spectrogram_window_length,
             round_bounds=True)
 
         for channel_id in range(self.es_audio.channels):
@@ -728,6 +766,8 @@ class VideoPlayerVisualization(VideoVisualization):
         super().__init__(es_audio=es_audio)
 
         self._frame = 0  # type: int
+
+        self._window_length = es.cfg['visualization.video.display.window-length']
 
         # Used to prevent loops when ui is being redrawn and updating values of controls which would trigger events
         self.__ui_updating = False  # type: bool
@@ -1250,7 +1290,10 @@ class VideoPlayerVisualization(VideoVisualization):
 
 
 def show_image(es_audio: es.audio.Audio):
+    spinner = es.utils.Spinner(f'Preparing image visualization... ')
     visualization = Visualization(es_audio=es_audio)
+    spinner.stop()
+
     visualization.show_figure()
 
 
@@ -1297,33 +1340,72 @@ def _on_config_updated():
 
     # Title
     es.cfg['visualization.style.title.max-width'] = math.floor(
-        es.cfg['visualization.style.title.max-width-factor'] * es.cfg['visualization.image.display.width'])
+        es.cfg['visualization.style.title.width-factor-max'] * es.cfg['visualization.image.display.width'])
 
-    # Colors
-    for i_channel in range(0, len(es.cfg['visualization.style.amplitude.channels'])):
+    # Channel colors
+    cfg_prefixes = [
+        "visualization.style.amplitude.channels",
+        "visualization.style.spectrogram.channels"
+    ]
+
+    # Initialize a dictionary to store the maximum channel number for each prefix
+    max_channels = {prefix: 0 for prefix in cfg_prefixes}
+
+    # Extract the maximum channel number for each prefix
+    for key in es.cfg.keys():
+        for prefix in cfg_prefixes:
+            if key.startswith(prefix):
+                parts = key[len(prefix):].split('.')
+                if len(parts) > 1 and parts[1].startswith("ch"):
+                    channel_number = int(parts[1][2:])  # Extract and cast to int
+                    max_channels[prefix] = max(max_channels[prefix], channel_number)
+
+    # Generate full channel lists (continuous from 1 to max_channels)
+    channel_numbers = {prefix: list(range(0, max_channels[prefix] + 1)) for prefix in max_channels}
+
+    es.cfg['visualization.style.amplitude.channels'] = [None] * len(channel_numbers['visualization.style.amplitude.channels'])
+    for i_channel in channel_numbers['visualization.style.amplitude.channels']:
+        es.cfg['visualization.style.amplitude.channels'][i_channel] = {
+            'peak-color': None,
+            'rms-color': None,
+            'background-color': None
+        }
+
         # If the color of the peak amplitude envelope is not defined, use the color from the first channel
-        if not es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color']:
-            es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'] = \
-                es.cfg['visualization.style.amplitude.channels'][0]['peak-color']
+        es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'] = \
+            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.peak-color'] if \
+                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.peak-color'] is not None else \
+                es.cfg['visualization.style.amplitude.channels.ch0.peak-color']
 
         # If the color of the rms amplitude envelope is not defined,
         # derive the color from the blending the peak color with white using the alpha level
-        if not es.cfg['visualization.style.amplitude.channels'][i_channel]['rms-color']:
-            es.cfg['visualization.style.amplitude.channels'][i_channel]['rms-color'] = _alpha_color(
-                es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'], (1, 1, 1),
-                es.cfg['visualization.style.amplitude.rms-alpha'])
+        es.cfg['visualization.style.amplitude.channels'][i_channel]['rms-color'] = \
+            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.rms-color'] if \
+                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.rms-color'] is not None else \
+                _alpha_color(
+                    es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'], (1, 1, 1),
+                    es.cfg['visualization.style.amplitude.rms-alpha'])
 
         # If the background color of the amplitude panel is not defined,
         # derive the color from the blending the peak color with black using the alpha level
-        if not es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color']:
-            es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color'] = _alpha_color(
-                es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'], (0, 0, 0),
-                es.cfg['visualization.style.amplitude.background-alpha'])
+        es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color'] = \
+            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.background-color'] if \
+                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.background-color'] is not None else \
+                _alpha_color(
+                    es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'], (0, 0, 0),
+                    es.cfg['visualization.style.amplitude.background-alpha'])
+
+    es.cfg['visualization.style.spectrogram.channels'] = [None] * len(channel_numbers['visualization.style.spectrogram.channels'])
+    for i_channel in channel_numbers['visualization.style.spectrogram.channels']:
+        es.cfg['visualization.style.spectrogram.channels'][i_channel] = {
+            'color-map': None
+        }
 
         # If the color map for the spectrogram of the channel is not defined, use the color map from the first channel
-        if not es.cfg['visualization.style.spectrogram.channels'][i_channel]['color-map']:
-            es.cfg['visualization.style.spectrogram.channels'][i_channel]['color-map'] = \
-                es.cfg['visualization.style.spectrogram.channels'][0]['color-map']
+        es.cfg['visualization.style.spectrogram.channels'][i_channel]['color-map'] = \
+            es.cfg[f'visualization.style.spectrogram.channels.ch{i_channel}.color-map'] if \
+                es.cfg[f'visualization.style.spectrogram.channels.ch{i_channel}.color-map'] is not None else \
+                es.cfg['visualization.style.spectrogram.channels.ch0.color-map']
 
 
 def _parse_resolution(resolution) -> typing.Tuple[int, int]:
