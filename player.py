@@ -10,8 +10,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Provides a real-time player for Estim audio files with visual rendering of various audio analyses and independent control of channel volume output.')
 
-    es.utils.add_parser_arguments(parser, ['input_files', 'recursive', 'config',
-                                           'dynamic_range', 'frequency_min', 'frequency_max'])
+    es.utils.add_parser_arguments(parser, es.utils.get_default_parser_arguments())
 
     args = vars(parser.parse_args())
 

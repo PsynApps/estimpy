@@ -24,6 +24,10 @@ files:
   output:
     # Path in which to save exported files
     path: ./
+    # Overwrite existing files by default
+    overwrite-default: False
+    # Prompt to overwrite existing files. Not relevant if overwrite-default is set to True.
+    overwrite-prompt: True
 metadata:
   default-genre: Estim
   # Pattern to extract metadata from file name
@@ -74,21 +78,21 @@ visualization:
     # Configuration for the amplitude panels
     amplitude:
       # First channel is mono/left, second is right (if stereo)
-      channels: [{
-        # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
-        background-color: ~,
-        # The color to use for the peak amplitude envelope
-        peak-color: '#4dbeee',
-        # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
-        rms-color: ~,
-      }, {
-        # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
-        background-color: ~,
-        # The color to use for the peak amplitude envelope
-        peak-color: '#b54dee',
-        # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
-        rms-color: ~ ,
-      }]
+      channels:
+        ch0:
+          # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
+          background-color: ~
+          # The color to use for the peak amplitude envelope
+          peak-color: '#4dbeee'
+          # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
+          rms-color: ~
+        ch1:
+          # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
+          background-color: ~
+          # The color to use for the peak amplitude envelope
+          peak-color: '#b54dee'
+          # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
+          rms-color: ~
       # Configuration for the axes of the amplitude panel
       axes:
         # Show the amplitude axis ticks and scale text
@@ -110,7 +114,7 @@ visualization:
       # Color of the axis ticks and scale text
       color: '#ffffff'
       # Font size of the scale text
-      font-size: 8
+      font-size: 16
       # Padding to add to text between edge of panel
       text-padding: 1
       # Length of axis ticks
@@ -125,6 +129,10 @@ visualization:
         family: Segoe UI Symbol, DejaVu Sans
       # Configuration for text fonts
       text:
+        # Color of the text border
+        border-color: '#000000'
+        # Width of the text border
+        border-width: 1
         # The font family name to use for text. Accepts multiple comma-delimited names and will use the first font found.
         family: Helvetica Neue, Helvetica, Arial, sans-serif
         # The font weight to use for text
@@ -132,20 +140,18 @@ visualization:
     # Configuration for the spectrogram panels
     spectrogram:
       # First channel is mono/left, second is right (if stereo)
-      channels: [{
-        # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
-        color-map: jet
-      }, {
-        # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
-        # If not defined will use color-map from first channel.
-        color-map: turbo
-      }]
+      channels:
+        ch0:
+          # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
+          color-map: jet
+        ch1:
+          # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
+          # If not defined will use color-map from first channel.
+          color-map: turbo
       # Configuration for the axes of the spectrogram
       axes:
-        # Configuration for the frequency axis of the spectrogram
-        frequency:
-          # Show the frequency axis ticks and scale text
-          enabled: True
+        # Show the frequency axis ticks and scale text
+        enabled: True
       # The dynamic range to use when rendering spectrograms (in decibels)
       dynamic-range: 90
     # Height ratios of panels
@@ -160,9 +166,18 @@ visualization:
       controls: 0.75
     # Configuration for the title panel
     title:
+      # Background color of the title text panel
+      background-color: '#000000'
+      # Color of the title text
       color: '#ffffff'
+      # Font size of the title text
       font-size: 24
-      max-width-factor: 0.9
+      # Maximum width factor of the title text
+      width-factor-max: 0.9
+    # Configuration for the time label
+    time:
+      # Font size for the time label
+      font-size: 24
     video:
       # Time position line color
       position-line-color: '#ffffff'
@@ -178,6 +193,8 @@ visualization:
       # Configuration for the title panel
       title:
         enabled: False
+        # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
+      window-length: 20
     # Configuration for exporting video
     export:
       # Codec to encode the video (passed to ffmpeg)
@@ -198,14 +215,6 @@ visualization:
       fps: 30
       # Maximum number of seconds between keyframes (longer intervals will produce smaller files but can cause motion artifacts)
       keyframe-interval: ~
-      # Re-encode final video when concatenating segments. Takes more time but will result in a smaller file. May also improve compatibility or performance with players.
-      reencode-segments: False
-      # Number of seconds to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur). Smaller values will result in larger video files. Must be an integer to ensure seamless concatenation.
-      segment-length: 3600
-      # Size of video (in pixels)
-      size: 1920x1080
-      # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
-      window-length: 20
       # Show a preview image of the entire video at the beginning of the video
       preview:
         # Enable the preview image
@@ -214,9 +223,19 @@ visualization:
         length: 2
         # Number of seconds to fade from the preview image into the video
         fade-length: 1
+      # Re-encode final video when concatenating segments. Takes more time but will result in a smaller file. May also improve compatibility or performance with players.
+      reencode-segments: False
+      # Number of seconds to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur). Smaller values will result in larger video files. Must be an integer to ensure seamless concatenation.
+      segment-length: 3600
+      # Size of video (in pixels)
+      size: 1920x1080
       # Configuration for the time display
       time:
         enabled: True
       # Configuration for the title panel for videos
       title:
         enabled: False
+      # Maximum length of video to encode
+      video-length-max: ~
+      # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
+      window-length: 20

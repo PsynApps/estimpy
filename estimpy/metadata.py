@@ -233,9 +233,6 @@ class MetadataFormat(abc.ABC):
     def save(cls, file: str, metadata: dict):
         file_tags = cls._load_file_tags(file)
 
-        if not file_tags:
-            return
-
         for tag, value in metadata.items():
             cls._set_file_tag_value(file_tags=file_tags, tag=tag, value=value)
 
@@ -283,8 +280,10 @@ class MetadataFormatMP3(MetadataFormat, abc.ABC):
     def _load_file_tags(cls, file: str) -> mutagen.id3.ID3 | None:
         try:
             return mutagen.id3.ID3(file)
-        except:
-            return None
+        except mutagen.id3.ID3NoHeaderError:
+            file_tags = mutagen.id3.ID3()
+            file_tags.filename = file
+            return file_tags
 
     @classmethod
     def _set_file_tag_value(cls, file_tags: mutagen.id3.ID3, tag: str, value):
@@ -355,6 +354,11 @@ def write_metadata(es_audio, image_file: str = None):
 
     image_data = open(image_file, 'rb').read()
     es_audio.metadata.image = image_data
+
+    spinner = es.utils.Spinner(f'Writing metadata... ')
     es_audio.metadata.save()
+    spinner.stop()
 
     es.utils.delete_temp_files()
+
+    print('Done!')

@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='EstimPy',
-    version='0.1',
+    version='1.0.0',
     author='Psynapse',
     author_email='psykinkster@gmail.com',
     packages=find_packages(),
@@ -17,14 +17,17 @@ setup(
     python_requires='>=3.11',
     install_requires=[
         'audioop-lts; python_version >= "3.13"',
+        'colorama'
         'flatdict',
         'matplotlib>=3.7.2',
         'mutagen',
         'numpy',
         'pydub',
         'pygame',
+        'pyqt6',
         'pyyaml',
-        'scipy'
+        'scipy',
+        'tqdm'
     ],
     entry_points={
         'console_scripts': [

@@ -1,11 +1,9 @@
-
-
 # EstimPy
 
 **EstimPy** is a Python library that generates visualizations of Estim audio files.
 
 <div align="center">
-<a href="https://youtu.be/7zNsNnao8KU" target="_blank"><img src="https://github.com/user-attachments/assets/4a117a9a-d802-4c1e-a0e2-9471290d4ece"></a>  
+<a href="https://youtu.be/7zNsNnao8KU" target="_blank"><img src="https://github.com/user-attachments/assets/a74e0039-8cca-4149-bdbb-3a97e2659ba7"></a>  
 </div>
 
 ## Visualization library
@@ -49,7 +47,7 @@ EstimPy helps users understand the flow, intensity, and texture of Estim audio s
 ### Default layout and behavior ###
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/a771d406-79db-44bb-af82-31f1b9a8f641" width="1080">
+  <img src="https://github.com/user-attachments/assets/50511517-f586-4435-acc3-f6d015462080" width="1080">
 </p>
 
 Both image and animated visualizations use the same basic layout to visualize each channel of audio data
@@ -61,14 +59,14 @@ Both image and animated visualizations use the same basic layout to visualize ea
   - The minimum frequency displayed is 0
   - The maximum frequency displayed is autodetected (unless overridden)
 
-#### 1-channel (mono) audio files ####
+#### 1-channel (mono) audio file ####
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/633dbbba-2b6e-42dc-ad7d-86380e6e88c5" width="480">
+  <img src="https://github.com/user-attachments/assets/0afe2b4e-cbee-44fd-af8f-75be93cf5790" width="480">
 </p>
 
-#### 2-channel (stereo) audio files ####
+#### 2-channel (stereo) audio file ####
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/6943a433-4241-471d-9df5-bd151e76e6b9" width="480">
+  <img src="https://github.com/user-attachments/assets/403624b1-284f-4682-af1d-012376500565" width="480">
 </p>
 
 ---
@@ -162,18 +160,21 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 
 #### Options
 
-| Option                                     | Description                                                                                                            |
-|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `-h`, `--help`                             | Show the help message and exit.                                                                                        |
-| `-i [INPUT_FILES ...]`, `--input-files`    | Input file(s). Supports wildcards for batch processing. If not provided, a file dialog will prompt for file selection. |
-| `-r`, `--recursive`                        | Load input files recursively from the specified directories.                                                           |
-| `-o OUTPUT_PATH`, `--output-path`          | Specify the path to save the output file(s). If not specified, files will be saved to the current path.                |
-| `-c [CONFIG ...]`, `--config`              | Apply additional configuration file(s).                                                                                |
-| `-drange DYNAMIC_RANGE`, `--dynamic-range` | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
-| `-fmin FREQUENCY_MIN`, `--frequency-min`   | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
-| `-fmax FREQUENCY_MAX`, `--frequency-max`   | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
-| `-rf RESUME_FRAME`, `--resume-frame`       | Specify the frame on which to resume video encoding (useful for resuming if encoding crashes).                         |
-| `-rs RESUME_SEGMENT`, `--resume-segment`   | Specify the segment on which to resume video encoding (useful for resuming if encoding crashes).                       |
+| Option                                             | Description                                                                                                            |
+|----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| `-h`, `--help`                                     | Show the help message and exit.                                                                                        |
+| `-i [INPUT_FILES ...]`, `--input-files`            | Input file(s). Supports wildcards for batch processing. If not provided, a file dialog will prompt for file selection. |
+| `-r`, `--recursive`                                | Load input files recursively from the specified directories.                                                           |
+| `-o OUTPUT_PATH`, `--output-path`                  | Specify the path to save the output file(s). If not specified, files will be saved to the current path.                |
+| `-c [CONFIG ...]`, `--config`                      | Apply additional configuration file(s).                                                                                |
+| `-co [CONFIG_OPTION VALUE ...]`, `--config-option` | Modify configuration option value(s).                                                                                  |
+| `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
+| `-drange DYNAMIC_RANGE`, `--dynamic-range`         | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
+| `-fmin FREQUENCY_MIN`, `--frequency-min`           | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
+| `-fmax FREQUENCY_MAX`, `--frequency-max`           | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
+| `-rf RESUME_FRAME`, `--resume-frame`               | Specify the frame on which to resume video encoding (useful for resuming if encoding crashes).                         |
+| `-rs RESUME_SEGMENT`, `--resume-segment`           | Specify the segment on which to resume video encoding (useful for resuming if encoding crashes).                       |
+| `-y`, `--yes`                                      | Answers yes to all interactive prompts (overwrites files by default).                                                  |
 
 #### Configuration
 
@@ -187,7 +188,7 @@ Many aspects of the visualization rendering and output can be customized using a
   ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8d40a223-c564-4ded-8c3c-07cf08afe253" width="480">
+  <img src="https://github.com/user-attachments/assets/52f9ecfc-0269-49b3-bf7b-95f0e9ca3782" width="480">
 </p>
 
 - **Save image visualization to an image file**
@@ -195,7 +196,15 @@ Many aspects of the visualization rendering and output can be customized using a
   python visualizer.py -wi -i input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/dfe0465e-b4f4-4819-9af7-e7f4f84d5d8e" width="480">
+  <img src="https://github.com/user-attachments/assets/629bc729-280a-43ce-9866-f30f8719275a" width="480">
+</p>
+
+- **Save image visualization to the metadata of an audio file**
+  ```
+  python visualizer.py -wm -i input.mp3
+  ```
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/c7762554-dd73-4d5f-a988-2fb1a0a60ba6" width="480">
 </p>
 
 - **Save image visualization to the metadata of all supported files in a path recursively**
@@ -203,15 +212,30 @@ Many aspects of the visualization rendering and output can be customized using a
   python visualizer.py -wm -i ../library/* -r
   ```
 
-- **Save animated visualization to a 4k 60fps video file**
+- **Save animated visualization to a video file**
   ```
-  python visualizer.py -wv -i input.mp3 -c video-4k video-60fps
+  python visualizer.py -wv -i input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/4a117a9a-d802-4c1e-a0e2-9471290d4ece">
+  <img src="https://github.com/user-attachments/assets/a74e0039-8cca-4149-bdbb-3a97e2659ba7">
 </p>
-  
-- **Perform multiple actions in one command:**
+
+- **Save animated visualization to a 8k 60fps video file**
+  ```
+  python visualizer.py -wv -i input.mp3 -c video-8k video-60fps
+  ```
+  **<a href="https://youtu.be/7zNsNnao8KU" target="_blank">Example high-resolution video (via YouTube)</a>**
+
+
+- **Save image visualization to an image file overwriting specific configuration options**
+  ```
+  python visualizer.py -wi -i input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.peak-color #93c3ff visualization.style.amplitude.channels.ch1.peak-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
+  ```
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/11858185-c7f8-4084-8eb3-450d4bcb6ae9" width="720">
+</p>
+
+- **Perform multiple actions in one command**
   ```
   python visualizer.py -si -wi -wm -wv -i input.mp3
   ```
@@ -235,27 +259,29 @@ python player.py [options]
 
 #### Options
 
-| Option                                            | Description                                                                                                            |
-|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `-h`, `--help`                                    | Show the help message and exit.                                                                                        |
-| `-i [INPUT_FILES ...]`, `--input-files`           | Input file(s). Supports wildcards for batch processing. If not provided, a file dialog will prompt for file selection. |
-| `-r`, `--recursive`                               | Load input files recursively from the specified directories.                                                           |
-| `-c [CONFIG ...]`, `--config`                     | Apply additional configuration file(s).                                                                                |
-| `-drange DYNAMIC_RANGE`, `--dynamic-range`        | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
-| `-fmin FREQUENCY_MIN`, `--frequency-min`          | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
-| `-fmax FREQUENCY_MAX`, `--frequency-max`          | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
+| Option                                             | Description                                                                                                            |
+|----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
+| `-h`, `--help`                                     | Show the help message and exit.                                                                                        |
+| `-i [INPUT_FILES ...]`, `--input-files`            | Input file(s). Supports wildcards for batch processing. If not provided, a file dialog will prompt for file selection. |
+| `-r`, `--recursive`                                | Load input files recursively from the specified directories.                                                           |
+| `-c [CONFIG ...]`, `--config`                      | Apply additional configuration file(s).                                                                                |
+| `-co [CONFIG_OPTION VALUE ...]`, `--config-option` | Modify configuration option value(s).                                                                                  |
+| `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
+| `-drange DYNAMIC_RANGE`, `--dynamic-range`         | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
+| `-fmin FREQUENCY_MIN`, `--frequency-min`           | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
+| `-fmax FREQUENCY_MAX`, `--frequency-max`           | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
 
 #### Examples
 
-- Launch the player and load an Estim audio file:
+- **Launch the player and load an Estim audio file**
   ```
   python player.py -i input.mp3
   ```
 <p align="center">
-  <a href="" target="_new"><img src="https://github.com/user-attachments/assets/c7ef7f1c-a118-4de3-bbc9-cd391eb1b004" width="720"></a>
+  <img src="https://github.com/user-attachments/assets/61907a99-b35d-4d3e-aac4-50c9226306a8" width="720">
 </p>
 
-- Launch the player and load multiple Estim audio files into a playlist:
+- **Launch the player and load multiple Estim audio files into a playlist**
   ```
   python player.py -i input1.mp3 input2.mp3 input3.mp3
   ```
@@ -264,33 +290,34 @@ python player.py [options]
 
 EstimPy uses a YAML-based configuration system to define its behavior. Configuration variables are initialized with the values specified in `config/default.yaml` from the python package directory.
 
-EstimPy's command-line scripts support loading additional configuration files to override default values. Several additional configuration files are also included in the EstimPy package for common scenarios where alternative settings would be preferred.
+EstimPy's command-line scripts support loading additional configuration profiles to override default values. Several additional configuration profiles are included in the EstimPy package in the `config/` subdirectory for common scenarios where alternative settings would be preferred.
 
-When specifying an additional configuration file using the `--config` option of the command line scripts, if the file is included with EstimPy (i.e., exists in the `config/` path of the package), it is not necessary to specify the path. It is also not necessary to specify the `.yaml` file extension
+When specifying one or more built-in configuration profiles using the `--config` option of the command line scripts, it is not necessary to specify the path or the `.yaml` file extension.
 
-### Additional Configuration Files
+### Additional Configuration Profiles
 
-The following additional configuration files are included with **EstimPy**:
+The following additional configuration profiles are included with **EstimPy**:
 
-| File Name                 | Description                                                    |
-|---------------------------|----------------------------------------------------------------|
-| `default.yaml`            | The default base configuration (loaded automatically)          |
-| `image-4ksquare.yaml`     | Generate image visualization in 4K with a square aspect ratio  |
-| `image-8ksquare.yaml`     | Generate image visualization in 8K with a square aspect ratio  |
-| `image-videopreview.yaml` | Generate image visualization in 1440p with a 16:9 aspect ratio |
-| `notitle.yaml`            | Remove the title panel from all visualizations                 |
-| `video-4k.yaml`           | Generate animated visualizations in 4K                         |
-| `video-8k.yaml`           | Generate animated visualizations in 8K                         |
-| `video-60fps.yaml`        | Generate animated visualizations in 60fps                      |
-| `video-120fps.yaml`       | Generate animated visualizations in 120fps                     |
-| `video-av1.yaml`          | Encode video with AV1 codec using CPU                          |
-| `video-av1_nvenc.yaml`    | Encode video with AV1 encoding using NVENC hardware            |
-| `video-hevc_nvenc.yaml`   | Encode video using x265 encoding with NVENC hardware           |
-| `video-vp9.yaml`          | Encode video with VP9 codec using CPU                          |
+| Profile Name         | Description                                                    |
+|----------------------|----------------------------------------------------------------|
+| `default`            | The default base configuration (loaded automatically)          |
+| `image-4ksquare`     | Generate image visualization in 4K with a square aspect ratio  |
+| `image-8ksquare`     | Generate image visualization in 8K with a square aspect ratio  |
+| `image-videopreview` | Generate image visualization in 1440p with a 16:9 aspect ratio |
+| `notitle`            | Remove the title panel from all visualizations                 |
+| `player-cd028`       | Optimized settings for the CD-028 player                       |
+| `video-4k`           | Generate animated visualizations in 4K                         |
+| `video-8k`           | Generate animated visualizations in 8K                         |
+| `video-60fps`        | Generate animated visualizations in 60fps                      |
+| `video-120fpsl`      | Generate animated visualizations in 120fps                     |
+| `video-av1`          | Encode video with AV1 codec using CPU                          |
+| `video-av1_nvenc`    | Encode video with AV1 encoding using NVENC hardware            |
+| `video-hevc_nvenc`   | Encode video using x265 encoding with NVENC hardware           |
+| `video-vp9`          | Encode video with VP9 codec using CPU                          |
 
 ### Creating custom configuration files
 
-The best way to create a custom configuration file to ensure it follows the correct schema is to:
+The best way to create a custom configuration profile to ensure it follows the correct schema is to:
 1. Copy `config/default.yaml` to the new file destination
 2. Remove the configuration options you don't wish to change
 3. Edit the values of the remaining options and save the file
@@ -299,3 +326,106 @@ You can then apply your configuration using the `--config` command-line option o
 ```
 python visualizer.py [actions] [options] --config path_to/config_file.yaml
 ```
+
+### Overwriting configuration option values
+
+Specific configuration option values can also be overwritten at runtime using the `--config-option` command-line argument.
+A list of options and their current values can be shown using the `--config-option-list` command-line argument.
+If additional configuration profiles have been loaded, any updated values will be reflected in the list.
+
+For reference, the default configuration options and values are as follows:
+
+| Configuration Option                                         | Value                                        |
+|--------------------------------------------------------------|----------------------------------------------|
+| analysis.spectrogram.frequency-max                           | None                                         |
+| analysis.spectrogram.frequency-max-method                    | spectral_edge                                |
+| analysis.spectrogram.frequency-max-padding-factor            | 1.1                                          |
+| analysis.spectrogram.frequency-min                           | 0                                            |
+| analysis.spectrogram.nfft                                    | 2048                                         |
+| analysis.spectrogram.window-function                         | hann                                         |
+| analysis.window-overlap                                      | 1024                                         |
+| analysis.window-size                                         | 2048                                         |
+| files.input.recursive                                        | False                                        |
+| files.output.overwrite-default                               | False                                        |
+| files.output.overwrite-prompt                                | True                                         |
+| files.output.path                                            | ./                                           |
+| metadata.default-genre                                       | Estim                                        |
+| metadata.file-path-pattern                                   | (?P<artist>[^\\\/]*?) - (?P<title>.*)        |
+| player.autoplay                                              | False                                        |
+| player.repeat                                                | False                                        |
+| player.skip-length                                           | 60                                           |
+| player.video-render-latency                                  | 0.5                                          |
+| player.volume-ramp-max-length                                | 5                                            |
+| player.volume-ramp-min-length                                | 1                                            |
+| player.volume-start                                          | 50                                           |
+| player.volume-step                                           | 1                                            |
+| visualization.image.display.size                             | 1080x1080                                    |
+| visualization.image.display.time.enabled                     | True                                         |
+| visualization.image.display.title.enabled                    | False                                        |
+| visualization.image.export.format                            | png                                          |
+| visualization.image.export.size                              | 1080x1080                                    |
+| visualization.image.export.time.enabled                      | True                                         |
+| visualization.image.export.title.enabled                     | True                                         |
+| visualization.style.amplitude.axes.enabled                   | True                                         |
+| visualization.style.amplitude.background-alpha               | 0.15                                         |
+| visualization.style.amplitude.channels.ch0.background-color  | None                                         |
+| visualization.style.amplitude.channels.ch0.peak-color        | #4dbeee                                      |
+| visualization.style.amplitude.channels.ch0.rms-color         | None                                         |
+| visualization.style.amplitude.channels.ch1.background-color  | None                                         |
+| visualization.style.amplitude.channels.ch1.peak-color        | #b54dee                                      |
+| visualization.style.amplitude.channels.ch1.rms-color         | None                                         |
+| visualization.style.amplitude.padding                        | 0.1                                          |
+| visualization.style.amplitude.rms-alpha                      | 0.5                                          |
+| visualization.style.amplitude.show-rms                       | True                                         |
+| visualization.style.axes.color                               | #ffffff                                      |
+| visualization.style.axes.font-size                           | 16                                           |
+| visualization.style.axes.text-padding                        | 1                                            |
+| visualization.style.axes.tick-length                         | 5                                            |
+| visualization.style.axes.tick-width                          | 1                                            |
+| visualization.style.font.symbols.family                      | Segoe UI Symbol, DejaVu Sans                 |
+| visualization.style.font.text.border-color                   | #000000                                      |
+| visualization.style.font.text.border-width                   | 1                                            |
+| visualization.style.font.text.family                         | Helvetica Neue, Helvetica, Arial, sans-serif |
+| visualization.style.font.text.weight                         | bold                                         |
+| visualization.style.spectrogram.axes.enabled                 | True                                         |
+| visualization.style.spectrogram.channels.ch0.color-map       | jet                                          |
+| visualization.style.spectrogram.channels.ch1.color-map       | turbo                                        |
+| visualization.style.spectrogram.dynamic-range                | 90                                           |
+| visualization.style.subplot-height-ratios.amplitude.mono     | 3                                            |
+| visualization.style.subplot-height-ratios.amplitude.stereo   | 1.25                                         |
+| visualization.style.subplot-height-ratios.controls           | 0.75                                         |
+| visualization.style.subplot-height-ratios.spectrogram.mono   | 6                                            |
+| visualization.style.subplot-height-ratios.spectrogram.stereo | 3.25                                         |
+| visualization.style.subplot-height-ratios.title              | 1                                            |
+| visualization.style.time.font-size                           | 24                                           |
+| visualization.style.title.background-color                   | #000000                                      |
+| visualization.style.title.color                              | #ffffff                                      |
+| visualization.style.title.font-size                          | 24                                           |
+| visualization.style.title.width-factor-max                   | 0.9                                          |
+| visualization.style.video.position-line-color                | #ffffff                                      |
+| visualization.video.display.size                             | 1920x1080                                    |
+| visualization.video.display.time.enabled                     | False                                        |
+| visualization.video.display.title.enabled                    | False                                        |
+| visualization.video.display.window-length                    | 20                                           |
+| visualization.video.export.codec                             | libx265                                      |
+| visualization.video.export.ffmpeg-extra-args.-colorspace     | bt709                                        |
+| visualization.video.export.ffmpeg-extra-args.-crf            | 26                                           |
+| visualization.video.export.ffmpeg-extra-args.-hide_banner    |                                              |
+| visualization.video.export.ffmpeg-extra-args.-loglevel       | error                                        |
+| visualization.video.export.ffmpeg-extra-args.-pix_fmt        | yuv420p                                      |
+| visualization.video.export.ffmpeg-extra-args.-preset         | slow                                         |
+| visualization.video.export.ffmpeg-extra-args.-tune           | animation                                    |
+| visualization.video.export.ffmpeg-extra-args.-y              |                                              |
+| visualization.video.export.format                            | mp4                                          |
+| visualization.video.export.fps                               | 30                                           |
+| visualization.video.export.keyframe-interval                 | None                                         |
+| visualization.video.export.preview.enabled                   | True                                         |
+| visualization.video.export.preview.fade-length               | 1                                            |
+| visualization.video.export.preview.length                    | 2                                            |
+| visualization.video.export.reencode-segments                 | False                                        |
+| visualization.video.export.segment-length                    | 3600                                         |
+| visualization.video.export.size                              | 1920x1080                                    |
+| visualization.video.export.time.enabled                      | True                                         |
+| visualization.video.export.title.enabled                     | False                                        |
+| visualization.video.export.video-length-max                  | None                                         |
+| visualization.video.export.window-length                     | 20                                           |
