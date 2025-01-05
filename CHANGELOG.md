@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.1.0] - 2025-01-04
+### Added
+- Added package installation support using `pip` 
+- `estimpy` added to PyPI
+
+### Changed
+- Renamed project from `EstimPy` to `estimpy` (EstimPy will remain the preferred stylized name)
+- Renamed front-end scripts and moved within package subdirectory:
+  - `visualizer.py` → `estimpy/cli_visualizer.py`
+  - `player.py` → `estimpy/cli_player.py`
+- Updated CLI entry points to reflect the new names:
+  - `estimpy-visualizer` now points to `visualizer_cli:main`.
+  - `estimpy-player` now points to `player_cli:main`.
+- Converted project specification from `setup.py` to `pyproject.toml`
+
+### Removed
+- Removed redundant `requirements.txt`
+
 ## [1.0.0] - 2025-01-01 (Happy New Year!)
 ### Added
 - Handling for validating output files and overwriting existing files

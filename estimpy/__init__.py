@@ -1,4 +1,4 @@
-"""A python package for Estim (EstimPy)."""
+"""A python package for Estim (estimpy)."""
 
 import ast
 import os

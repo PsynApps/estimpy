@@ -1,0 +1,53 @@
+[build-system]
+requires = ['setuptools>=42', 'wheel']
+build-backend = 'setuptools.build_meta'
+
+[project]
+name = 'estimpy'
+version = '1.1.0'
+description = 'A package for Estim audio playback and visualization'
+readme = 'README.md'
+license = {text = 'MIT'}
+authors = [
+    {name = 'Psynapse', email = 'psynapse@psynapse.gay'}
+]
+classifiers = [
+    'Programming Language :: Python :: 3',
+    'License :: OSI Approved :: MIT License',
+    'Operating System :: OS Independent'
+]
+requires-python = '>=3.11'
+
+dependencies = [
+    'audioop-lts; python_version >= "3.13"',
+    'colorama',
+    'flatdict',
+    'matplotlib>=3.7.2',
+    'mutagen',
+    'numpy',
+    'pydub',
+    'pygame',
+    'pyqt6',
+    'pyyaml',
+    'scipy',
+    'tqdm'
+]
+
+[project.urls]
+Homepage = 'https://github.com/PsynApps/estimpy'
+Documentation = 'https://github.com/PsynApps/estimpy/blob/main/README.md'
+Source = 'https://github.com/PsynApps/estimpy'
+Tracker = 'https://github.com/PsynApps/estimpy/issues'
+Changelog = 'https://github.com/PsynApps/estimpy/blob/main/CHANGELOG.md'
+Discussions = 'https://github.com/PsynApps/estimpy/discussions'
+PyPI = 'https://pypi.org/project/estimpy/'
+
+[project.entry-points.console_scripts]
+estimpy-visualizer = 'estimpy.cli_visualizer:main'
+estimpy-player = 'estimpy.cli_player:main'
+
+[tool.setuptools.packages.find]
+exclude = ['assets*', 'export*', 'tests*']
+
+[tool.setuptools.package-data]
+estimpy = ['config/*.yaml']

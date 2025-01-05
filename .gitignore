@@ -1,5 +1,18 @@
-*__pycache__*
-/.idea
-/assets
-/export
-/tests
+# Byte-compiled files
+*.pyc
+__pycache__/
+
+# Distribution/build artifacts
+*.egg-info/
+dist/
+
+# Editor project files
+.idea/
+.vscode/
+
+# Development-only directories/files
+/assets/
+/export/
+/tests/
+todo.txt
+*.swp

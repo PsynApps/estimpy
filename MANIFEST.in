@@ -1,0 +1,19 @@
+# Include key files
+include CHANGELOG.md
+include README.md
+include LICENSE
+
+# Include YAML config files
+recursive-include estimpy/config *.yaml
+
+# Exclude unnecessary directories
+exclude __pycache__/
+exclude *.pyc
+exclude *.pyo
+exclude *.pyd
+exclude *.egg-info/
+exclude .git/
+exclude .idea/
+exclude tests/*
+exclude assets/*
+exclude export/*

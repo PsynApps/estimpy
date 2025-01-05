@@ -1,3 +1,13 @@
+"""
+Visualizer CLI
+
+This script serves as the command-line entry point for the EstimPy visualizer tool.
+It provides a user-friendly interface for visualizing Estim audio files.
+
+Usage:
+    Run via the command line using `estimpy-visualizer`.
+"""
+
 import argparse
 import logging
 import sys
@@ -6,7 +16,8 @@ import tkinter.filedialog
 
 import estimpy as es
 
-if __name__ == '__main__':
+
+def main():
     logging.getLogger().setLevel(logging.ERROR)
 
     parser = argparse.ArgumentParser(description='Generates various forms of visualization for Estim media files')
@@ -28,7 +39,7 @@ if __name__ == '__main__':
                         help='Segment on which to resume video encoding. Only relevant for the write-video action. Useful if script crashes during a large encoding. Will not work correctly if segment-length configuration value is changed between runs.')
 
     parser.add_argument('-y', '--yes', action='store_true',
-                        help='Answers yes to all interactive prompts (overwrites files by default).')
+                        help='Answers yes to all interactive prompts (overwrites existing output files by default).')
 
     args = vars(parser.parse_args())
 
@@ -84,3 +95,7 @@ if __name__ == '__main__':
 
         if actions['show-image']:
             es.visualization.show_image(es_audio=es_audio)
+
+
+if __name__ == '__main__':
+    main()

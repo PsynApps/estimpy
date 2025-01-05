@@ -6,8 +6,20 @@
 <a href="https://youtu.be/7zNsNnao8KU" target="_blank"><img src="https://github.com/user-attachments/assets/a74e0039-8cca-4149-bdbb-3a97e2659ba7"></a>  
 </div>
 
+## Table of Contents
+- [Visualization library](#visualization-library)
+- [Motivation](#motivation)
+- [Features](#features)
+- [Disclaimer](#disclaimer)
+- [Getting started](#getting-started)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [estimpy-visualizer](#estimpy-visualizer)
+  - [estimpy-player](#estimpy-player)
+- [Configuration](#configuration)
+
 ## Visualization library
-[**Click here**](https://www.youtube.com/@Psynapster/videos) to access a library of pre-rendered high-resolution (8k 60fps) visualizations of some popular estim audio files.
+[**Click here**](https://www.youtube.com/@Psynapster/videos) to access a library of pre-rendered high-resolution (8k 60fps) visualizations of some popular Estim audio files.
 
 ## Motivation
 
@@ -15,7 +27,7 @@ Estim is a hobby which uses specialized signal generators to produce powerful se
 
 Many commercial Estim units support custom stimulation signals using audio input in addition to an included small library of simple stimulation patterns. Over time, the Estim enthusiast community has created a large repository of custom sessions distributed as basic audio files. While this format is convenient because it is non-proprietary and easy to use, it does not provide an easy mechanism to understand the nuances of a session.
 
-EstimPy helps users understand the flow, intensity, and texture of Estim audio sessions by generating intuitive visualizations from the audio data.
+**EstimPy** helps users understand the flow, intensity, and texture of Estim audio sessions by generating intuitive visualizations from the audio data.
 
 ## Features
 - **Visualization analyses**: Visualizations are generated for each channel of audio data
@@ -29,7 +41,7 @@ EstimPy helps users understand the flow, intensity, and texture of Estim audio s
 - **Animated visualization**: Generates an animated sliding visualization of the audio file
   - **Video file export**: Animated visualization can be saved to a video file
   - **Interactive player**: Animated visualization used within experimental audio file player
-- **Audio player**: Plays estim audio files for use with stereostim devices (***HIGHLY EXPERIMENTAL!***)
+- **Audio player**: Plays Estim audio files for use with stereostim devices (***HIGHLY EXPERIMENTAL!***)
   - **Real-time visualization**: Based on the animated visualization
   - **Separate channel output control**: Allows signal gain of each channel to be independently controlled
   - **Smooth intensity transitions**: Ensures that any changes in playback will transition smoothly to avoid sudden changes in output intensity
@@ -70,22 +82,22 @@ Both image and animated visualizations use the same basic layout to visualize ea
 </p>
 
 ---
-## Getting Started
+## Getting started
 
 ### System requirements
 
-**EstimPy** requires that **FFmpeg** and **FFprobe** are installed and accessible via your system’s PATH. If you would like to use alternative codecs, FFmpeg must also be built with those libraries (e.g. libaom-av1).
+**EstimPy** requires that **FFmpeg** and **FFprobe** are installed and accessible via your system's PATH. If you would like to use alternative codecs, FFmpeg must also be built with those libraries (e.g. libaom-av1).
 
 #### Installing FFmpeg and FFprobe
 
 ##### Windows
 
 - Download the FFmpeg executable from the [FFmpeg official website](https://ffmpeg.org/download.html)
-- Extract the downloaded archive to a directory of your choice (e.g., `C:\ffmpeg`)
-- Add the bin` directory to your system’s PATH:
+- Extract the downloaded archive to a directory of your choice (e.g., `C:\ffmpeg\`)
+- Add the `bin` directory to your system’s PATH:
   - Open **System Properties > Advanced > Environment Variables**
   - Under **System variables**, select **Path** and click **Edit**
-  - Click **New** and add the path to the bin folder (e.g., `C:\ffmpeg\bin`)
+  - Click **New** and add the path to the `bin` folder (e.g., `C:\ffmpeg\bin\`)
 
 ##### MacOS
 
@@ -102,10 +114,9 @@ Both image and animated visualizations use the same basic layout to visualize ea
   sudo apt install ffmpeg
   ```
 
-##### Verifying Installation
+##### Verifying FFmpeg installation
 
 After installing FFmpeg and FFprobe, ensure they are accessible via your system's PATH by running the following commands in your terminal:
-
 ```
 ffmpeg -version
 ffprobe -version
@@ -114,17 +125,34 @@ ffprobe -version
 Both commands should return the version of FFmpeg/FFprobe that is installed.
 ### Installation
 
-To install **EstimPy**, you must clone the repository and install dependencies manually:
+#### Installing the latest stable release
 
+You can install the latest stable release of **EstimPy** directly from PyPI using:
 ```
-git clone https://github.com/PsynApps/EstimPy.git
-cd EstimPy
-pip install -r requirements.txt
+pip install estimpy
 ```
 
-#### Windows error
+#### Installing the latest development version
 
-On Windows while installing from requirements.txt, you may get an error like: ```Microsoft Visual C++ 14.0 or greater is required. Get it with "Microsoft C++ Build Tools"```. This error occurs when you are using the latest version of python because prebuilt package wheels are only included for earlier versions of Python. To fix this, you can either:
+To install the latest development version (which may be unstable), use the following:
+```
+git clone https://github.com/PsynApps/estimpy.git
+cd estimpy
+```
+
+To install the package for basic usage:
+```
+pip install .
+```
+
+For development purposes, you can also install the package in editable mode:
+```
+pip install -e .
+```
+
+#### Windows installation error
+
+On Windows, you may get an error like: ```Microsoft Visual C++ 14.0 or greater is required. Get it with "Microsoft C++ Build Tools"```. This error occurs when you are using the latest version of python because prebuilt package wheels are only included for earlier versions of Python. To fix this, you can either:
 * Install the ["C++ development tools"](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (requires ~9 GB) from Microsoft Visual Studio
 * Downgrade your python version by one minor revision (e.g. 3.12 when 3.13 is the latest minor release)
 
@@ -132,19 +160,19 @@ On Windows while installing from requirements.txt, you may get an error like: ``
 
 EstimPy provides two command-line tools for generating visualizations.
 
-- `visualizer.py`: Generates image and video visualizations of Estim audio files
-- `player.py`: Provides a highly experimental real-time player for Estim audio files
+- `estimpy-visualizer`: Generates image and video visualizations of Estim audio files
+- `estimpy-player`: Provides a highly experimental real-time player for Estim audio files
 
-### `visualizer.py`
+### `estimpy-visualizer`
 
-- `visualizer.py` performs one or more actions using one or more input files.
+- `estimpy-visualizer` performs one or more actions using one or more input files.
 - Multiple actions can be performed in a single command, allowing for flexibility in generating visualizations, saving files, and embedding metadata. 
 - If no input file is specified, a file dialog will be shown to allow you to select one or more input files.
 - If no action is specified, the script will use the `show-image` action.
 
 #### Basic usage
 ```
-python visualizer.py [actions] [options]
+estimpy-visualizer [actions] [options]
 ```
 
 #### Actions
@@ -174,17 +202,13 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 | `-fmax FREQUENCY_MAX`, `--frequency-max`           | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
 | `-rf RESUME_FRAME`, `--resume-frame`               | Specify the frame on which to resume video encoding (useful for resuming if encoding crashes).                         |
 | `-rs RESUME_SEGMENT`, `--resume-segment`           | Specify the segment on which to resume video encoding (useful for resuming if encoding crashes).                       |
-| `-y`, `--yes`                                      | Answers yes to all interactive prompts (overwrites files by default).                                                  |
-
-#### Configuration
-
-Many aspects of the visualization rendering and output can be customized using additional configuration files specified by the `--config` command-line option. See the Configuration section for more details.
+| `-y`, `--yes`                                      | Answers yes to all interactive prompts (overwrites existing output files by default).                                  |
 
 #### Examples
 
 - **Show image visualization interactively**
   ```
-  python visualizer.py -si -i input.mp3
+  estimpy-visualizer -si -i input.mp3
   ```
 
 <p align="center">
@@ -193,7 +217,7 @@ Many aspects of the visualization rendering and output can be customized using a
 
 - **Save image visualization to an image file**
   ```
-  python visualizer.py -wi -i input.mp3
+  estimpy-visualizer -wi -i input.mp3
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/629bc729-280a-43ce-9866-f30f8719275a" width="480">
@@ -201,7 +225,7 @@ Many aspects of the visualization rendering and output can be customized using a
 
 - **Save image visualization to the metadata of an audio file**
   ```
-  python visualizer.py -wm -i input.mp3
+  estimpy-visualizer -wm -i input.mp3
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c7762554-dd73-4d5f-a988-2fb1a0a60ba6" width="480">
@@ -209,12 +233,12 @@ Many aspects of the visualization rendering and output can be customized using a
 
 - **Save image visualization to the metadata of all supported files in a path recursively**
   ```
-  python visualizer.py -wm -i ../library/* -r
+  estimpy-visualizer -wm -i ../library/* -r
   ```
 
 - **Save animated visualization to a video file**
   ```
-  python visualizer.py -wv -i input.mp3
+  estimpy-visualizer -wv -i input.mp3
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/a74e0039-8cca-4149-bdbb-3a97e2659ba7">
@@ -222,14 +246,14 @@ Many aspects of the visualization rendering and output can be customized using a
 
 - **Save animated visualization to a 8k 60fps video file**
   ```
-  python visualizer.py -wv -i input.mp3 -c video-8k video-60fps
+  estimpy-visualizer -wv -i input.mp3 -c video-8k video-60fps
   ```
   **<a href="https://youtu.be/7zNsNnao8KU" target="_blank">Example high-resolution video (via YouTube)</a>**
 
 
 - **Save image visualization to an image file overwriting specific configuration options**
   ```
-  python visualizer.py -wi -i input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.peak-color #93c3ff visualization.style.amplitude.channels.ch1.peak-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
+  estimpy-visualizer -wi -i input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.peak-color #93c3ff visualization.style.amplitude.channels.ch1.peak-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/11858185-c7f8-4084-8eb3-450d4bcb6ae9" width="720">
@@ -237,7 +261,7 @@ Many aspects of the visualization rendering and output can be customized using a
 
 - **Perform multiple actions in one command**
   ```
-  python visualizer.py -si -wi -wm -wv -i input.mp3
+  estimpy-visualizer -si -wi -wm -wv -i input.mp3
   ```
   This command will:
   - Save an image visualization to input.png
@@ -245,16 +269,16 @@ Many aspects of the visualization rendering and output can be customized using a
   - Save an animated visualization to input.mp4
   - Display the image visualization interactively
     
-### `player.py`
+### `estimpy-player`
 
-- `player.py` provides a real-time player for Estim audio files with an animated visualization
+- `estimpy-player` provides a real-time player for Estim audio files with an animated visualization
 - Provides independent control of channel volume output. Changes in output levels are always gradually ramped to avoid sudden changes in stimulation level.
 - If no input file is specified, a file dialog will be shown where one or more files can be selected.
 - If multiple input files are specified, a playlist will be created, and files will be played in the specified order.
 
 #### Basic usage
 ```
-python player.py [options]
+estimpy-player [options]
 ```
 
 #### Options
@@ -275,7 +299,7 @@ python player.py [options]
 
 - **Launch the player and load an Estim audio file**
   ```
-  python player.py -i input.mp3
+  estimpy-player -i input.mp3
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/61907a99-b35d-4d3e-aac4-50c9226306a8" width="720">
@@ -283,7 +307,7 @@ python player.py [options]
 
 - **Launch the player and load multiple Estim audio files into a playlist**
   ```
-  python player.py -i input1.mp3 input2.mp3 input3.mp3
+  estimpy-player -i input1.mp3 input2.mp3 input3.mp3
   ```
   
 ## Configuration
@@ -294,7 +318,7 @@ EstimPy's command-line scripts support loading additional configuration profiles
 
 When specifying one or more built-in configuration profiles using the `--config` option of the command line scripts, it is not necessary to specify the path or the `.yaml` file extension.
 
-### Additional Configuration Profiles
+### Additional configuration profiles
 
 The following additional configuration profiles are included with **EstimPy**:
 
@@ -309,7 +333,7 @@ The following additional configuration profiles are included with **EstimPy**:
 | `video-4k`           | Generate animated visualizations in 4K                         |
 | `video-8k`           | Generate animated visualizations in 8K                         |
 | `video-60fps`        | Generate animated visualizations in 60fps                      |
-| `video-120fpsl`      | Generate animated visualizations in 120fps                     |
+| `video-120fps`       | Generate animated visualizations in 120fps                     |
 | `video-av1`          | Encode video with AV1 codec using CPU                          |
 | `video-av1_nvenc`    | Encode video with AV1 encoding using NVENC hardware            |
 | `video-hevc_nvenc`   | Encode video using x265 encoding with NVENC hardware           |
@@ -324,7 +348,7 @@ The best way to create a custom configuration profile to ensure it follows the c
 
 You can then apply your configuration using the `--config` command-line option of EstimPy's scripts using
 ```
-python visualizer.py [actions] [options] --config path_to/config_file.yaml
+estimpy-visualizer [actions] [options] --config path_to/config_file.yaml
 ```
 
 ### Overwriting configuration option values

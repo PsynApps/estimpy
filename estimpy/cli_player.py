@@ -1,3 +1,13 @@
+"""
+Player CLI
+
+This script serves as the command-line entry point for the EstimPy audio player tool.
+It provides a user-friendly interface for playing Estim audio files.
+
+Usage:
+    Run via the command line using `estimpy-visualizer`.
+"""
+
 import argparse
 import logging
 import tkinter as tk
@@ -5,7 +15,8 @@ import tkinter.filedialog
 
 import estimpy as es
 
-if __name__ == '__main__':
+
+def main():
     logging.getLogger().setLevel(logging.ERROR)
 
     parser = argparse.ArgumentParser(description='Provides a real-time player for Estim audio files with visual rendering of various audio analyses and independent control of channel volume output.')
@@ -28,3 +39,7 @@ if __name__ == '__main__':
 
     video_player = es.player.Player(audio_files=audio_files)
     video_player.show()
+
+
+if __name__ == '__main__':
+    main()
