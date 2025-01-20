@@ -323,6 +323,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     with open(video_segment_list_file, 'w') as f:
         for video_segment_file in video_segment_files:
+            # Escape any single quotes in file name (in a very bizarre way required by ffmpeg)
+            video_segment_file = video_segment_file.replace("'", "'\\''")
             # Format each line in the required 'file 'path/to/file'' format
             f.write(f'file \'{video_segment_file}\'\n')
 
@@ -378,5 +380,9 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     print('Deleting temporary files.')
 
     es.utils.delete_temp_files()
+
+    print(f'Saved file "{video_file}" ({os.path.getsize(video_file)}).')
+
+    print()
 
     return video_file

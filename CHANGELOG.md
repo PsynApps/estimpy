@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1] - 2025-01-19
+### Added
+- Added `--version` command-line argument to display package version information
+
+### Fixed
+- Fixed bug when writing video with apostrophe in file name
+
 ## [1.1.0] - 2025-01-04
 ### Added
 - Added package installation support using `pip` 

@@ -2,6 +2,7 @@
 
 import argparse
 import glob
+import importlib.metadata
 import itertools
 import numpy as np
 import os
@@ -65,6 +66,9 @@ def add_parser_arguments(parser: argparse.ArgumentParser, args: list = None) -> 
     if args is None:
         return
 
+    if 'version' in args:
+        parser.add_argument('--version', action='store_true', help='Display version information and exit.')
+
     if 'input_files' in args:
         parser.add_argument('-i', '--input-files', default=None, nargs='*', help='Input file(s). Supports wildcards.')
 
@@ -110,7 +114,7 @@ def delete_temp_files():
 
 
 def get_default_parser_arguments() -> list:
-    return ['input_files', 'recursive', 'config', 'config_option', 'config_option_list',
+    return ['version', 'input_files', 'recursive', 'config', 'config_option', 'config_option_list',
             'dynamic_range', 'frequency_min', 'frequency_max']
 
 
@@ -174,6 +178,11 @@ def handle_parser_arguments(args: dict) -> None:
 
     argkeys = args.keys()
 
+    argkey = 'version'
+    if argkey in argkeys and args[argkey]:
+        print(importlib.metadata.version('estimpy'))
+        sys.exit()
+
     # Important to load config files
     argkey = 'config'
     if argkey in argkeys and args[argkey]:
@@ -213,6 +222,7 @@ def handle_parser_arguments(args: dict) -> None:
             print(f"{key.ljust(key_width)}: {str(es.cfg[key])}")
 
         sys.exit()
+
     # Configuration option shortcuts
     argkey = 'recursive'
     if argkey in argkeys and args[argkey] is not None:
