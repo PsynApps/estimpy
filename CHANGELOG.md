@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.2] - 2025-01-26
+### Changed
+- Changed batched file handling
+  - Batch will continue processing additional files even if one or more files fail
+  - List of files will always be processed in alphabetical order
+
+### Fixed
+- Fixed metadata handling bug
+
 ## [1.1.1] - 2025-01-19
 ### Added
 - Added `--version` command-line argument to display package version information

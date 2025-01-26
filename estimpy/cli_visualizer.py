@@ -79,22 +79,21 @@ def main():
 
         image_file = None
 
-        if actions['write-image']:
-            image_file = es.export.write_image(es_audio=es_audio)
+        try:
+            if actions['write-image']:
+                image_file = es.export.write_image(es_audio=es_audio)
 
-        if actions['write-metadata']:
-            try:
+            if actions['write-metadata']:
                 es.metadata.write_metadata(es_audio=es_audio, image_file=image_file)
-            except Exception as e:
-                print(e)
 
-        if actions['write-video']:
-            video_file = es.export.write_video(
-                es_audio=es_audio, image_file=image_file,
-                frame_start=resume_frame, segment_start=resume_segment)
+            if actions['write-video']:
+                es.export.write_video(es_audio=es_audio, image_file=image_file,
+                    frame_start=resume_frame, segment_start=resume_segment)
 
-        if actions['show-image']:
-            es.visualization.show_image(es_audio=es_audio)
+            if actions['show-image']:
+                es.visualization.show_image(es_audio=es_audio)
+        except Exception as e:
+            print(e)
 
 
 if __name__ == '__main__':

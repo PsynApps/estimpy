@@ -136,6 +136,10 @@ def get_file_list(file_patterns: typing.Iterable, recursive: bool = None) -> lis
             files += glob.glob(files_pattern, recursive=True)
         else:
             files += glob.glob(input_file_pattern)
+
+    # Sort the files for a predictable order
+    files.sort()
+
     return files
 
 

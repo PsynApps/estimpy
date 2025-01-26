@@ -219,8 +219,13 @@ class MetadataFormat(abc.ABC):
             return {}
 
         for tag, file_tag_field in cls._tag_fields().items():
-            if file_tag_field in file_tags and file_tags[file_tag_field][0]:
-                tags[tag] = file_tags[file_tag_field][0]
+            try:
+                if file_tag_field in file_tags and file_tags[file_tag_field][0]:
+                    tags[tag] = file_tags[file_tag_field][0]
+            except Exception:
+                # There are weird bugs that can happen when trying to access tag fields,
+                # so if any one tag doesn't read properly, just skip it.
+                pass
 
         image = cls._get_metadata_image(file_tags)
 
@@ -325,8 +330,12 @@ class MetadataFormatMP4(MetadataFormat, abc.ABC):
         return image
 
     @classmethod
-    def _load_file_tags(cls, file: str) -> mutagen.mp4.MP4:
-        return mutagen.mp4.MP4(file)
+    def _load_file_tags(cls, file: str) -> mutagen.mp4.MP4 | None:
+        try:
+            return mutagen.mp4.MP4(file)
+        except Exception as e:
+            print(e)
+            return None
 
     @classmethod
     def _set_file_tag_value(cls, file_tags: mutagen.mp4.MP4, tag: str, value):
