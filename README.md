@@ -156,6 +156,20 @@ On Windows, you may get an error like: ```Microsoft Visual C++ 14.0 or greater i
 * Install the ["C++ development tools"](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (requires ~9 GB) from Microsoft Visual Studio
 * Downgrade your python version by one minor revision (e.g. 3.12 when 3.13 is the latest minor release)
 
+#### Mac/Linux installation error
+
+If you install python via ```brew``` on Mac or ```apt``` on Linux, tkinter may not be included by default.
+
+##### Mac
+```
+brew install python-tk
+```
+
+##### Linux
+```
+sudo apt install python3-tk
+```
+
 ## Usage
 
 EstimPy provides two command-line tools for generating visualizations.

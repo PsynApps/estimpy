@@ -11,6 +11,7 @@ dist/
 .vscode/
 
 # Development-only directories/files
+.venv/
 /assets/
 /export/
 /tests/

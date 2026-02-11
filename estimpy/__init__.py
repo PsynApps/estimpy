@@ -17,7 +17,6 @@ if sys.version_info < MIN_VERSION:
         f'You will need to install a new Python environment with a compatible version to use this package.'
     )
 
-import flatdict
 import yaml
 
 os.environ['QT_ENABLE_HIGHDPI_SCALING'] = '0'  # Necessary to prevent forced DPI scaling on high DPI displays
@@ -137,6 +136,17 @@ def _check_dependencies() -> None:
     _check_ffprobe()
 
 
+def _flat_dict(d: dict, parent_key: str = '', delimiter: str = '.') -> dict:
+    items = []
+    for k, v in d.items():
+        new_key = parent_key + delimiter + k if parent_key else k
+        if isinstance(v, dict):
+            items.extend(_flat_dict(v, new_key, delimiter).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
 def _load_config(file: str) -> None:
     global cfg
 
@@ -155,7 +165,7 @@ def _load_config(file: str) -> None:
 
     with open(file, 'r') as file_handle:
         try:
-            file_cfg = flatdict.FlatDict(yaml.safe_load(file_handle), delimiter='.')
+            file_cfg = _flat_dict(yaml.safe_load(file_handle), delimiter='.')
 
             # Store base configuration (without derived values from config.updated handlers)
             # Needed to show which configuration options can be effectively updated from the command line

@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.3] - 2026-02-10
+### Removed
+- Removed `flatdict` package requirement in favor of a custom implementation
+
+### Added
+- Updated `.gitignore` to include `.venv/` for virtual environment files
+- Added installation instructions for `tkinter` on Mac and Linux in the README
+
 ## [1.1.2] - 2025-01-26
 ### Changed
 - Changed batched file handling
