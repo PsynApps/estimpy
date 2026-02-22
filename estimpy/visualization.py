@@ -1,14 +1,18 @@
+import colorsys
 import enum
 import math
+import time
 import typing
 
 import estimpy as es
 import functools
 import matplotlib
+import numpy as np
 import matplotlib.animation
 import matplotlib.patheffects
 import matplotlib.pyplot
 import matplotlib.widgets
+from PIL import Image, ImageDraw, ImageFont
 
 _DPI = 100
 
@@ -72,6 +76,34 @@ class Visualization:
     @property
     def es_audio(self):
         return self._es_audio
+
+    @property
+    def _channel_layout(self):
+        """Display order and inversion for each channel: list of (channel_id, invert)."""
+        if es.cfg.get('visualization.triphase', False) and self.es_audio.channels == 3:
+            return [(0, False), (1, True), (2, False)]
+        elif self.es_audio.channels >= 2:
+            return [(0, False), (1, True)]
+        else:
+            return [(0, False)]
+
+    @property
+    def _scrub_channel_layout(self):
+        """Channel layout for scrub panels: always shows original stereo channels (no triphase)."""
+        if self.es_audio.channels >= 2:
+            return [(0, False), (1, True)]
+        else:
+            return [(0, False)]
+
+    @property
+    def _layout_ratio_key(self):
+        """Config key suffix for height ratios."""
+        if es.cfg.get('visualization.triphase', False) and self.es_audio.channels == 3:
+            return 'triphase'
+        elif self.es_audio.channels >= 2:
+            return 'stereo'
+        else:
+            return 'mono'
 
     @property
     def peak_envelope(self) -> es.analysis.Envelope:
@@ -191,12 +223,12 @@ class Visualization:
 
         ax = self._handles['figure'].add_subplot(gridspec)
         self._handles['axes'][self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id)] = ax
-        self._format_amplitude_axes(ax=ax, invert=invert)
+        self._format_amplitude_axes(ax=ax, channel_id=channel_id, invert=invert)
 
         ax.set_facecolor(axes_style_cfg['background-color'])
 
         ax.fill(self.peak_envelope.times, self.peak_envelope.envelope_data[channel_id, :],
-                color=axes_style_cfg['peak-color'])
+                color=axes_style_cfg['base-color'])
 
         if es.cfg['visualization.style.amplitude.show-rms']:
             ax.fill(self.rms_envelope.times, self.rms_envelope.envelope_data[channel_id, :],
@@ -211,10 +243,8 @@ class Visualization:
 
             i_subplot += 1
 
-        for channel_id in range(self.es_audio.channels):
-            if channel_id == 1 and self.es_audio.channels == 2:
-                # Special case for the right channel of stereo audio where the amplitude and spectrogram axes
-                # should be shown in opposite order and inverted
+        for channel_id, invert in self._channel_layout:
+            if invert:
                 self._add_amplitude_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot], invert=True)
                 i_subplot += 1
                 self._add_spectrogram_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot], invert=True)
@@ -236,6 +266,7 @@ class Visualization:
         self._handles['time'] = self._handles['figure'].text(
             x=1, y=0, s=time_string, ha='right', va='bottom',
             fontsize=es.cfg['visualization.style.time.font-size'],
+            fontproperties=es.cfg['visualization.style.font.text.mpl-fontproperties'],
             color=es.cfg['visualization.style.axes.color'])
 
         # Set text path effects
@@ -270,6 +301,7 @@ class Visualization:
         title_text_handle = ax.annotate(self.es_audio.get_string(), xy=(0.5, 0.5), xycoords='axes fraction',
                                         ha='center', va='center',
                                         fontsize=es.cfg['visualization.style.title.font-size'],
+                                        fontproperties=es.cfg['visualization.style.font.text.mpl-fontproperties'],
                                         color=es.cfg['visualization.style.title.color'])
 
         title_text_extent = title_text_handle.get_window_extent()
@@ -297,6 +329,9 @@ class Visualization:
                            width=es.cfg['visualization.style.axes.tick-width'],
                            colors=es.cfg['visualization.style.axes.color'])
             ax.set_yticks(ticks=spectrogram_yticks)
+            _mpl_fp = es.cfg['visualization.style.font.text.mpl-fontproperties']
+            for label in ax.get_yticklabels():
+                label.set_fontproperties(_mpl_fp)
 
             if not invert:
                 axis_label_data_min = AxisScaleText.BOTTOM.value
@@ -304,19 +339,20 @@ class Visualization:
             else:
                 axis_label_data_min = AxisScaleText.TOP.value
                 axis_label_data_max = AxisScaleText.BOTTOM.value
-
             axes_text = [
                 ax.annotate(
                     text=self._get_spectrogram_scale_text(self.spectrogram.frequency_min),
                     xy=axis_label_data_min['xy'], xycoords='axes fraction', va=axis_label_data_min['va'],
                     xytext=axis_label_data_min['xytext'], textcoords='offset points',
                     fontsize=es.cfg['visualization.style.axes.font-size'],
+                    fontproperties=_mpl_fp,
                     color=es.cfg['visualization.style.axes.color']),
                 ax.annotate(
                     text=self._get_spectrogram_scale_text(self.spectrogram.frequency_max),
                     xy=axis_label_data_max['xy'], xycoords='axes fraction', va=axis_label_data_max['va'],
                     xytext=axis_label_data_max['xytext'], textcoords='offset points',
                     fontsize=es.cfg['visualization.style.axes.font-size'],
+                    fontproperties=_mpl_fp,
                     color=es.cfg['visualization.style.axes.color'])]
 
             for text in axes_text:
@@ -329,13 +365,25 @@ class Visualization:
         if invert:
             ax.invert_yaxis()
 
-    def _format_amplitude_axes(self, ax, invert: bool = False, hideaxis: bool = False):
+    def _get_amplitude_y_max(self, channel_id: int) -> float:
+        """Get the amplitude y-axis maximum for a channel.
+
+        The triphase channel -(A+B) can peak at 2.0 (+6 dB) since it sums two channels
+        in the analog domain without clipping.
+        """
+        padding = es.cfg['visualization.style.amplitude.padding']
+        if es.cfg.get('visualization.triphase', False) and self.es_audio.channels == 3 and channel_id == 2:
+            return 2 * (1 + padding)
+        return 1 + padding
+
+    def _format_amplitude_axes(self, ax, channel_id: int = 0, invert: bool = False, hideaxis: bool = False):
         ax.set_facecolor('black')
+        ax.xaxis.set_visible(False)
         ax.spines.bottom.set_visible(False)
         ax.spines.top.set_visible(False)
         ax.set_xlim([0, self.es_audio.length])
         # Add padding above envelope
-        ax.set_ylim([0, 1 + es.cfg['visualization.style.amplitude.padding']])
+        ax.set_ylim([0, self._get_amplitude_y_max(channel_id)])
 
         if es.cfg['visualization.style.amplitude.axes.enabled'] and not hideaxis:
             amplitude_yticks = [0]
@@ -344,17 +392,22 @@ class Visualization:
                            width=es.cfg['visualization.style.axes.tick-width'],
                            colors=es.cfg['visualization.style.axes.color'])
             ax.set_yticks(ticks=amplitude_yticks)
+            _mpl_fp = es.cfg['visualization.style.font.text.mpl-fontproperties']
+            for label in ax.get_yticklabels():
+                label.set_fontproperties(_mpl_fp)
 
             if not invert:
                 axis_label_data = AxisScaleText.TOP.value
             else:
                 axis_label_data = AxisScaleText.BOTTOM.value
 
+            amp_label = '+6 dB' if self._get_amplitude_y_max(channel_id) > 1.5 else '0 dB'
             axes_text = ax.annotate(
-                text='0 dB',
+                text=amp_label,
                 xy=axis_label_data['xy'], xycoords='axes fraction',
                 xytext=axis_label_data['xytext'], textcoords='offset points', va=axis_label_data['va'],
                 fontsize=es.cfg['visualization.style.axes.font-size'],
+                fontproperties=_mpl_fp,
                 color=es.cfg['visualization.style.axes.color'])
 
             # Set text path effects
@@ -376,21 +429,15 @@ class Visualization:
         if self._title_enabled(mode=self._mode):
             gridspec_params['height_ratios'].append(es.cfg['visualization.style.subplot-height-ratios.title'])
 
-        if self.es_audio.channels == 1:
-            # Mono
-            gridspec_params['height_ratios'] += [es.cfg['visualization.style.subplot-height-ratios.spectrogram.mono'],
-                                                 es.cfg['visualization.style.subplot-height-ratios.amplitude.mono']]
-        elif self.es_audio.channels == 2:
-            # Stereo
-            gridspec_params['height_ratios'] += [
-                es.cfg['visualization.style.subplot-height-ratios.spectrogram.stereo'],
-                es.cfg['visualization.style.subplot-height-ratios.amplitude.stereo'],
-                es.cfg['visualization.style.subplot-height-ratios.amplitude.stereo'],
-                es.cfg['visualization.style.subplot-height-ratios.spectrogram.stereo']]
-        else:
-            # Multichannel
-            # TODO need a generalized solution to calculate ratios based upon number of channels (including stereo)
-            raise Exception('Multichannel audio is not yet supported')
+        ratio_key = self._layout_ratio_key
+        spec_ratio = es.cfg[f'visualization.style.subplot-height-ratios.spectrogram.{ratio_key}']
+        amp_ratio = es.cfg[f'visualization.style.subplot-height-ratios.amplitude.{ratio_key}']
+
+        for ch_id, invert in self._channel_layout:
+            if invert:
+                gridspec_params['height_ratios'] += [amp_ratio, spec_ratio]
+            else:
+                gridspec_params['height_ratios'] += [spec_ratio, amp_ratio]
 
         gridspec_params['nrows'] = len(gridspec_params['height_ratios'])
 
@@ -418,13 +465,6 @@ class Visualization:
         self._add_figure_subplots(gridspec=gridspec)
 
         matplotlib.pyplot.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
-
-    def _remove_elements(self, handle_list):
-        for handle in handle_list:
-            if isinstance(handle, list):
-                self._remove_elements(handle)
-            else:
-                handle.remove()
 
     def _set_text_path_effects(self, text_handle):
         if hasattr(text_handle, 'set_path_effects') and callable(getattr(text_handle, 'set_path_effects')):
@@ -499,6 +539,7 @@ class VideoVisualization(Visualization):
 
         self.__amplitude_window_length = None
         self.__spectrogram_window_length = None
+        self.__precolored_spectrograms = None
 
 
     @property
@@ -532,6 +573,20 @@ class VideoVisualization(Visualization):
 
         return self.__spectrogram_window_length
 
+    @property
+    def _precolored_spectrograms(self):
+        if self.__precolored_spectrograms is None:
+            self.__precolored_spectrograms = {}
+            norm = matplotlib.colors.Normalize(
+                vmin=-es.cfg['visualization.style.spectrogram.dynamic-range'], vmax=0)
+            for channel_id in range(self.es_audio.channels):
+                style_cfg = self._get_spectrogram_style_cfg(channel_id)
+                cmap = matplotlib.colormaps[style_cfg['color-map']]
+                self.__precolored_spectrograms[channel_id] = cmap(
+                    norm(self.spectrogram.spectrogram_data[channel_id])).astype(np.float32)
+
+        return self.__precolored_spectrograms
+
     def load(self, es_audio: es.audio.Audio):
         if es_audio is None:
             return
@@ -540,10 +595,12 @@ class VideoVisualization(Visualization):
 
         self._animation = None
         self._frames = range(math.floor(es_audio.length * self.fps))
+        self.__precolored_spectrograms = None
 
-    def make_figure(self):
+    def make_figure(self, skip_initial_frame=False):
         super().make_figure()
-        self.make_frame(0)
+        if not skip_initial_frame:
+            self.make_frame(0)
 
     def make_frame(self, frame):
         if self._handles['figure'] is None:
@@ -551,9 +608,6 @@ class VideoVisualization(Visualization):
 
         self._frame = frame
         t = self._frame_to_time(frame)
-
-        self._remove_elements(self._handles['video_frame'])
-        self._handles['video_frame'].clear()
 
         for position_line in self._handles['position_lines']:
             position_line.set_xdata([t])
@@ -570,26 +624,37 @@ class VideoVisualization(Visualization):
             round_bounds=True)
 
         # Update the amplitude
-        for channel_id in range(self.es_audio.channels):
+        for channel_id, _ in self._channel_layout:
             axes_style_cfg = self._get_amplitude_style_cfg(channel_id)
 
             axes_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id)
 
             self._handles['axes'][axes_key].set_xlim(axes_xlim)
-            self._handles['video_frame'].append(
-                self._handles['axes'][axes_key].fill(
-                    self.peak_envelope.times[i_amplitude_min:i_amplitude_max],
-                    es.analysis.Envelope.pad_envelope_data(
-                        self.peak_envelope.envelope_data[channel_id, (i_amplitude_min + 1):(i_amplitude_max - 1)]),
-                    color=axes_style_cfg['peak-color']))
 
+            # Peak envelope
+            peak_x = self.peak_envelope.times[i_amplitude_min:i_amplitude_max]
+            peak_y = es.analysis.Envelope.pad_envelope_data(
+                self.peak_envelope.envelope_data[channel_id, (i_amplitude_min + 1):(i_amplitude_max - 1)])
+            peak_xy = np.column_stack([peak_x, peak_y])
+
+            if channel_id in self._handles['amplitude_peak_fills']:
+                self._handles['amplitude_peak_fills'][channel_id].set_xy(peak_xy)
+            else:
+                self._handles['amplitude_peak_fills'][channel_id] = self._handles['axes'][axes_key].fill(
+                    peak_x, peak_y, color=axes_style_cfg['base-color'])[0]
+
+            # RMS envelope
             if es.cfg['visualization.style.amplitude.show-rms']:
-                self._handles['video_frame'].append(
-                    self._handles['axes'][axes_key].fill(
-                        self.rms_envelope.times[i_amplitude_min:i_amplitude_max],
-                        es.analysis.Envelope.pad_envelope_data(
-                            self.rms_envelope.envelope_data[channel_id, (i_amplitude_min + 1):(i_amplitude_max - 1)]),
-                        color=axes_style_cfg['rms-color']))
+                rms_x = self.rms_envelope.times[i_amplitude_min:i_amplitude_max]
+                rms_y = es.analysis.Envelope.pad_envelope_data(
+                    self.rms_envelope.envelope_data[channel_id, (i_amplitude_min + 1):(i_amplitude_max - 1)])
+                rms_xy = np.column_stack([rms_x, rms_y])
+
+                if channel_id in self._handles['amplitude_rms_fills']:
+                    self._handles['amplitude_rms_fills'][channel_id].set_xy(rms_xy)
+                else:
+                    self._handles['amplitude_rms_fills'][channel_id] = self._handles['axes'][axes_key].fill(
+                        rms_x, rms_y, color=axes_style_cfg['rms-color'])[0]
 
         i_spectrogram_min, i_spectrogram_max = self._get_window_range(
             t=self.i_spectrogram(t),
@@ -597,22 +662,24 @@ class VideoVisualization(Visualization):
             window_length=self._spectrogram_window_length,
             round_bounds=True)
 
-        for channel_id in range(self.es_audio.channels):
-            axes_style_cfg = self._get_spectrogram_style_cfg(channel_id)
-
+        for channel_id, _ in self._channel_layout:
             axes_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id)
 
             self._handles['axes'][axes_key].set_xlim(axes_xlim)
-            self._handles['video_frame'].append(
-                self._handles['axes'][axes_key].imshow(
-                    self.spectrogram.spectrogram_data[channel_id, :, i_spectrogram_min:i_spectrogram_max],
-                    aspect='auto', origin='lower',
-                    cmap=axes_style_cfg['color-map'],
-                    extent=[self.spectrogram.times[i_spectrogram_min],
-                            self.spectrogram.times[i_spectrogram_max],
-                            self.spectrogram.frequency_min,
-                            self.spectrogram.frequency_max],
-                    vmin=-es.cfg['visualization.style.spectrogram.dynamic-range'], vmax=0))
+
+            spec_data = self._precolored_spectrograms[channel_id][:, i_spectrogram_min:i_spectrogram_max, :]
+            spec_extent = [self.spectrogram.times[i_spectrogram_min],
+                           self.spectrogram.times[i_spectrogram_max],
+                           self.spectrogram.frequency_min,
+                           self.spectrogram.frequency_max]
+
+            if channel_id in self._handles['spectrogram_images']:
+                self._handles['spectrogram_images'][channel_id].set_data(spec_data)
+                self._handles['spectrogram_images'][channel_id].set_extent(spec_extent)
+            else:
+                self._handles['spectrogram_images'][channel_id] = self._handles['axes'][axes_key].imshow(
+                    spec_data, aspect='auto', origin='lower',
+                    extent=spec_extent)
 
         self._update_time_text()
 
@@ -629,6 +696,636 @@ class VideoVisualization(Visualization):
 
         return width_scale_factor, height_scale_factor
 
+    def prepare_direct_render(self, profiling: bool = False):
+        """One-time setup for direct frame rendering (bypasses matplotlib per-frame)."""
+        fig = self._handles['figure']
+        fig.canvas.draw()
+        fig_width, fig_height = fig.canvas.get_width_height()
+
+        # Identify data subplot keys (only for displayed channels)
+        self._dr_data_axes_keys = []
+        for channel_id, _ in self._channel_layout:
+            self._dr_data_axes_keys.append(
+                self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id))
+            self._dr_data_axes_keys.append(
+                self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id))
+
+        # --- Capture 1: Chrome image (no dynamic elements) ---
+        self._set_dynamic_elements_visible(False)
+        fig.canvas.draw()
+        self._chrome_image = np.array(fig.canvas.buffer_rgba())[:, :, :3].copy()
+
+        # --- Capture 2: Axis overlay (data subplot backgrounds transparent) ---
+        orig_fig_facecolor = fig.patch.get_facecolor()
+        orig_facecolors = {}
+        fig.patch.set_facecolor((0, 0, 0, 0))
+        for key in self._dr_data_axes_keys:
+            ax = self._handles['axes'][key]
+            orig_facecolors[key] = ax.get_facecolor()
+            ax.set_facecolor((0, 0, 0, 0))
+
+        fig.canvas.draw()
+        axis_overlay_rgba = np.array(fig.canvas.buffer_rgba())
+        self._axis_overlay = axis_overlay_rgba[:, :, :3].copy()
+        self._axis_overlay_alpha = axis_overlay_rgba[:, :, 3].copy()
+
+        # Restore facecolors
+        fig.patch.set_facecolor(orig_fig_facecolor)
+        for key in self._dr_data_axes_keys:
+            self._handles['axes'][key].set_facecolor(orig_facecolors[key])
+        self._set_dynamic_elements_visible(True)
+
+        # --- Compute subplot pixel regions ---
+        self._data_regions = {}
+        for key in self._dr_data_axes_keys:
+            bbox = self._handles['axes'][key].get_position()
+            x0 = int(round(bbox.x0 * fig_width))
+            y0 = int(round((1 - bbox.y1) * fig_height))
+            x1 = int(round(bbox.x1 * fig_width))
+            y1 = int(round((1 - bbox.y0) * fig_height))
+            self._data_regions[key] = (x0, y0, x1, y1)
+
+        self._scrub_regions = {}
+        for channel_id, _ in self._scrub_channel_layout:
+            key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE_SCRUB, channel=channel_id)
+            bbox = self._handles['axes'][key].get_position()
+            x0 = int(round(bbox.x0 * fig_width))
+            y0 = int(round((1 - bbox.y1) * fig_height))
+            x1 = int(round(bbox.x1 * fig_width))
+            y1 = int(round((1 - bbox.y0) * fig_height))
+            self._scrub_regions[key] = (x0, y0, x1, y1)
+
+        # --- Position line width ---
+        if self._handles['position_lines']:
+            lw_pt = self._handles['position_lines'][0].get_linewidth()
+            self._position_line_width_px = max(1, int(round(lw_pt * fig.dpi / 72)))
+        else:
+            self._position_line_width_px = 1
+
+        line_color = matplotlib.colors.to_rgb(es.cfg['visualization.style.video.position-line-color'])
+        self._position_line_color = (np.array(line_color) * 255).astype(np.uint8)
+
+        # --- Time text rendering setup ---
+        self._dr_time_enabled = self._time_enabled()
+
+        if self._dr_time_enabled and self._handles['time'] is not None:
+            time_fontsize_pt = self._handles['time'].get_fontsize()
+            self._dr_time_font_size_px = max(1, int(round(time_fontsize_pt * fig.dpi / 72)))
+
+            font_file = es.cfg['visualization.style.font.text.file']
+            font_face_index = es.cfg.get('visualization.style.font.text.face-index', 0)
+            self._dr_time_font = ImageFont.truetype(font_file, self._dr_time_font_size_px, index=font_face_index)
+
+            time_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.axes.color'])
+            self._dr_time_color = tuple(int(c * 255) for c in time_color_rgb)
+
+            border_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.font.text.border-color'])
+            self._dr_time_border_color = tuple(int(c * 255) for c in border_color_rgb)
+            self._dr_time_border_width = max(1, int(round(self._text_border_width * fig.dpi / 72)))
+
+            # Position: bottom-right of figure (matching matplotlib's x=1, y=0, ha='right', va='bottom')
+            self._dr_time_position = (fig_width, fig_height)
+
+        # --- Pre-compute axis overlay masks for data regions (for efficient compositing) ---
+        self._axis_overlay_masks = {}
+        for key in self._dr_data_axes_keys:
+            x0, y0, x1, y1 = self._data_regions[key]
+            mask = self._axis_overlay_alpha[y0:y1, x0:x1] > 0
+            self._axis_overlay_masks[key] = mask
+
+        # Store figure dimensions
+        self._dr_fig_width = fig_width
+        self._dr_fig_height = fig_height
+
+        # --- Shift-and-paint state ---
+
+        # Scroll dynamics
+        # Use the first data region to get panel width (all panels span full figure width)
+        first_key = self._dr_data_axes_keys[0]
+        dr_x0, _, dr_x1, _ = self._data_regions[first_key]
+        self._dr_panel_width = dr_x1 - dr_x0
+        self._dr_pixels_per_second = self._dr_panel_width / self._window_length
+        self._dr_never_scrolls = self.es_audio.length <= self._window_length
+
+        # Per-channel colormap objects (for on-demand spectrogram coloring)
+        self._dr_spec_norm = matplotlib.colors.Normalize(
+            vmin=-es.cfg['visualization.style.spectrogram.dynamic-range'], vmax=0)
+        self._dr_spec_cmaps = {}
+        for ch, _ in self._channel_layout:
+            style_cfg = self._get_spectrogram_style_cfg(ch)
+            self._dr_spec_cmaps[ch] = matplotlib.colormaps[style_cfg['color-map']]
+
+        # Cached amplitude y-max per channel
+        self._dr_amp_y_max = {}
+        for ch, _ in self._channel_layout:
+            self._dr_amp_y_max[ch] = self._get_amplitude_y_max(ch)
+        self._dr_show_rms = es.cfg['visualization.style.amplitude.show-rms']
+        self._dr_amp_bg_rgb = {}
+        self._dr_amp_peak_rgb = {}
+        self._dr_amp_rms_rgb = {}
+        for ch, _ in self._channel_layout:
+            style_cfg = self._get_amplitude_style_cfg(ch)
+            self._dr_amp_bg_rgb[ch] = (np.array(matplotlib.colors.to_rgb(style_cfg['background-color'])) * 255).astype(np.uint8)
+            self._dr_amp_peak_rgb[ch] = (np.array(matplotlib.colors.to_rgb(style_cfg['base-color'])) * 255).astype(np.uint8)
+            if self._dr_show_rms:
+                self._dr_amp_rms_rgb[ch] = (np.array(matplotlib.colors.to_rgb(style_cfg['rms-color'])) * 255).astype(np.uint8)
+
+        # Invert flags per panel
+        self._dr_invert = {}
+        for ch, inv in self._channel_layout:
+            self._dr_invert[self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=ch)] = inv
+            self._dr_invert[self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=ch)] = inv
+
+        # Direct references to data arrays (avoid property lookups per frame)
+        self._dr_peak_times = self.peak_envelope.times
+        self._dr_peak_data = self.peak_envelope.envelope_data
+        self._dr_rms_times = self.rms_envelope.times if self._dr_show_rms else None
+        self._dr_rms_data = self.rms_envelope.envelope_data if self._dr_show_rms else None
+        self._dr_spec_times = self.spectrogram.times
+
+        # Pre-compute axis overlay fancy indices (for efficient save/restore)
+        self._dr_overlay_indices = {}
+        self._dr_overlay_values = {}
+        for key in self._dr_data_axes_keys:
+            x0, y0, x1, y1 = self._data_regions[key]
+            mask = self._axis_overlay_masks[key]
+            if mask.any():
+                ys, xs = np.where(mask)
+                self._dr_overlay_indices[key] = (ys + y0, xs + x0)
+                self._dr_overlay_values[key] = self._axis_overlay[y0:y1, x0:x1][mask].copy()
+
+        # Note: _axis_overlay and _axis_overlay_alpha are kept alive
+        # to support re-rendering window time labels on zoom changes
+
+        # Initialize persistent frame buffer and state
+        self._dr_frame_buffer = self._chrome_image.copy()
+        self._dr_buffer_initialized = False
+        self._dr_prev_window_min = None
+        self._dr_scroll_accumulator = 0.0
+        self._dr_saved_regions = []
+        self._dr_overlay_underlay = {}
+        self._dr_time_text_cache = {}
+
+        # Free precolored spectrograms to save memory (export path uses on-demand colormap)
+        for ch in self._handles['spectrogram_images']:
+            self._handles['spectrogram_images'][ch].set_data(np.zeros((1, 1, 4)))
+        self.__precolored_spectrograms = None
+
+        # Profiling
+        self._dr_profiling = profiling
+        if self._dr_profiling:
+            self._dr_profile_interval = 100
+            self._dr_profile_frame_count = 0
+            self._dr_profile_times = {
+                'restore_overlays': 0.0,
+                'restore_axis': 0.0,
+                'shift_panels': 0.0,
+                'paint_strips': 0.0,
+                'save_axis': 0.0,
+                'apply_axis': 0.0,
+                'save_overlays': 0.0,
+                'draw_lines': 0.0,
+                'draw_time': 0.0,
+                'total_render': 0.0,
+            }
+
+    def _dr_print_profile(self):
+        """Print profiling summary and reset accumulators."""
+        n = self._dr_profile_frame_count
+        if n == 0:
+            return
+        print(f'\n--- Render profile ({n} frames) ---')
+        total = self._dr_profile_times['total_render']
+        for key, val in self._dr_profile_times.items():
+            avg_ms = (val / n) * 1000
+            pct = (val / total * 100) if total > 0 else 0
+            print(f'  {key:20s}: {avg_ms:7.2f} ms/frame  ({pct:5.1f}%)')
+        print(f'  {"avg fps":20s}: {n / total:.1f}' if total > 0 else '')
+        print()
+        # Reset
+        self._dr_profile_frame_count = 0
+        for key in self._dr_profile_times:
+            self._dr_profile_times[key] = 0.0
+
+    def render_frame_direct(self, frame) -> np.ndarray:
+        """Render a single frame as an RGB numpy array using shift-and-paint optimization."""
+        _profiling = self._dr_profiling
+        if _profiling:
+            t0_total = time.perf_counter()
+
+        self._frame = frame
+        t = self._frame_to_time(frame)
+
+        window_min, window_max = self._get_window_range(
+            t=t, total_length=self.es_audio.length, window_length=self._window_length)
+        axes_xlim = (window_min, window_max)
+
+        if not self._dr_buffer_initialized:
+            # Full re-render of all panels (first frame or after zoom change).
+            # Restore any previous overlays first — position lines drawn on the
+            # scrub panels are baked into the frame buffer and must be erased
+            # before re-rendering, since scrub panels are not repainted here.
+            self._dr_restore_overlay_regions()
+            self._dr_restore_axis_underlay()
+            self._dr_render_full_panels(window_min, window_max)
+            self._dr_buffer_initialized = True
+        else:
+            # Subsequent frames: restore previous overlays, then shift or re-render
+            if _profiling:
+                t0 = time.perf_counter()
+            self._dr_restore_overlay_regions()
+            if _profiling:
+                self._dr_profile_times['restore_overlays'] += time.perf_counter() - t0
+
+                t0 = time.perf_counter()
+            self._dr_restore_axis_underlay()
+            if _profiling:
+                self._dr_profile_times['restore_axis'] += time.perf_counter() - t0
+
+            shift_pixels = 0
+            if not self._dr_never_scrolls and window_min != self._dr_prev_window_min:
+                shift_pixels = self._dr_compute_scroll(window_min)
+
+            if shift_pixels == -1:
+                # Discontinuous jump — full re-render
+                self._dr_render_full_panels(window_min, window_max)
+            elif shift_pixels > 0:
+                # Incremental scroll — shift and paint new strip
+                if _profiling:
+                    t0 = time.perf_counter()
+                self._dr_shift_panels(shift_pixels)
+                if _profiling:
+                    self._dr_profile_times['shift_panels'] += time.perf_counter() - t0
+
+                    t0 = time.perf_counter()
+                for ch, _ in self._channel_layout:
+                    spec_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=ch)
+                    amp_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=ch)
+                    x0, _, x1, _ = self._data_regions[spec_key]
+                    pw = x1 - x0
+                    sx = pw - shift_pixels
+                    self._dr_paint_spectrogram_strip(ch, spec_key, sx, shift_pixels, window_min, window_max)
+                    self._dr_paint_amplitude_strip(ch, amp_key, sx, shift_pixels, window_min, window_max)
+                if _profiling:
+                    self._dr_profile_times['paint_strips'] += time.perf_counter() - t0
+
+        # Apply axis overlay (layer 1 → 2)
+        if _profiling:
+            t0 = time.perf_counter()
+        self._dr_save_axis_underlay()
+        if _profiling:
+            self._dr_profile_times['save_axis'] += time.perf_counter() - t0
+
+            t0 = time.perf_counter()
+        self._dr_apply_all_axis_overlays()
+        if _profiling:
+            self._dr_profile_times['apply_axis'] += time.perf_counter() - t0
+
+        # Apply position lines + time text (layer 2 → 3)
+        if _profiling:
+            t0 = time.perf_counter()
+        self._dr_save_overlay_regions(t, axes_xlim)
+        if _profiling:
+            self._dr_profile_times['save_overlays'] += time.perf_counter() - t0
+
+            t0 = time.perf_counter()
+        self._dr_draw_position_lines(t, axes_xlim)
+        if _profiling:
+            self._dr_profile_times['draw_lines'] += time.perf_counter() - t0
+
+        if self._dr_time_enabled and self._handles['time'] is not None:
+            if _profiling:
+                t0 = time.perf_counter()
+            self._dr_draw_time_text(t)
+            if _profiling:
+                self._dr_profile_times['draw_time'] += time.perf_counter() - t0
+
+        # Update state
+        self._dr_prev_window_min = window_min
+
+        if _profiling:
+            self._dr_profile_times['total_render'] += time.perf_counter() - t0_total
+            self._dr_profile_frame_count += 1
+            if self._dr_profile_frame_count >= self._dr_profile_interval:
+                self._dr_print_profile()
+
+        # Buffer is already RGB — return directly (contiguous for fast tobytes)
+        return self._dr_frame_buffer
+
+    def _set_dynamic_elements_visible(self, visible: bool):
+        """Show/hide all dynamic per-frame elements."""
+        for channel_id in self._handles['amplitude_peak_fills']:
+            self._handles['amplitude_peak_fills'][channel_id].set_visible(visible)
+        for channel_id in self._handles['amplitude_rms_fills']:
+            self._handles['amplitude_rms_fills'][channel_id].set_visible(visible)
+        for channel_id in self._handles['spectrogram_images']:
+            self._handles['spectrogram_images'][channel_id].set_visible(visible)
+        for line in self._handles['position_lines']:
+            line.set_visible(visible)
+        if self._handles['time'] is not None:
+            self._handles['time'].set_visible(visible)
+
+    def update_window_length(self, new_length):
+        """Update the sliding window length dynamically (e.g., for zoom controls).
+        Must be called after prepare_direct_render()."""
+        self._window_length = new_length
+
+        # Invalidate cached window lengths
+        self.__amplitude_window_length = None
+        self.__spectrogram_window_length = None
+
+        # Update scroll dynamics
+        self._dr_pixels_per_second = self._dr_panel_width / self._window_length
+        self._dr_never_scrolls = self.es_audio.length <= self._window_length
+
+        # Force full re-render on next frame
+        self._dr_buffer_initialized = False
+        self._dr_scroll_accumulator = 0.0
+
+    # --- Shift-and-paint methods ---
+
+    def _dr_compute_scroll(self, window_min) -> int:
+        """Compute integer pixel shift from sub-pixel scroll accumulator.
+        Returns shift_pixels (>= 0), or -1 to signal full re-render needed."""
+        delta_seconds = window_min - self._dr_prev_window_min
+        delta_pixels = delta_seconds * self._dr_pixels_per_second
+
+        # If delta is abnormally large, force full re-render
+        if delta_pixels >= self._dr_panel_width or delta_pixels < 0:
+            self._dr_scroll_accumulator = 0.0
+            return -1
+
+        self._dr_scroll_accumulator += delta_pixels
+        shift_int = round(self._dr_scroll_accumulator)
+        self._dr_scroll_accumulator -= shift_int
+        return max(0, shift_int)
+
+    def _dr_shift_panels(self, shift_pixels):
+        """Shift each data region left by shift_pixels within the frame buffer."""
+        for key in self._dr_data_axes_keys:
+            x0, y0, x1, y1 = self._data_regions[key]
+            self._dr_frame_buffer[y0:y1, x0:x1 - shift_pixels] = \
+                self._dr_frame_buffer[y0:y1, x0 + shift_pixels:x1]
+
+    def _dr_render_full_panels(self, window_min, window_max):
+        """Full-width render for first frame or fallback."""
+        for ch, _ in self._channel_layout:
+            spec_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=ch)
+            amp_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=ch)
+            x0, _, x1, _ = self._data_regions[spec_key]
+            pw = x1 - x0
+            self._dr_paint_spectrogram_strip(ch, spec_key, 0, pw, window_min, window_max)
+            self._dr_paint_amplitude_strip(ch, amp_key, 0, pw, window_min, window_max)
+
+    def _dr_paint_spectrogram_strip(self, channel_id, panel_key, strip_x_start, strip_width,
+                                     window_min, window_max):
+        """Render a spectrogram region (strip or full panel) into the frame buffer."""
+        x0, y0, x1, y1 = self._data_regions[panel_key]
+        panel_width = x1 - x0
+        panel_height = y1 - y0
+        invert = self._dr_invert[panel_key]
+        window_length = window_max - window_min
+
+        if strip_width <= 0 or panel_width <= 0 or panel_height <= 0 or window_length <= 0:
+            return
+
+        # Time range for the strip columns
+        strip_time_start = window_min + (strip_x_start / panel_width) * window_length
+        strip_time_end = window_min + ((strip_x_start + strip_width) / panel_width) * window_length
+
+        # Map to spectrogram column indices
+        spec_times = self._dr_spec_times
+        col_start = max(0, np.searchsorted(spec_times, strip_time_start, side='left') - 1)
+        col_end = min(len(spec_times), np.searchsorted(spec_times, strip_time_end, side='right') + 1)
+
+        if col_end <= col_start:
+            return
+
+        # Slice raw dB spectrogram data
+        spec_db = self.spectrogram.spectrogram_data[channel_id, :, col_start:col_end]
+
+        # Flip for origin='lower' (unless inverted)
+        if not invert:
+            spec_db = spec_db[::-1]
+
+        # Resize in data space BEFORE applying colormap — interpolating dB values produces
+        # clean color transitions, whereas interpolating in RGB creates false intermediate colors
+        pil_data = Image.fromarray(spec_db.astype(np.float32), 'F')
+        pil_data = pil_data.resize((strip_width, panel_height), Image.LANCZOS)
+        resized_db = np.array(pil_data)
+
+        # Apply colormap to the resized data
+        rgba_float = self._dr_spec_cmaps[channel_id](self._dr_spec_norm(resized_db))
+        spec_uint8 = (np.clip(rgba_float[:, :, :3], 0, 1) * 255).astype(np.uint8)
+
+        # Write into frame buffer
+        self._dr_frame_buffer[y0:y1, x0 + strip_x_start:x0 + strip_x_start + strip_width] = spec_uint8
+
+    def _dr_paint_amplitude_strip(self, channel_id, panel_key, strip_x_start, strip_width,
+                                   window_min, window_max):
+        """Render an amplitude region (strip or full panel) into the frame buffer."""
+        x0, y0, x1, y1 = self._data_regions[panel_key]
+        panel_width = x1 - x0
+        panel_height = y1 - y0
+        invert = self._dr_invert[panel_key]
+        window_length = window_max - window_min
+
+        if strip_width <= 0 or panel_width <= 0 or panel_height <= 0 or window_length <= 0:
+            return
+
+        # Time range for strip columns
+        strip_time_start = window_min + (strip_x_start / panel_width) * window_length
+        strip_time_end = window_min + ((strip_x_start + strip_width) / panel_width) * window_length
+
+        # Create strip buffer filled with background color
+        strip = np.empty((panel_height, strip_width, 3), dtype=np.uint8)
+        strip[:] = self._dr_amp_bg_rgb[channel_id]
+
+        # Interpolate peak amplitude for each strip pixel column
+        pixel_times = np.linspace(strip_time_start, strip_time_end, strip_width)
+        pixel_amplitudes = np.interp(pixel_times, self._dr_peak_times,
+                                      self._dr_peak_data[channel_id])
+
+        # Convert to pixel heights
+        pixel_heights = np.clip(
+            pixel_amplitudes / self._dr_amp_y_max[channel_id] * panel_height, 0, panel_height).astype(np.int32)
+
+        # Vectorized fill
+        rows = np.arange(panel_height)[:, np.newaxis]
+        if not invert:
+            mask = rows >= (panel_height - pixel_heights)[np.newaxis, :]
+        else:
+            mask = rows < pixel_heights[np.newaxis, :]
+        strip[mask] = self._dr_amp_peak_rgb[channel_id]
+
+        # RMS overlay
+        if self._dr_show_rms:
+            pixel_rms = np.interp(pixel_times, self._dr_rms_times,
+                                   self._dr_rms_data[channel_id])
+            rms_heights = np.clip(
+                pixel_rms / self._dr_amp_y_max[channel_id] * panel_height, 0, panel_height).astype(np.int32)
+            if not invert:
+                rms_mask = rows >= (panel_height - rms_heights)[np.newaxis, :]
+            else:
+                rms_mask = rows < rms_heights[np.newaxis, :]
+            strip[rms_mask] = self._dr_amp_rms_rgb[channel_id]
+
+        # Write into frame buffer
+        self._dr_frame_buffer[y0:y1, x0 + strip_x_start:x0 + strip_x_start + strip_width] = strip
+
+    def _dr_save_axis_underlay(self):
+        """Save clean data pixels underneath axis overlay positions."""
+        for key in self._dr_overlay_indices:
+            ys, xs = self._dr_overlay_indices[key]
+            self._dr_overlay_underlay[key] = self._dr_frame_buffer[ys, xs].copy()
+
+    def _dr_restore_axis_underlay(self):
+        """Restore clean data pixels at axis overlay positions."""
+        for key in self._dr_overlay_underlay:
+            ys, xs = self._dr_overlay_indices[key]
+            self._dr_frame_buffer[ys, xs] = self._dr_overlay_underlay[key]
+
+    def _dr_apply_all_axis_overlays(self):
+        """Stamp axis overlay pixel values at pre-computed positions."""
+        for key in self._dr_overlay_values:
+            ys, xs = self._dr_overlay_indices[key]
+            self._dr_frame_buffer[ys, xs] = self._dr_overlay_values[key]
+
+    def _dr_save_overlay_regions(self, t, axes_xlim):
+        """Save pixel regions under position lines and time text before drawing."""
+        self._dr_saved_regions = []
+        half_lw = self._position_line_width_px // 2
+        xlim_min, xlim_max = axes_xlim
+        xlim_range = xlim_max - xlim_min
+
+        # Data panel position lines
+        if xlim_range > 0:
+            x_frac = (t - xlim_min) / xlim_range
+            for key in self._dr_data_axes_keys:
+                x0, y0, x1, y1 = self._data_regions[key]
+                w = x1 - x0
+                x_px = x0 + int(x_frac * w)
+                x_start = max(x0, x_px - half_lw)
+                x_end = min(x1, x_px + half_lw + 1)
+                if x_start < x_end:
+                    saved = self._dr_frame_buffer[y0:y1, x_start:x_end].copy()
+                    self._dr_saved_regions.append((y0, y1, x_start, x_end, saved))
+
+        # Scrub panel position lines
+        if self.es_audio.length > 0:
+            scrub_x_frac = t / self.es_audio.length
+            for key in self._scrub_regions:
+                x0, y0, x1, y1 = self._scrub_regions[key]
+                w = x1 - x0
+                x_px = x0 + int(scrub_x_frac * w)
+                x_start = max(x0, x_px - half_lw)
+                x_end = min(x1, x_px + half_lw + 1)
+                if x_start < x_end:
+                    saved = self._dr_frame_buffer[y0:y1, x_start:x_end].copy()
+                    self._dr_saved_regions.append((y0, y1, x_start, x_end, saved))
+
+        # Time text region
+        if self._dr_time_enabled and self._handles['time'] is not None:
+            time_string = self._get_time_text()
+            text_img = self._dr_get_time_text_image(time_string)
+            th, tw = text_img.shape[:2]
+            margin = max(2, self._dr_time_font_size_px // 8)
+            tx = self._dr_fig_width - tw - margin
+            ty = self._dr_fig_height - th - margin
+            tx = max(0, tx)
+            ty = max(0, ty)
+            tx_end = min(self._dr_fig_width, tx + tw)
+            ty_end = min(self._dr_fig_height, ty + th)
+            if tx < tx_end and ty < ty_end:
+                saved = self._dr_frame_buffer[ty:ty_end, tx:tx_end].copy()
+                self._dr_saved_regions.append((ty, ty_end, tx, tx_end, saved))
+
+    def _dr_restore_overlay_regions(self):
+        """Restore pixel regions saved from previous frame's overlays."""
+        for y0, y1, x_start, x_end, saved_pixels in self._dr_saved_regions:
+            self._dr_frame_buffer[y0:y1, x_start:x_end] = saved_pixels
+        self._dr_saved_regions = []
+
+    def _dr_draw_position_lines(self, t, axes_xlim):
+        """Draw position lines on data panels and scrub panels."""
+        half_lw = self._position_line_width_px // 2
+        xlim_min, xlim_max = axes_xlim
+        xlim_range = xlim_max - xlim_min
+
+        # Position in data subplots
+        if xlim_range > 0:
+            x_frac = (t - xlim_min) / xlim_range
+            for key in self._dr_data_axes_keys:
+                x0, y0, x1, y1 = self._data_regions[key]
+                w = x1 - x0
+                x_px = x0 + int(x_frac * w)
+                x_start = max(x0, x_px - half_lw)
+                x_end = min(x1, x_px + half_lw + 1)
+                if x_start < x_end:
+                    self._dr_frame_buffer[y0:y1, x_start:x_end] = self._position_line_color
+
+        # Position in scrub subplots
+        if self.es_audio.length > 0:
+            scrub_x_frac = t / self.es_audio.length
+            for key in self._scrub_regions:
+                x0, y0, x1, y1 = self._scrub_regions[key]
+                w = x1 - x0
+                x_px = x0 + int(scrub_x_frac * w)
+                x_start = max(x0, x_px - half_lw)
+                x_end = min(x1, x_px + half_lw + 1)
+                if x_start < x_end:
+                    self._dr_frame_buffer[y0:y1, x_start:x_end] = self._position_line_color
+
+    def _dr_draw_time_text(self, t):
+        """Draw time text onto the frame buffer using cached rendered text."""
+        time_string = self._get_time_text()
+        text_img = self._dr_get_time_text_image(time_string)
+        th, tw = text_img.shape[:2]
+        margin = max(2, self._dr_time_font_size_px // 8)
+        tx = self._dr_fig_width - tw - margin
+        ty = self._dr_fig_height - th - margin
+
+        tx = max(0, tx)
+        ty = max(0, ty)
+        tx_end = min(self._dr_fig_width, tx + tw)
+        ty_end = min(self._dr_fig_height, ty + th)
+
+        if tx >= tx_end or ty >= ty_end:
+            return
+
+        # Alpha composite the RGBA text image onto the RGB frame buffer
+        text_region = text_img[:ty_end - ty, :tx_end - tx]
+        alpha = text_region[:, :, 3:4].astype(np.float32) / 255.0
+        bg = self._dr_frame_buffer[ty:ty_end, tx:tx_end].astype(np.float32)
+        fg = text_region[:, :, :3].astype(np.float32)
+        blended = fg * alpha + bg * (1.0 - alpha)
+        self._dr_frame_buffer[ty:ty_end, tx:tx_end] = blended.astype(np.uint8)
+
+    def _dr_get_time_text_image(self, text_string) -> np.ndarray:
+        """Render time text to a cached RGBA numpy array."""
+        if text_string not in self._dr_time_text_cache:
+            # Measure text size
+            dummy_img = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(dummy_img)
+            bbox = draw.textbbox((0, 0), text_string, font=self._dr_time_font,
+                                  stroke_width=self._dr_time_border_width)
+            tw = bbox[2] - bbox[0] + 2 * self._dr_time_border_width
+            th = bbox[3] - bbox[1] + 2 * self._dr_time_border_width
+
+            text_img = Image.new('RGBA', (tw, th), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(text_img)
+            draw.text(
+                (-bbox[0] + self._dr_time_border_width,
+                 -bbox[1] + self._dr_time_border_width),
+                text_string, font=self._dr_time_font,
+                fill=(*self._dr_time_color, 255),
+                stroke_width=self._dr_time_border_width,
+                stroke_fill=(*self._dr_time_border_color, 255))
+
+            self._dr_time_text_cache[text_string] = np.array(text_img)
+
+        return self._dr_time_text_cache[text_string]
+
     def _add_amplitude_subplot(self, channel_id: int, gridspec: matplotlib.gridspec.GridSpec,
                                invert: bool = False, scrub: bool = False):
         if self._handles['figure'] is None:
@@ -639,7 +1336,7 @@ class VideoVisualization(Visualization):
 
         ax = self._handles['figure'].add_subplot(gridspec)
         self._handles['axes'][self._get_axis_handle_id(type=axis_type, channel=channel_id)] = ax
-        self._format_amplitude_axes(ax=ax, invert=invert, hideaxis=scrub)
+        self._format_amplitude_axes(ax=ax, channel_id=channel_id, invert=invert, hideaxis=scrub)
 
         ax.set_facecolor(axes_style_cfg['background-color'])
 
@@ -648,7 +1345,7 @@ class VideoVisualization(Visualization):
         if scrub:
             ax.set_xlim(self.peak_envelope.times[0], self.peak_envelope.times[len(self.peak_envelope.times) - 1])
             ax.fill(self.peak_envelope.times, self.peak_envelope.envelope_data[channel_id, :],
-                    color=axes_style_cfg['peak-color'])
+                    color=axes_style_cfg['base-color'])
 
             if es.cfg['visualization.style.amplitude.show-rms']:
                 ax.fill(self.rms_envelope.times, self.rms_envelope.envelope_data[channel_id, :],
@@ -661,9 +1358,9 @@ class VideoVisualization(Visualization):
         i_subplot = super()._add_figure_subplots(gridspec=gridspec)
 
         # Additional amplitude subplots if rendering a video to show envelopes for full file for scrubbing purposes
-        for channel_id in range(self.es_audio.channels):
+        for channel_id, invert in self._scrub_channel_layout:
             self._add_amplitude_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot],
-                                        invert=(channel_id == 1 and self.es_audio.channels == 2), scrub=True)
+                                        invert=invert, scrub=True)
             i_subplot += 1
 
         return i_subplot
@@ -686,19 +1383,9 @@ class VideoVisualization(Visualization):
     def _get_gridspec_params(self):
         gridspec_params = super()._get_gridspec_params()
 
-        if self.es_audio.channels == 1:
-            # If the figure is for a video, add 1 more amplitude panel with half the normal height at the bottom
-            gridspec_params['height_ratios'].append(
-                es.cfg['visualization.style.subplot-height-ratios.amplitude.mono'] / 2)
-        elif self.es_audio.channels == 2:
-            # If the figure is for a video, add 2 more amplitude panels with half the normal height at the bottom
-            gridspec_params['height_ratios'].append(
-                es.cfg['visualization.style.subplot-height-ratios.amplitude.stereo'] / 2)
-            gridspec_params['height_ratios'].append(
-                es.cfg['visualization.style.subplot-height-ratios.amplitude.stereo'] / 2)
-        else:
-            # Multichannel
-            raise Exception('Multichannel audio is not yet supported')
+        amp_ratio = es.cfg[f'visualization.style.subplot-height-ratios.amplitude.{self._layout_ratio_key}']
+        for ch_id, invert in self._scrub_channel_layout:
+            gridspec_params['height_ratios'].append(amp_ratio / 2)
 
         gridspec_params['nrows'] = len(gridspec_params['height_ratios'])
 
@@ -728,6 +1415,9 @@ class VideoVisualization(Visualization):
 
         self._handles['position_lines'] = []
         self._handles['video_frame'] = []
+        self._handles['amplitude_peak_fills'] = {}
+        self._handles['amplitude_rms_fills'] = {}
+        self._handles['spectrogram_images'] = {}
 
     def _set_animation(self):
         if self._handles['figure'] is None:
@@ -758,538 +1448,9 @@ class VideoVisualization(Visualization):
         return es.cfg['visualization.video.export.title.enabled']
 
 
-class VideoPlayerVisualization(VideoVisualization):
-    def __init__(self, player: es.player.Player = None):
-        self._player = player  # type: es.player.Player()
-        es_audio = self._player.get_es_audio()
-
-        super().__init__(es_audio=es_audio)
-
-        self._frame = 0  # type: int
-
-        self._window_length = es.cfg['visualization.video.display.window-length']
-
-        # Used to prevent loops when ui is being redrawn and updating values of controls which would trigger events
-        self.__ui_updating = False  # type: bool
-
-    @property
-    def frame(self) -> int:
-        return self._frame
-
-    @property
-    def player(self) -> es.player.Player:
-        return self._player
-
-    def load(self, es_audio: es.audio.Audio):
-        if es_audio is None:
-            return
-
-        super().load(es_audio=es_audio)
-
-    def make_figure(self):
-        super().make_figure()
-
-        # Hide the toolbar
-        self._handles['figure'].canvas.manager.toolbar.setVisible(False)
-
-        self._handles['figure'].canvas.mpl_connect('button_press_event', self._on_button_press)
-        self._handles['figure'].canvas.mpl_connect('key_press_event', self._on_key_press)
-        self._handles['figure'].canvas.mpl_connect('motion_notify_event', self._on_motion_notify)
-
-    def make_frame(self, frame: int = 0):
-        if self._handles['figure'] is None:
-            return
-
-        # If playing, ignore the requested frame and set the frame to the time of the playing audio
-        if self.player.is_playing():
-            audio_time = None
-            if es.player.audio.is_playing():
-                audio_time = es.player.audio.get_time() + es.cfg['player.video-render-latency']
-            else:
-                # The animation should only be playing with the audio not playing when the file has completed playback
-                audio_time = 0
-                self.player.stop()
-            self._frame = self._time_to_frame(audio_time)
-        else:
-            self._frame = frame
-
-        super().make_frame(self._frame)
-
-        self._handles['clock'].set_text(self._get_time_text())
-
-        # Update the volume sliders to reflect the true playback volume without triggering the on_changed event
-        for channel in range(self.es_audio.channels):
-            ui_updating = self._ui_updating(True)
-            self._handles['volume_slider'][channel].set_val(es.player.audio.get_volume(channel))
-            self._ui_updating(ui_updating)
-
-        return self._handles['figure']
-
-    def mute(self, channel: int = None):
-        button_id = None
-
-        if channel is None:
-            # Mute master
-            button_id = 'mute-unmute-master'
-        else:
-            # Mute channel
-            button_id = f'mute-unmute-{channel}'
-
-        self._set_button_label_text(self._handles['buttons'][button_id], PlaybackIcons.MUTED)
-        self._set_button_active(self._handles['buttons'][button_id])
-
-    def pause(self):
-        if self.animation is not None:
-            self.animation.pause()
-
-        self._set_button_label_text(self._handles['buttons']['play-pause'], PlaybackIcons.PLAY)
-
-        self._handles['figure'].canvas.draw()
-
-    def play(self):
-        # If trying to play from the end of the file, reset to the beginning
-        # if self.time >= self.es_audio.length:
-        #    self._time = 0
-
-        if self.animation is None:
-            self._set_animation()
-        else:
-            self.animation.resume()
-
-        self._handles['buttons']['play-pause'].label.set_text(PlaybackIcons.PAUSE)
-        self._set_button_inactive(self._handles['buttons']['stop'])
-
-        self._handles['figure'].canvas.draw()
-
-    def set_time(self, time: float):
-        self.make_frame(self._time_to_frame(min(max(0, time), self._frame_to_time(len(self.frames) - 1))))
-        self._handles['figure'].canvas.draw()
-
-    def set_volume(self, volume: int, channel: int = None):
-        if channel is None:
-            for channel_id in range(self.es_audio.channels):
-                self.set_volume(volume=volume, channel=channel_id)
-            return
-
-        volume = volume if volume is not None else self.player.get_channel_volume(channel)
-        volume = max(0, min(100, round(volume)))
-
-        ui_updating = self._ui_updating(True)
-        self._handles['volume_slider'][channel].set_val(volume)
-        self._ui_updating(ui_updating)
-
-        self._handles['figure'].canvas.draw()
-
-    def show_figure(self):
-        if es.cfg['player.autoplay']:
-            self._set_animation()
-
-        super().show_figure()
-
-    def stop(self):
-        if self.animation is not None:
-            self.animation.pause()
-
-        self.set_time(0)
-
-        self._set_button_label_text(self._handles['buttons']['play-pause'], PlaybackIcons.PLAY)
-        self._set_button_active(self._handles['buttons']['stop'])
-
-        self._handles['figure'].canvas.draw()
-
-    def toggle_full_screen(self):
-        manager = matplotlib.pyplot.get_current_fig_manager()
-        if self.player.is_full_screen():
-            manager.window.showNormal()
-        else:
-            manager.window.showMaximized()
-
-    def unmute(self, channel: int = None):
-        button_id = None
-
-        if channel is None:
-            # Unmute master, set volume to all channels to 0 but don't update their individual UI
-            button_id = 'mute-unmute-master'
-        else:
-            # Unmute channel
-            button_id = f'mute-unmute-{channel}'
-
-        self._set_button_label_text(self._handles['buttons'][button_id], PlaybackIcons.UNMUTED)
-        self._set_button_inactive(self._handles['buttons'][button_id])
-
-    def _add_figure_subplots(self, gridspec: matplotlib.gridspec.GridSpec) -> int:
-        i_subplot = super()._add_figure_subplots(gridspec=gridspec)
-
-        self._add_controls_subplot(gridspec=gridspec[i_subplot])
-        i_subplot += 1
-
-        return i_subplot
-
-    def _add_controls_subplot(self, gridspec: matplotlib.gridspec.GridSpec):
-        if self._handles['figure'] is None:
-            return
-
-        ax = self._handles['figure'].add_subplot(gridspec)
-        self._handles['axes'][self._get_axis_handle_id(type=AxisTypes.CONTROLS)] = ax
-
-        button_size = 0.04
-
-        # How much wider the figure is than tall
-        button_aspect_ratio = \
-            es.cfg['visualization.video.display.width'] / es.cfg['visualization.video.display.height']
-
-        # Compensate for aspect ratio to make buttons square
-        button_width = button_size / button_aspect_ratio
-        button_height = button_size
-        button_bottom = 0.015
-        button_padding = 0.02
-
-        text_y_18 = 0.5
-
-        buttons = {
-            'play-pause': {
-                'text': PlaybackIcons.PLAY,
-                'left': button_padding
-            },
-            'stop': {
-                'text': PlaybackIcons.STOP,
-                'left': 0
-            },
-            'previous-file': {
-                'text': PlaybackIcons.PREVIOUS_FILE,
-                'left': button_padding
-            },
-            'skip-back': {
-                'text': PlaybackIcons.SKIP_BACK,
-                'left': 0
-            },
-            'skip-forward': {
-                'text': PlaybackIcons.SKIP_FORWARD,
-                'left': 0,
-                'bottom': 0.02
-            },
-            'next-file': {
-                'text': PlaybackIcons.NEXT_FILE,
-                'left': 0
-            }
-        }
-
-        # Add elements from left to right
-        current_left = 0
-        for button_id in buttons:
-            current_left += buttons[button_id]['left']
-
-            self._handles['buttons'][button_id] = matplotlib.widgets.Button(
-                matplotlib.pyplot.axes((
-                    current_left,
-                    button_bottom,
-                    button_width,
-                    button_height)),
-                buttons[button_id]['text'])
-
-            current_left += button_width
-
-            self._format_button(self._handles['buttons'][button_id])
-
-            event = button_id if 'event' not in buttons[button_id] else buttons[button_id]['event']
-
-            self._handles['buttons'][button_id].on_clicked(functools.partial(self._event_handler, event))
-
-            self._handles['text'].append(self._handles['buttons'][button_id].label)
-
-        # Clock
-        current_left += button_padding
-        clock_string = self._get_time_text()
-        clock_font_size = 22
-        self._handles['clock'] = ax.text(
-            x=current_left,
-            y=0.45,
-            s=clock_string,
-            transform=ax.transAxes, fontsize=clock_font_size, va='center')
-        self._handles['text'].append(self._handles['clock'])
-
-        clock_text_extent = self._handles['clock'].get_window_extent()
-        clock_image_text_width = clock_text_extent.x1 - clock_text_extent.x0
-
-        clock_text_max_width_factor = 0.12
-        clock_text_max_width = math.floor(clock_text_max_width_factor * es.cfg['visualization.video.display.width'])
-
-        if clock_image_text_width > clock_text_max_width:
-            title_text_font_size = math.floor(clock_text_max_width / clock_image_text_width * clock_font_size)
-            self._handles['clock'].set_fontsize(title_text_font_size)
-
-        # Add elements from right to left
-        slider_width = 4 * button_width
-
-        volume_buttons = {
-            'volume-up': {
-                'text': PlaybackIcons.VOLUME_UP,
-                'left': None,
-                'event': 'volume-up',
-                'channel': None
-            },
-            'volume-down': {
-                'text': PlaybackIcons.VOLUME_DOWN,
-                'left': None,
-                'event': 'volume-down',
-                'channel': None
-            },
-            'mute-unmute': {
-                'text': PlaybackIcons.UNMUTED,
-                'left': None,
-                'event': 'mute-unmute',
-                'channel': None
-            }
-        }
-
-        current_left = 1
-        for channel_id in range(self.es_audio.channels - 1, 0 - 1, -1):
-            current_left -= 2 * button_padding + slider_width
-
-            self._handles['volume_slider'][channel_id] = matplotlib.widgets.Slider(
-                ax=matplotlib.pyplot.axes((
-                    current_left,
-                    button_bottom,
-                    slider_width,
-                    button_height)),
-                label='',
-                valmin=0,
-                valmax=100,
-                valstep=1,
-                initcolor=None
-            )
-
-            self._handles['volume_slider'][channel_id].set_val(self.player.get_channel_volume(channel_id))
-            self._handles['volume_slider'][channel_id].valtext.set_fontsize(18)
-            self._handles['text'].append(self._handles['volume_slider'][channel_id].valtext)
-
-            self._handles['volume_slider'][channel_id].on_changed(functools.partial(
-                self._event_handler,
-                'volume-slider',
-                channel=channel_id))
-
-            current_left -= button_padding
-            for volume_button_id in volume_buttons:
-                button_id = f'{volume_button_id}-{channel_id}'
-                current_left -= button_width
-
-                self._handles['buttons'][button_id] = matplotlib.widgets.Button(
-                    matplotlib.pyplot.axes((
-                        current_left,
-                        button_bottom,
-                        button_width,
-                        button_height)),
-                    volume_buttons[volume_button_id]['text'])
-
-                self._format_button(self._handles['buttons'][button_id])
-
-                event = volume_button_id if 'event' not in volume_buttons[volume_button_id] \
-                    else volume_buttons[volume_button_id]['event']
-
-                self._handles['buttons'][button_id].on_clicked(functools.partial(
-                    self._event_handler,
-                    event,
-                    channel=channel_id))
-
-                self._handles['text'].append(self._handles['buttons'][button_id].label)
-
-            # The label is approximately the same width as a button padding
-            current_left -= 1.5 * button_padding
-            self._handles['text'].append(ax.text(
-                x=current_left,
-                y=text_y_18,
-                s=chr(channel_id + 65),
-                transform=ax.transAxes, fontsize=22, va='center'))
-
-            # The line is approximately the same width as a button padding
-            current_left -= 0.75 * button_padding
-            ax.axvline(x=current_left, color='k', lw=0.5)
-
-        # Master volume controls
-        current_left -= button_padding
-        for volume_button_id in volume_buttons:
-            button_id = f'{volume_button_id}-master'
-            current_left -= button_width
-
-            self._handles['buttons'][button_id] = matplotlib.widgets.Button(
-                matplotlib.pyplot.axes((
-                    current_left,
-                    button_bottom,
-                    button_width,
-                    button_height)),
-                volume_buttons[volume_button_id]['text'])
-
-            self._format_button(self._handles['buttons'][button_id])
-
-            event = volume_button_id if 'event' not in volume_buttons[volume_button_id] \
-                else volume_buttons[volume_button_id]['event']
-
-            self._handles['buttons'][button_id].on_clicked(functools.partial(self._event_handler, event))
-
-            self._handles['text'].append(self._handles['buttons'][button_id].label)
-
-        # The label is approximately the same width as a 2.25 button paddings
-        current_left -= 2.25 * button_padding
-        self._handles['text'].append(ax.text(
-            x=current_left,
-            y=text_y_18,
-            s='All',
-            transform=ax.transAxes, fontsize=22, va='center'))
-
-        # The line is approximately the same width a button padding
-        current_left -= 0.75 * button_padding
-        ax.axvline(x=current_left, color='k', lw=0.5)
-
-    def _event_handler(self, event, event_data=None, channel=None):
-        if event == 'play-pause':
-            self.player.toggle_playing()
-        elif event == 'stop':
-            self.player.stop()
-        elif event == 'rewind':
-            self.player.set_time(0)
-        elif event == 'skip-back':
-            self.player.set_time(self.player._time - es.cfg['player.skip-length'])
-        elif event == 'skip-forward':
-            self.player.set_time(self.player._time + es.cfg['player.skip-length'])
-        elif event == 'previous-file':
-            self.player.previous_file()
-        elif event == 'next-file':
-            self.player.next_file()
-        elif event == 'volume-down':
-            self.player.step_volume(volume_step=-es.cfg['player.volume-step'], channel=channel)
-        elif event == 'volume-up':
-            self.player.step_volume(volume_step=es.cfg['player.volume-step'], channel=channel)
-        elif event == 'volume-slider' and not self._ui_updating():
-            self.player.set_volume(volume=event_data, channel=channel)
-        elif event == 'mute-unmute':
-            self.player.toggle_muted(channel=channel)
-
-    def _format_button(self, button_handle):
-        if button_handle:
-            button_font_name = es.cfg['visualization.style.font.symbols.properties'].get_family()
-
-            button_handle.label.set_fontname(button_font_name)
-            button_handle.label.set_fontsize(16)
-
-    def _get_time_text(self):
-        return es.utils.seconds_to_string(self.player.get_time()) + ' / ' \
-            + es.utils.seconds_to_string(self.es_audio.length)
-
-    def _get_gridspec_params(self):
-        gridspec_params = super()._get_gridspec_params()
-
-        gridspec_params['height_ratios'].append(es.cfg['visualization.style.subplot-height-ratios.controls'])
-        gridspec_params['nrows'] = len(gridspec_params['height_ratios'])
-
-        return gridspec_params
-
-    def _initialize_handles(self):
-        super()._initialize_handles()
-
-        self._handles['buttons'] = {}
-        self._handles['clock'] = None
-        self._handles['volume_slider'] = {}  # type: typing.Dict[matplotlib.widgets.Slider]
-
-    def _on_button_press(self, event):
-        if event.inaxes is None:
-            return
-
-        for axes_handle in self._handles['axes']:
-            if self._handles['axes'][axes_handle] == event.inaxes:
-                if axes_handle.find(AxisTypes.AMPLITUDE_SCRUB) == -1 and \
-                        axes_handle.find(AxisTypes.CONTROLS) == -1:
-                    self.player.toggle_playing()
-                elif axes_handle.find(AxisTypes.AMPLITUDE_SCRUB) >= 0:
-                    self.player.set_time(event.xdata)
-
-    def _on_key_press(self, event):
-        if event.key.isspace():
-            self._event_handler('play-pause')
-        elif event.key == 'down':
-            self._event_handler('volume-down')
-        elif event.key == 'up':
-            self._event_handler('volume-up')
-        elif event.key == 'left':
-            self._event_handler('skip-backward')
-        elif event.key == 'right':
-            self._event_handler('skip-forward')
-        elif event.key == 'pageup':
-            self._event_handler('previous-file')
-        elif event.key == 'pagedown':
-            self._event_handler('next-file')
-        elif event.key == 'home':
-            self._event_handler('rewind')
-        elif event.key == 'end':
-            self.stop()
-            matplotlib.pyplot.close(self._handles['figure'])
-        elif event.key == 'f' or event.key == 'alt+enter':
-            self.toggle_full_screen()
-
-    def _on_motion_notify(self, event):
-        if event.inaxes is None or event.button is None:
-            return
-
-        for axes_handle in self._handles['axes']:
-            if self._handles['axes'][axes_handle] == event.inaxes and axes_handle.find(AxisTypes.AMPLITUDE_SCRUB) != -1:
-                self.player.set_time(event.xdata)
-
-    def _set_animation(self):
-        if self._handles['figure'] is None:
-            return
-
-        self._animation = matplotlib.animation.FuncAnimation(fig=self._handles['figure'], func=self.make_frame,
-                                                             repeat=False, cache_frame_data=False)
-
-    def _set_button_active(self, button_handle) -> None:
-        if button_handle:
-            active_color = 0.95
-            button_handle.color = (active_color, active_color, active_color, 1)
-            self._handles['figure'].canvas.draw()
-
-    def _set_button_inactive(self, button_handle) -> None:
-        if button_handle:
-            active_color = 0.85
-            button_handle.color = (active_color, active_color, active_color, 1)
-            self._handles['figure'].canvas.draw()
-
-    def _set_button_label_text(self, button_handle, label_text: str = None):
-        if button_handle:
-            button_handle.label.set_text(label_text)
-            self._handles['figure'].canvas.draw()
-
-    def _ui_updating(self, ui_updating: bool = None) -> bool:
-        # We will want to return the value of _ui_updating *before* potentially updating it to allow nesting
-        prev_ui_updating = self.__ui_updating
-
-        if ui_updating is not None:
-            self.__ui_updating = ui_updating
-
-        return prev_ui_updating
-
-    def _update_time_text(self):
-        if self._handles['figure'] is None or self._handles['time'] is None:
-            return
-
-        super()._update_time_text()
-
-        ax_controls = self._handles['axes'][self._get_axis_handle_id(type=AxisTypes.CONTROLS)]
-
-        if ax_controls:
-            figure_height = self._handles['figure'].get_window_extent().y1
-            controls_height = ax_controls.get_window_extent().y1
-
-            self._handles['time'].set_position((1, 0 + (controls_height / figure_height)))
-
-    @classmethod
-    def _time_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:
-        return es.cfg['visualization.video.display.time.enabled']
-
-    @classmethod
-    def _title_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:
-        return es.cfg['visualization.video.display.title.enabled']
-
-
 def show_image(es_audio: es.audio.Audio):
+    set_optimal_nfft(es_audio, figure_height=es.cfg['visualization.image.display.height'],
+                     title_enabled=es.cfg['visualization.image.display.title.enabled'])
     spinner = es.utils.Spinner(f'Preparing image visualization... ')
     visualization = Visualization(es_audio=es_audio)
     spinner.stop()
@@ -1303,6 +1464,190 @@ def _alpha_color(color, bg_color, alpha) -> str:
     bg_rgb = matplotlib.colors.to_rgb(bg_color)
     alpha_rgb = [alpha * c1 + (1 - alpha) * c2 for (c1, c2) in zip(rgb, bg_rgb)]
     return '#' + ''.join(f'{i:02X}' for i in [round(255 * x) for x in alpha_rgb])
+
+
+def _derive_channel_colormap(base_cmap_name: str, peak_color: str, background_color: str = None,
+                              radius_degrees: float = 30.0,
+                              n_samples: int = 256) -> matplotlib.colors.ListedColormap:
+    """Derive a channel-specific colormap by recoloring the base region to match a peak color.
+
+    The "base region" is where the colormap's hue stays near its starting hue (e.g., the blue
+    region of jet). This region is recolored to match the channel's base-color hue and saturation,
+    preserving the original luminance profile. The "signal region" (rapidly changing hues) is
+    left untouched, so spectral features look identical across all channels.
+
+    :param radius_degrees: Hue distance in degrees (0-180) from the base hue within which
+        colormap samples are recolored. The outer 25% of the radius is a cosine transition zone.
+
+    If background_color is provided, the luminance at the bottom of the base region is pushed
+    down to match the amplitude panel's background color, creating a smooth visual transition
+    between the two panels at silence.
+    """
+    base_cmap = matplotlib.colormaps[base_cmap_name]
+
+    # Sample the base colormap
+    positions = np.linspace(0.0, 1.0, n_samples)
+    base_rgba = base_cmap(positions)
+    base_rgb = base_rgba[:, :3]
+
+    # Convert all samples to HLS
+    base_hls = np.array([colorsys.rgb_to_hls(r, g, b) for r, g, b in base_rgb])
+    # Columns: [0]=hue (0-1), [1]=lightness (0-1), [2]=saturation (0-1)
+
+    # Identify the base hue from the first sample with sufficient saturation
+    saturation_threshold = 0.2
+    saturated_mask = base_hls[:, 2] > saturation_threshold
+    if not np.any(saturated_mask):
+        return base_cmap
+
+    base_hue = base_hls[np.argmax(saturated_mask), 0]
+
+    # Parse the channel base-color into HLS (only the hue is used for recoloring)
+    peak_rgb = matplotlib.colors.to_rgb(peak_color)
+    peak_h, _, _ = colorsys.rgb_to_hls(*peak_rgb)
+
+    # Compute angular hue distance from base hue (circular, in [0, 0.5] range)
+    hue_dist = np.abs(base_hls[:, 0] - base_hue)
+    hue_dist = np.minimum(hue_dist, 1.0 - hue_dist)
+
+    # Unsaturated samples are treated as base region (dark/black start should be recolored)
+    hue_dist[~saturated_mask] = 0.0
+
+    # Blend weights: 1.0 in base region, 0.0 in signal region, smooth cosine transition
+    # The outer 25% of the radius is a transition zone
+    outer_threshold = radius_degrees / 360.0
+    inner_threshold = 0.75 * outer_threshold
+
+    blend = np.ones(n_samples)
+    transition_mask = (hue_dist > inner_threshold) & (hue_dist < outer_threshold)
+    t = (hue_dist[transition_mask] - inner_threshold) / (outer_threshold - inner_threshold)
+    blend[transition_mask] = 0.5 * (1.0 + np.cos(np.pi * t))
+    blend[hue_dist >= outer_threshold] = 0.0
+
+    # Compute background relative luminance for darkening
+    lum_weights = np.array([0.2126, 0.7152, 0.0722])
+    if background_color is not None:
+        bg_Y = np.array(matplotlib.colors.to_rgb(background_color)) @ lum_weights
+    else:
+        bg_Y = None
+
+    # Recolor blended positions
+    result_rgb = base_rgb.copy()
+    recolor_mask = blend > 0.0
+    recolor_indices = np.where(recolor_mask)[0]
+    max_recolor_idx = recolor_indices[-1] if len(recolor_indices) > 0 else 0
+
+    for i in recolor_indices:
+        # Replace hue, keep original luminance and saturation
+        recolored = np.array(colorsys.hls_to_rgb(peak_h, base_hls[i, 1], base_hls[i, 2]))
+
+        # Scale to match the original's perceptual brightness,
+        # compensating for HLS lightness non-uniformity across hues
+        original_Y = base_rgb[i] @ lum_weights
+        recolored_Y = recolored @ lum_weights
+        if recolored_Y > 0:
+            recolored = np.clip(recolored * (original_Y / recolored_Y), 0, 1)
+
+        # Darken toward background brightness at position 0, reaching original brightness
+        # at the edge of the recolored region
+        if bg_Y is not None and max_recolor_idx > 0:
+            position_factor = i / max_recolor_idx
+            matched_Y = recolored @ lum_weights
+            target_Y = bg_Y + (matched_Y - bg_Y) * position_factor
+            if matched_Y > 0:
+                recolored = np.clip(recolored * (target_Y / matched_Y), 0, 1)
+
+        result_rgb[i] = blend[i] * recolored + (1.0 - blend[i]) * base_rgb[i]
+
+    result_rgba = np.column_stack([result_rgb, base_rgba[:, 3]])
+    return matplotlib.colors.ListedColormap(result_rgba)
+
+
+def calculate_spectrogram_panel_height(figure_height: float, n_channels: int,
+                                       triphase: bool = False,
+                                       title_enabled: bool = False,
+                                       include_scrub: bool = False) -> float:
+    """Calculate the pixel height of one spectrogram panel from layout configuration.
+
+    Uses the configured subplot height ratios to determine what fraction of the
+    total figure height is allocated to each spectrogram panel. Accounts for
+    title, amplitude, and optional scrub panels.
+
+    :param figure_height: Total figure height in pixels.
+    :param n_channels: Number of audio channels (1=mono, 2=stereo, 3=triphase).
+    :param triphase: Whether triphase display mode is active.
+    :param title_enabled: Whether the title panel is shown.
+    :param include_scrub: Whether scrub panels are included (video mode).
+    :return: Height of one spectrogram panel in pixels.
+    """
+    if triphase and n_channels >= 3:
+        ratio_key = 'triphase'
+        n_display = 3
+    elif n_channels >= 2:
+        ratio_key = 'stereo'
+        n_display = 2
+    else:
+        ratio_key = 'mono'
+        n_display = 1
+
+    spec_ratio = es.cfg[f'visualization.style.subplot-height-ratios.spectrogram.{ratio_key}']
+    amp_ratio = es.cfg[f'visualization.style.subplot-height-ratios.amplitude.{ratio_key}']
+
+    total_ratio = n_display * (spec_ratio + amp_ratio)
+
+    if title_enabled:
+        total_ratio += es.cfg['visualization.style.subplot-height-ratios.title']
+
+    if include_scrub:
+        n_scrub = min(n_channels, 2)
+        total_ratio += n_scrub * (amp_ratio / 2)
+
+    if total_ratio <= 0:
+        return figure_height
+
+    return figure_height * spec_ratio / total_ratio
+
+
+def set_optimal_nfft(es_audio: es.audio.Audio, figure_height: float,
+                     triphase: bool = None, title_enabled: bool = False,
+                     include_scrub: bool = False):
+    """Set resolution-aware nfft in config if nfft is auto-determined.
+
+    Performs a coarse frequency estimation and calculates the optimal nfft
+    based on the spectrogram panel height for the given output dimensions.
+    Skips optimization if the user has explicitly configured nfft.
+
+    :param es_audio: Audio object to estimate frequency content from.
+    :param figure_height: Output figure height in pixels.
+    :param triphase: Whether triphase mode is active (defaults to config value).
+    :param title_enabled: Whether the title panel is shown.
+    :param include_scrub: Whether scrub panels are included (video mode).
+    """
+    if not es.cfg.get('analysis.spectrogram.nfft-auto', False):
+        return
+
+    if triphase is None:
+        triphase = es.cfg.get('visualization.triphase', False)
+
+    freq_max = es.cfg['analysis.spectrogram.frequency-max']
+    if freq_max is None:
+        freq_max = es.analysis.estimate_frequency_max_coarse(
+            es_audio.data, es_audio.sample_rate)
+
+    panel_height = calculate_spectrogram_panel_height(
+        figure_height=figure_height,
+        n_channels=es_audio.channels,
+        triphase=triphase,
+        title_enabled=title_enabled,
+        include_scrub=include_scrub)
+
+    optimal_nfft = es.analysis.calculate_optimal_nfft(
+        sample_rate=es_audio.sample_rate,
+        frequency_max=freq_max,
+        panel_height=panel_height,
+        window_size=es.cfg['analysis.window-size'])
+
+    es.cfg['analysis.spectrogram.nfft'] = optimal_nfft
 
 
 def _on_config_updated():
@@ -1324,11 +1669,55 @@ def _on_config_updated():
 
     # Font
     # Text
+    _families = [item.strip() for item in es.cfg['visualization.style.font.text.family'].split(',')]
+    _weight = es.cfg['visualization.style.font.text.weight']
     es.cfg['visualization.style.font.text.properties'] = matplotlib.font_manager.FontProperties(
-        family=[item.strip() for item in es.cfg['visualization.style.font.text.family'].split(',')],
-        weight=es.cfg['visualization.style.font.text.weight'])
+        family=_families, weight=_weight)
     es.cfg['visualization.style.font.text.file'] = matplotlib.font_manager.findfont(
         es.cfg['visualization.style.font.text.properties'])
+    # Determine the correct face index for TTC (TrueType Collection) files
+    # Pillow defaults to index 0 (usually Regular); we need to find the matching face
+    es.cfg['visualization.style.font.text.face-index'] = 0
+    _font_file = es.cfg['visualization.style.font.text.file']
+    if _font_file.lower().endswith('.ttc'):
+        _target_weight = _weight.lower()
+        for _i in range(64):
+            try:
+                _face = ImageFont.truetype(_font_file, 12, index=_i)
+                _style = _face.getname()[1].lower()
+                if _target_weight in _style:
+                    es.cfg['visualization.style.font.text.face-index'] = _i
+                    break
+            except OSError:
+                break
+    # Matplotlib's FT2Font cannot select face indices from TTC files, so bold/italic
+    # variants in TTC files won't render correctly. Find a non-TTC font file that
+    # matches the requested weight for matplotlib text rendering.
+    _mpl_font_file = None
+    _weight_num = es.cfg['visualization.style.font.text.properties'].get_weight()
+    if isinstance(_weight_num, str):
+        _weight_num = {'ultralight': 100, 'light': 200, 'normal': 400, 'regular': 400,
+                       'book': 400, 'medium': 500, 'roman': 500, 'semibold': 600,
+                       'demibold': 600, 'demi': 600, 'bold': 700, 'heavy': 800,
+                       'extra bold': 800, 'black': 900}.get(_weight_num, 400)
+    if _font_file.lower().endswith('.ttc') and _weight_num >= 700:
+        # Search configured font families for a non-TTC bold font
+        for _family in _families:
+            for _entry in matplotlib.font_manager.fontManager.ttflist:
+                if (_entry.name.lower() == _family.lower()
+                        and _entry.weight >= 700
+                        and _entry.style == 'normal'
+                        and not _entry.fname.lower().endswith('.ttc')):
+                    _mpl_font_file = _entry.fname
+                    break
+            if _mpl_font_file:
+                break
+    if _mpl_font_file:
+        es.cfg['visualization.style.font.text.mpl-fontproperties'] = \
+            matplotlib.font_manager.FontProperties(fname=_mpl_font_file)
+    else:
+        es.cfg['visualization.style.font.text.mpl-fontproperties'] = \
+            matplotlib.font_manager.FontProperties(family=_families, weight=_weight)
     # Set matplotlib font configuration
     matplotlib.pyplot.rcParams['font.family'] = es.cfg['visualization.style.font.text.properties'].get_family()
     matplotlib.pyplot.rcParams['font.weight'] = es.cfg['visualization.style.font.text.properties'].get_weight()
@@ -1344,8 +1733,7 @@ def _on_config_updated():
 
     # Channel colors
     cfg_prefixes = [
-        "visualization.style.amplitude.channels",
-        "visualization.style.spectrogram.channels"
+        "visualization.style.amplitude.channels"
     ]
 
     # Initialize a dictionary to store the maximum channel number for each prefix
@@ -1366,46 +1754,70 @@ def _on_config_updated():
     es.cfg['visualization.style.amplitude.channels'] = [None] * len(channel_numbers['visualization.style.amplitude.channels'])
     for i_channel in channel_numbers['visualization.style.amplitude.channels']:
         es.cfg['visualization.style.amplitude.channels'][i_channel] = {
-            'peak-color': None,
+            'base-color': None,
             'rms-color': None,
             'background-color': None
         }
 
-        # If the color of the peak amplitude envelope is not defined, use the color from the first channel
-        es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'] = \
-            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.peak-color'] if \
-                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.peak-color'] is not None else \
-                es.cfg['visualization.style.amplitude.channels.ch0.peak-color']
+        # If the base color is not defined, use the color from the first channel
+        es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color'] = \
+            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.base-color'] if \
+                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.base-color'] is not None else \
+                es.cfg['visualization.style.amplitude.channels.ch0.base-color']
 
         # If the color of the rms amplitude envelope is not defined,
-        # derive the color from the blending the peak color with white using the alpha level
+        # derive the color from blending the base color with white using the alpha level
         es.cfg['visualization.style.amplitude.channels'][i_channel]['rms-color'] = \
             es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.rms-color'] if \
                 es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.rms-color'] is not None else \
                 _alpha_color(
-                    es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'], (1, 1, 1),
+                    es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color'], (1, 1, 1),
                     es.cfg['visualization.style.amplitude.rms-alpha'])
 
         # If the background color of the amplitude panel is not defined,
-        # derive the color from the blending the peak color with black using the alpha level
+        # derive the color from blending the base color with black using the alpha level
         es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color'] = \
             es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.background-color'] if \
                 es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.background-color'] is not None else \
                 _alpha_color(
-                    es.cfg['visualization.style.amplitude.channels'][i_channel]['peak-color'], (0, 0, 0),
+                    es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color'], (0, 0, 0),
                     es.cfg['visualization.style.amplitude.background-alpha'])
 
-    es.cfg['visualization.style.spectrogram.channels'] = [None] * len(channel_numbers['visualization.style.spectrogram.channels'])
-    for i_channel in channel_numbers['visualization.style.spectrogram.channels']:
-        es.cfg['visualization.style.spectrogram.channels'][i_channel] = {
-            'color-map': None
-        }
+    # Resolve per-channel spectrogram colormaps. For each channel:
+    # 1. If an explicit per-channel override is set, use it directly
+    # 2. Otherwise, derive from the base colormap (with color matching if enabled)
+    base_cmap_name = es.cfg['visualization.style.spectrogram.color-map']
+    match_amplitude_color = es.cfg.get('visualization.style.spectrogram.match-amplitude-color', True)
+    n_amplitude_channels = len(es.cfg['visualization.style.amplitude.channels'])
 
-        # If the color map for the spectrogram of the channel is not defined, use the color map from the first channel
-        es.cfg['visualization.style.spectrogram.channels'][i_channel]['color-map'] = \
-            es.cfg[f'visualization.style.spectrogram.channels.ch{i_channel}.color-map'] if \
-                es.cfg[f'visualization.style.spectrogram.channels.ch{i_channel}.color-map'] is not None else \
-                es.cfg['visualization.style.spectrogram.channels.ch0.color-map']
+    resolved_channels = [None] * n_amplitude_channels
+    for i_channel in range(n_amplitude_channels):
+        # Check for explicit per-channel colormap override from config
+        channel_override = es.cfg.get(f'visualization.style.spectrogram.channels.ch{i_channel}.color-map')
+
+        if channel_override is not None:
+            # Explicit override — use the specified colormap directly
+            resolved_channels[i_channel] = {'color-map': channel_override}
+        else:
+            cmap_registry_name = f'_estimpy_ch{i_channel}'
+
+            # Unregister any previously derived colormap for this channel
+            if cmap_registry_name in matplotlib.colormaps:
+                matplotlib.colormaps.unregister(name=cmap_registry_name)
+
+            if match_amplitude_color:
+                peak_color = es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color']
+                background_color = es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color']
+                radius = es.cfg.get('visualization.style.spectrogram.match-amplitude-color-radius', 30)
+                derived_cmap = _derive_channel_colormap(base_cmap_name, peak_color,
+                                                         background_color=background_color,
+                                                         radius_degrees=radius)
+                matplotlib.colormaps.register(derived_cmap, name=cmap_registry_name)
+                resolved_channels[i_channel] = {'color-map': cmap_registry_name}
+            else:
+                resolved_channels[i_channel] = {'color-map': base_cmap_name}
+
+    es.cfg['visualization.style.spectrogram.channels'] = resolved_channels
 
 
 def _parse_resolution(resolution) -> typing.Tuple[int, int]:

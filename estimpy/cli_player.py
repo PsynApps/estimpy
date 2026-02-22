@@ -10,8 +10,6 @@ Usage:
 
 import argparse
 import logging
-import tkinter as tk
-import tkinter.filedialog
 
 import estimpy as es
 
@@ -23,14 +21,20 @@ def main():
 
     es.utils.add_parser_arguments(parser, es.utils.get_default_parser_arguments())
 
+    parser.add_argument('-t', '--triphase', action='store_true',
+                        help='Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode. Useful for visualizing 3-electrode estim audio.')
+
     args = vars(parser.parse_args())
 
     es.utils.handle_parser_arguments(args)
 
+    if args['triphase']:
+        es.cfg['visualization.triphase'] = True
+
     input_files = args['input_files']
 
     if not input_files:
-        input_files = tk.filedialog.askopenfilenames(initialdir='.', title='Select file(s)')
+        input_files = es.utils.prompt_file_dialog(title='Select file(s)')
 
     recursive = args['recursive']
 

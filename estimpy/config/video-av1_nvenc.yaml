@@ -4,7 +4,8 @@ visualization:
     export:
       codec: av1_nvenc
       ffmpeg-extra-args:
-        '-crf': ~
-        '-cq': 26
-        '-preset': p6
-        '-tune': hq
+        '-crf': ~                                                                                                                                                                                           
+        '-cq': 24
+        '-preset': p6                                                                                                                                                                                       
+        '-tune': hq                                                                
+        '-spatial-aq': 1

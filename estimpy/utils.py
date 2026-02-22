@@ -143,6 +143,18 @@ def get_file_list(file_patterns: typing.Iterable, recursive: bool = None) -> lis
     return files
 
 
+def prompt_file_dialog(title: str = 'Select file(s)') -> tuple:
+    """Show a Qt file dialog to select one or more files.
+
+    :param str title: The title of the file dialog window.
+    :return tuple: A tuple of selected file paths, or an empty tuple if cancelled.
+    """
+    from PyQt6.QtWidgets import QApplication, QFileDialog
+    app = QApplication.instance() or QApplication([])
+    files, _ = QFileDialog.getOpenFileNames(None, title, '.')
+    return tuple(files)
+
+
 def get_output_file(output_path: str, input_file_name: str, file_format: str) -> str:
     # Convert path to absolute path
     output_path = os.path.abspath(output_path)

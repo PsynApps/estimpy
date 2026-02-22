@@ -11,8 +11,6 @@ Usage:
 import argparse
 import logging
 import sys
-import tkinter as tk
-import tkinter.filedialog
 
 import estimpy as es
 
@@ -29,6 +27,8 @@ def main():
                         help='Modify the input file(s) to add or replace the album art metadata with the image visualization. This is only supported for mp3, mp4, and m4a files.')
     parser.add_argument('-wv', '--write-video', action='store_true',
                         help='Save a video file with an animated visualization of the input file(s). Files will use the audio track from the input file and be saved using the same base file name as the input file.')
+    parser.add_argument('-t', '--triphase', action='store_true',
+                        help='Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode. Useful for visualizing 3-electrode estim audio.')
 
     es.utils.add_parser_arguments(parser, es.utils.get_default_parser_arguments() + ['output_path'])
 
@@ -37,6 +37,9 @@ def main():
 
     parser.add_argument('-rs', '--resume-segment', default=None, type=int,
                         help='Segment on which to resume video encoding. Only relevant for the write-video action. Useful if script crashes during a large encoding. Will not work correctly if segment-length configuration value is changed between runs.')
+
+    parser.add_argument('-p', '--profiling', action='store_true',
+                        help='Enable profiling output for video export. Prints per-frame timing breakdown to stdout.')
 
     parser.add_argument('-y', '--yes', action='store_true',
                         help='Answers yes to all interactive prompts (overwrites existing output files by default).')
@@ -48,7 +51,7 @@ def main():
     input_files = args['input_files']
 
     if not input_files:
-        input_files = tk.filedialog.askopenfilenames(initialdir='.', title='Select file(s)')
+        input_files = es.utils.prompt_file_dialog(title='Select file(s)')
 
     if not input_files:
         sys.exit()
@@ -77,6 +80,13 @@ def main():
         es_audio = es.audio.Audio(file=file)
         spinner.stop()
 
+        if args['triphase']:
+            es.cfg['visualization.triphase'] = True
+            if es_audio.channels == 2:
+                es_audio = es_audio.with_triphase()
+            else:
+                print(f'Warning: Triphase requires stereo audio, ignoring -t for {file}')
+
         image_file = None
 
         try:
@@ -88,7 +98,8 @@ def main():
 
             if actions['write-video']:
                 es.export.write_video(es_audio=es_audio, image_file=image_file,
-                    frame_start=resume_frame, segment_start=resume_segment)
+                    frame_start=resume_frame, segment_start=resume_segment,
+                    profiling=args['profiling'])
 
             if actions['show-image']:
                 es.visualization.show_image(es_audio=es_audio)

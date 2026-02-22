@@ -1,0 +1,23 @@
+---
+visualization:
+  image:
+    export:
+      size: 1136x640
+  style:
+    axes:
+      font-size: 32
+    time:
+      font-size: 48
+  video:
+    export:
+      codec: libx264
+      fmpeg-extra-args:
+        '-profile:v': 'high'
+        '-level': 4.1
+        '-movflags': ''
+        '+faststart': ''
+      fps: 60
+      preview:
+        enabled: False
+      size: 1136x640
+    window-length: 10

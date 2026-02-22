@@ -36,6 +36,11 @@ def get_time() -> float:
         return 0
 
 
+def get_current_volume(channel: int) -> float:
+    """Get the current actual volume for a channel (reflects smoothing ramp)."""
+    return _volumes[channel]
+
+
 def get_volume(channel: int) -> float:
     return _volumes[channel]
 
@@ -58,7 +63,12 @@ def is_paused() -> bool:
 
 
 def is_playing() -> bool:
-    return _is_playing # and _audio_time + time.time() - _clock_time <= _es_audio.length
+    """Return True if audio is actively playing (started and channels still producing output)."""
+    if not _is_playing:
+        return False
+    if not _channels:
+        return False
+    return any(ch.get_busy() for ch in _channels)
 
 
 def load(es_audio: es.audio.Audio):
@@ -71,38 +81,22 @@ def load(es_audio: es.audio.Audio):
     _es_audio = es_audio
 
 
-def pause_unpause():
-    global _is_playing, _audio_time, _clock_time
-
-    if is_playing():
-        for channel in _channels:
-            channel.pause()
-
-        _is_playing = False
-    elif _channels:
-        for channel in _channels:
-            channel.unpause()
-
-        _audio_time = get_time()
-        _clock_time = time.time()
-        _is_playing = True
-
-
-def play(audio_time: float = 0):
+def play(audio_time: float = 0, target_volumes: typing.List[float] = None):
     global _is_playing, _audio_time, _clock_time, _channels, _volumes
 
-    if is_playing():
-        # Should only happen if audio_time is different
+    if _is_playing:
         stop()
-    elif is_paused():
-        pause_unpause()
-        return
 
     sample_time = _es_audio.time_to_data_index(audio_time)
 
-    pygame.mixer.init(frequency=_es_audio.sample_rate, size=-_es_audio.bit_depth, channels=2)
+    # Use a small audio buffer (256 samples) so that volume changes via
+    # set_volume() take effect every ~5.8ms instead of every ~11.6ms (default
+    # 512). This doubles the granularity of fade-to-zero transitions in stop(),
+    # making individual volume steps small enough (~6%) to be inaudible.
+    pygame.mixer.init(frequency=_es_audio.sample_rate, size=-_es_audio.bit_depth, channels=2, buffer=256)
 
-    loops = -1 if es.cfg['player.repeat'] else 0
+    repeat_mode = _get_repeat_mode()
+    loops = -1 if repeat_mode == 'one' else 0
 
     _channels = []
 
@@ -117,13 +111,15 @@ def play(audio_time: float = 0):
         # data, so we have to duplicate every sample.
         sound = pygame.mixer.Sound(buffer=np.repeat(_es_audio.data_raw[channel, sample_time:], 2).tobytes())
 
-        # Having a very short fade should ensure the volume is at or near 0
-        # until the volume can be explicitly set to 0
-        _channels[channel].play(sound, loops=loops, fade_ms=100)
+        # Set channel volume to 0 before playing to prevent a brief burst at
+        # the default volume (1.0) before the ramp thread starts.
+        _channels[channel].set_volume(0, 0)
+        _channels[channel].play(sound, loops=loops)
 
-        # Set channel volume to 0, then call set_volume() again to the correct volume.
-        # This will make playback start from 0 and ramp up to the desired volume.
-        channel_volume = _volumes[channel]
+        # Ramp from 0 to the desired volume for a smooth start.
+        # Use target_volumes (from Player, which tracks the user's intended volume)
+        # rather than _volumes (which may hold an intermediate ramp value after a stop).
+        channel_volume = target_volumes[channel] if target_volumes else _volumes[channel]
         ramp_volume(volume_start=0, volume_end=channel_volume, channel=channel)
 
     _clock_time = time.time()
@@ -153,10 +149,10 @@ def ramp_volume(volume_end: float, volume_start: float = None, channel: int = No
     ramp_length = ramp_length if ramp_length is not None else es.cfg['player.volume-ramp-min-length'] + abs(
         (es.cfg['player.volume-ramp-max-length'] - es.cfg['player.volume-ramp-min-length']) *
         (volume_end - volume_start) / 100)
-    step_length = 0.1
+    step_length = 0.02
 
-    # Calculate the number of steps to ramp the volume
-    volume_steps = round(ramp_length / step_length)
+    # Calculate the number of steps to ramp the volume (at least 1 to ensure the final volume is applied)
+    volume_steps = max(1, round(ramp_length / step_length))
 
     # Set the start time of this thread (used to allow the thread exit early if another is started before it finishes)
     _volume_thread_times[channel] = time.time()
@@ -170,7 +166,7 @@ def ramp_volume(volume_end: float, volume_start: float = None, channel: int = No
         for current_volume in np.linspace(volume_start, volume_end, volume_steps):
             # See if this thread should exit because another more recent
             # thread controlling the volume of this channel has been started
-            if not is_playing() or _volume_thread_times[channel] > thread_start_time:
+            if not _is_playing or _volume_thread_times[channel] > thread_start_time:
                 return
 
             # Set the current volume
@@ -186,7 +182,7 @@ def ramp_volume(volume_end: float, volume_start: float = None, channel: int = No
 
 
 def set_volume(volume: float = None, channel: int = None):
-    global _channels, _volumes
+    global _channels, _volumes, _volume_thread_times
 
     if channel is None:
         for i_channel, _ in enumerate(_channels):
@@ -195,40 +191,82 @@ def set_volume(volume: float = None, channel: int = None):
 
     volume = volume if volume is not None else _volumes[channel]
 
-    if volume <= _volumes[channel]:
-        # Decreasing volume can happen instantaneously
-        _set_channel_volume_unsafe(volume=volume, channel=channel)
-        _volumes[channel] = volume
-    else:
-        # Increasing volume should be ramped to avoid sudden jolts
+    if volume < _volumes[channel]:
+        # Decreasing: short ramp to avoid audible click from abrupt volume drop
+        ramp_volume(volume_end=volume, channel=channel, ramp_length=0.15)
+    elif volume > _volumes[channel]:
+        # Increasing: longer ramp to avoid sudden jolt
         ramp_volume(volume_end=volume, channel=channel)
 
 
 def stop():
     global _is_playing, _audio_time, _clock_time
 
-    if is_playing():
-        for channel in _channels:
-            channel.stop()
+    if not _is_playing:
+        return
 
-        _is_playing = False
-        _audio_time = 0
-        _clock_time = 0
+    # Set _is_playing to False first so that any running ramp threads exit
+    # on their next iteration (their _set_channel_volume_unsafe calls also
+    # become no-ops). Update timestamps as a secondary signal.
+    _is_playing = False
+    for i in range(len(_volume_thread_times)):
+        _volume_thread_times[i] = time.time()
 
-        pygame.mixer.quit()
+    # Synchronous fade-to-zero to prevent pops. Uses direct channel.set_volume()
+    # calls with proper L/R stereo panning, avoiding SDL_mixer's fadeout() which
+    # only updates volume at buffer boundaries and produces zipper noise.
+    # With buffer=256 at 44100Hz, each buffer is ~5.8ms. We call set_volume
+    # every 3ms (faster than the buffer period) so that each buffer fill picks
+    # up the most recent value. Over 90ms this yields ~15 effective volume
+    # steps of ~6-7% each — small enough to be inaudible.
+    if _channels and any(ch.get_busy() for ch in _channels):
+        fade_steps = 30
+        step_sleep = 0.003
+        for step in range(fade_steps - 1, -1, -1):
+            scale = step / fade_steps
+            for i, ch in enumerate(_channels):
+                vol = (_volumes[i] / 100) * scale
+                if len(_channels) == 1:
+                    ch.set_volume(vol, vol)
+                elif i % 2 == 0:
+                    ch.set_volume(vol, 0)
+                else:
+                    ch.set_volume(0, vol)
+            time.sleep(step_sleep)
+        # Hold at zero for one buffer period to ensure silence reaches the
+        # audio output before channels are stopped.
+        time.sleep(0.008)
+
+    for channel in _channels:
+        channel.stop()
+
+    _audio_time = 0
+    _clock_time = 0
+
+    pygame.mixer.quit()
 
 
 def toggle_playing():
-    if is_playing() or is_paused():
-        pause_unpause()
+    if _is_playing:
+        stop()
     else:
         play()
+
+
+def _get_repeat_mode() -> str:
+    """Get the current repeat mode, with backward compatibility for boolean values."""
+    mode = es.cfg.get('player.repeat', 'none')
+    if mode is True:
+        return 'one'
+    elif mode is False or mode is None:
+        return 'none'
+    return str(mode)
 
 
 def _set_channel_volume_unsafe(volume: float = None, channel: int = None):
     global _channels
 
-    if is_playing() and -len(_channels) <= channel < len(_channels):
+    if _is_playing and _channels and -len(_channels) <= channel < len(_channels):
         if len(_channels) == 1:
             _channels[channel].set_volume(volume / 100, volume / 100)
         elif channel % 2 == 0:

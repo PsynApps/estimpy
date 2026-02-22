@@ -39,17 +39,19 @@ class Envelope:
         if start > es_audio.sample_count or end > es_audio.sample_count:
             raise Exception('Invalid start or end time for envelope.')
 
-        def window_function(window: np.ndarray):
+        # Vectorized envelope computation using stride tricks (avoids Python loop)
+        channels = []
+        for j in range(es_audio.channels):
+            channel_data = audio_data[j, start:end]
+            # Create overlapping windows view without copying data
+            windows = np.lib.stride_tricks.sliding_window_view(channel_data, window_size)[::step_size]
             if mode == EnvelopeModes.PEAK:
-                return np.max(window)
+                channels.append(np.max(windows, axis=1))
             elif mode == EnvelopeModes.RMS:
-                return np.sqrt(np.mean(window))
+                channels.append(np.sqrt(np.mean(windows, axis=1)))
             else:
-                return 0
-
-        self._envelope_data = np.array([[window_function(audio_data[j, i:i + window_size])
-                                         for i in range(start, end, step_size)]
-                                        for j in range(es_audio.channels)])
+                channels.append(np.zeros(windows.shape[0]))
+        self._envelope_data = np.array(channels)
 
         envelope_samples = self._envelope_data.size if es_audio.channels == 1 else self._envelope_data.shape[1]
 
@@ -173,7 +175,8 @@ class Spectrogram:
     def generate_spectrogram_data(cls, audio_data: np.ndarray, sample_rate: int, window_function: str = None,
                                   window_size: int = None, window_overlap: int = None, nfft: int = None,
                                   frequency_min: float = None, frequency_max: float = None,
-                                  scaling: SpectrogramScaling = SpectrogramScaling.DB) -> \
+                                  scaling: SpectrogramScaling = SpectrogramScaling.DB,
+                                  reassign: bool = None) -> \
                                       typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         :param audio_data:
@@ -185,6 +188,7 @@ class Spectrogram:
         :param frequency_min:
         :param frequency_max:
         :param scaling:
+        :param reassign:
         :return:
         """
         frequencies = None
@@ -201,7 +205,13 @@ class Spectrogram:
             window_overlap = es.cfg['analysis.window-overlap']
 
         if nfft is None:
-            nfft = es.cfg['analysis.spectrogram.nfft']
+            # Scale nfft proportionally with window_size. When audio is resampled
+            # to a lower sample rate, window_size shrinks but the config nfft
+            # stays at the original value — without scaling, this creates enormous
+            # FFT arrays (e.g., 8192-point FFT on a 92-sample window).
+            config_nfft = es.cfg['analysis.spectrogram.nfft']
+            config_ws = es.cfg['analysis.window-size']
+            nfft = max(round(config_nfft * window_size / config_ws), window_size)
 
         if frequency_min is None:
             frequency_min = es.cfg['analysis.spectrogram.frequency-min']
@@ -211,47 +221,266 @@ class Spectrogram:
             frequency_max = es.cfg['analysis.spectrogram.frequency-max']\
                 if es.cfg['analysis.spectrogram.frequency-max'] is not None else math.floor(sample_rate / 2)
 
+        if reassign is None:
+            reassign = es.cfg.get('analysis.spectrogram.reassign', False)
+
         nfft = max(nfft, window_size)
 
-        # Multichannel
-        for i in range(audio_data.shape[0]):
-            frequencies, times, spectrogram_channel = scipy.signal.spectrogram(
-                audio_data[i, :].T,
-                fs=sample_rate,
-                window=window_function,
-                nperseg=window_size,
-                noverlap=window_overlap,
-                nfft=nfft,
-                scaling='spectrum',
-                mode='magnitude'
-            )
-            # Convert channel to 3d matrix with the first dimension as the channel_id
-            spectrogram_channel = spectrogram_channel.reshape(1, *spectrogram_channel.shape)
+        # Build the window array for use with both standard and reassigned paths
+        h = scipy.signal.get_window(window_function, window_size)
 
-            if spectrogram_data is None:
-                spectrogram_data = spectrogram_channel
-            else:
-                # Append all channels on to the first
-                spectrogram_data = np.append(spectrogram_data, spectrogram_channel, axis=0)
-
-        # Trim spectrogram to only include specified frequency range
-        # Find the indicies which correspond to the desired frequency range
-        frequency_step = frequencies[1] - frequencies[0]
-        i_frequency_min = math.floor(frequency_min / frequency_step)
-        i_frequency_max = min(math.ceil(frequency_max / frequency_step) + 1, len(frequencies) - 1)
-
-        frequencies = frequencies[i_frequency_min:i_frequency_max]
-
-        # Trim spectrogram to the desired frequency range
-        if len(audio_data.shape) == 1:
-            spectrogram_data = spectrogram_data[i_frequency_min:i_frequency_max, :]
+        if reassign:
+            spectrogram_data = cls._generate_reassigned_spectrogram(
+                audio_data=audio_data, sample_rate=sample_rate, window=h,
+                window_size=window_size, window_overlap=window_overlap, nfft=nfft,
+                frequency_min=frequency_min, frequency_max=frequency_max)
         else:
-            spectrogram_data = spectrogram_data[:, i_frequency_min:i_frequency_max, :]
+            # Standard spectrogram path
+            for i in range(audio_data.shape[0]):
+                frequencies, times, spectrogram_channel = scipy.signal.spectrogram(
+                    audio_data[i, :].T,
+                    fs=sample_rate,
+                    window=h,
+                    nperseg=window_size,
+                    noverlap=window_overlap,
+                    nfft=nfft,
+                    scaling='spectrum',
+                    mode='magnitude'
+                )
+                spectrogram_channel = spectrogram_channel.astype(np.float32).reshape(1, *spectrogram_channel.shape)
+
+                if spectrogram_data is None:
+                    spectrogram_data = spectrogram_channel
+                else:
+                    spectrogram_data = np.concatenate([spectrogram_data, spectrogram_channel], axis=0)
+
+        # For the reassigned path, extract frequencies/times from the histogram grid
+        # (already restricted to display range inside _generate_reassigned_spectrogram)
+        if reassign:
+            all_frequencies = np.fft.rfftfreq(nfft, d=1.0 / sample_rate)
+            freq_step = all_frequencies[1] - all_frequencies[0] if len(all_frequencies) > 1 else 1.0
+            i_freq_min = max(0, math.floor(frequency_min / freq_step)) if frequency_min else 0
+            if frequency_max is not None and frequency_max < all_frequencies[-1]:
+                i_freq_max = min(len(all_frequencies) - 1, math.ceil(frequency_max / freq_step) + 1)
+            else:
+                i_freq_max = len(all_frequencies) - 1
+            frequencies = all_frequencies[i_freq_min:i_freq_max + 1]
+
+            hop = window_size - window_overlap
+            n_samples = audio_data.shape[1] if len(audio_data.shape) > 1 else len(audio_data)
+            times = np.arange(window_size // 2, n_samples - window_size // 2 + 1, hop) / sample_rate
+        else:
+            # Trim standard spectrogram to only include specified frequency range
+            frequency_step = frequencies[1] - frequencies[0]
+            i_frequency_min = math.floor(frequency_min / frequency_step)
+            i_frequency_max = min(math.ceil(frequency_max / frequency_step) + 1, len(frequencies) - 1)
+
+            frequencies = frequencies[i_frequency_min:i_frequency_max]
+
+            if len(audio_data.shape) == 1:
+                spectrogram_data = spectrogram_data[i_frequency_min:i_frequency_max, :]
+            else:
+                spectrogram_data = spectrogram_data[:, i_frequency_min:i_frequency_max, :]
 
         if scaling == SpectrogramScaling.DB:
             spectrogram_data = 20 * es.utils.log10_quiet(spectrogram_data)
 
         return frequencies, times, spectrogram_data
+
+    @classmethod
+    def _generate_reassigned_spectrogram(cls, audio_data: np.ndarray, sample_rate: int,
+                                         window: np.ndarray, window_size: int,
+                                         window_overlap: int, nfft: int,
+                                         frequency_min: float = None,
+                                         frequency_max: float = None) -> np.ndarray:
+        """Compute a reassigned spectrogram using three windowed DFTs per channel.
+
+        Uses np.fft.rfft directly (not scipy.signal.stft) to avoid window-sum
+        normalization that breaks when sum(window) ≈ 0 for the derivative and
+        time-ramped windows.
+
+        Frames are processed in chunks to limit peak memory usage. Histogram bins
+        are fixed, so partial histograms from each chunk are summed before the
+        final smoothing step.
+
+        Returns magnitude data on the same grid as a standard spectrogram (shape: channels x frequencies x times).
+        """
+        ref_power = np.float32(1e-6)
+
+        # Derivative window (central difference)
+        window_f32 = window.astype(np.float32)
+        dh = np.gradient(window_f32)
+
+        # Frequency and time axes for the output grid
+        all_frequencies = np.fft.rfftfreq(nfft, d=1.0 / sample_rate).astype(np.float32)
+        hop = window_size - window_overlap
+        n_channels = audio_data.shape[0]
+
+        # Compute standard time axis matching scipy.signal.spectrogram convention
+        n_samples = audio_data.shape[1]
+        times = (np.arange(window_size // 2, n_samples - window_size // 2 + 1, hop) / sample_rate).astype(np.float32)
+
+        # Restrict histogram frequency bins to the display range.
+        # The FFT still covers all frequencies, but the histogram and gaussian
+        # filter only operate on the display range — points that reassign outside
+        # are dropped, matching what the post-trim would have done anyway.
+        freq_step = all_frequencies[1] - all_frequencies[0] if len(all_frequencies) > 1 else 1.0
+        if frequency_min is not None and frequency_min > 0:
+            i_freq_min = max(0, math.floor(frequency_min / freq_step))
+        else:
+            i_freq_min = 0
+        if frequency_max is not None and frequency_max < all_frequencies[-1]:
+            i_freq_max = min(len(all_frequencies) - 1, math.ceil(frequency_max / freq_step) + 1)
+        else:
+            i_freq_max = len(all_frequencies) - 1
+
+        frequencies = all_frequencies[i_freq_min:i_freq_max + 1]
+        freq_edges = cls._centers_to_edges(frequencies).astype(np.float64)
+        time_edges = cls._centers_to_edges(times).astype(np.float64)
+
+        # Normalize magnitude scaling factors
+        win_sum = np.float32(np.sum(window_f32))
+        sqrt2_f32 = np.float32(np.sqrt(2))
+        half_nyquist = np.float32(sample_rate / 2)
+        audio_length = np.float32(n_samples / sample_rate)
+        n_freqs = nfft // 2 + 1
+
+        # Chunk size: number of frames per chunk. Tuned to keep peak intermediate
+        # memory per chunk under ~1-2 GB (n_freqs * chunk_size * 16 bytes for complex64 arrays).
+        chunk_frames = max(1, min(10000, 500_000_000 // (n_freqs * 16)))
+
+        spectrogram_data = None
+
+        for i in range(n_channels):
+            x = audio_data[i, :]
+
+            # Extract overlapping frames using stride tricks (no boundary padding)
+            all_frames = np.lib.stride_tricks.sliding_window_view(x, window_size)[::hop]
+            n_frames = min(all_frames.shape[0], len(times))
+
+            # Accumulate histograms across chunks
+            n_freq_bins = len(frequencies)
+            n_time_bins = len(times)
+            hist_power = np.zeros((n_freq_bins, n_time_bins), dtype=np.float64)
+            hist_count = np.zeros((n_freq_bins, n_time_bins), dtype=np.float64)
+
+            for chunk_start in range(0, n_frames, chunk_frames):
+                chunk_end = min(chunk_start + chunk_frames, n_frames)
+                frames = all_frames[chunk_start:chunk_end]
+                chunk_n = frames.shape[0]
+                chunk_times = times[chunk_start:chunk_end]
+
+                # Compute windowed DFTs directly — no normalization, so ratios are exact.
+                # Use complex64 (single precision) to halve memory.
+                S_h = np.fft.rfft(frames * window_f32, n=nfft, axis=1).astype(np.complex64).T
+                S_dh = np.fft.rfft(frames * dh, n=nfft, axis=1).astype(np.complex64).T
+
+                # Derive S_th from S_h using the frequency-domain relationship:
+                # S_th[k] = j*nfft/(2π) * dS_h/dk - (window_size-1)/2 * S_h[k]
+                # This eliminates one FFT (saves ~33% of FFT computation time).
+                dS_h_dk = np.gradient(S_h, axis=0)
+                S_th = np.complex64(1j * nfft / (2 * np.pi)) * dS_h_dk - np.float32((window_size - 1) / 2.0) * S_h
+                del dS_h_dk
+
+                # Use raw magnitude for mask and ratios (normalization cancels in ratios)
+                raw_magnitude = np.abs(S_h)
+                mask = raw_magnitude > ref_power
+
+                # Normalize magnitude to match scipy.signal.spectrogram(mode='magnitude', scaling='spectrum')
+                # which divides by sum(window) and doubles the one-sided spectrum
+                magnitude = raw_magnitude / win_sum
+                magnitude[1:-1, :] *= sqrt2_f32
+                del raw_magnitude
+
+                # Initialize reassigned coordinates at bin centers (use all FFT frequencies,
+                # not the display-restricted ones — the histogram will handle the filtering)
+                bin_freqs = np.broadcast_to(all_frequencies[:, np.newaxis], S_h.shape).copy()
+                frame_times_chunk = np.broadcast_to(chunk_times[np.newaxis, :], S_h.shape).copy()
+
+                # Compute reassigned coordinates where signal is above threshold
+                ratio_dh = np.zeros_like(S_h)
+                ratio_th = np.zeros_like(S_h)
+                ratio_dh[mask] = S_dh[mask] / S_h[mask]
+                ratio_th[mask] = S_th[mask] / S_h[mask]
+                del S_h, S_dh, S_th
+
+                reassigned_freqs = bin_freqs.copy()
+                reassigned_times = frame_times_chunk.copy()
+                del bin_freqs, frame_times_chunk
+                reassigned_freqs[mask] -= np.imag(ratio_dh[mask]) * np.float32(sample_rate / (2 * np.pi))
+                reassigned_times[mask] += np.real(ratio_th[mask]) / np.float32(sample_rate)
+                del ratio_dh, ratio_th, mask
+
+                # Clip to valid ranges
+                np.clip(reassigned_freqs, 0, half_nyquist, out=reassigned_freqs)
+                np.clip(reassigned_times, 0, audio_length, out=reassigned_times)
+
+                # Scatter power onto the output grid and accumulate
+                power = magnitude ** 2
+                del magnitude
+                chunk_hist_power, _, _ = np.histogram2d(
+                    reassigned_freqs.ravel().astype(np.float64),
+                    reassigned_times.ravel().astype(np.float64),
+                    bins=[freq_edges, time_edges],
+                    weights=power.ravel().astype(np.float64))
+                chunk_hist_count, _, _ = np.histogram2d(
+                    reassigned_freqs.ravel().astype(np.float64),
+                    reassigned_times.ravel().astype(np.float64),
+                    bins=[freq_edges, time_edges])
+                del reassigned_freqs, reassigned_times, power
+
+                hist_power += chunk_hist_power
+                hist_count += chunk_hist_count
+                del chunk_hist_power, chunk_hist_count
+
+            # Nadaraya-Watson kernel smoothing: smooth both power and count with
+            # the same Gaussian, then divide. This fills gaps between sparse
+            # reassigned points while preserving per-source magnitude (no dilution).
+            # Frequency sigma scales with zero-padding ratio so smoothing width
+            # is relative to the true frequency resolution regardless of nfft.
+            smoothing = es.cfg.get('analysis.spectrogram.reassign-smoothing', 0.5)
+
+            if smoothing > 0:
+                zp_ratio = nfft / window_size
+                sigma_freq = smoothing * zp_ratio / 2
+                sigma_time = smoothing * 1.0
+                smooth_power = scipy.ndimage.gaussian_filter(hist_power, sigma=(sigma_freq, sigma_time))
+                smooth_count = scipy.ndimage.gaussian_filter(hist_count, sigma=(sigma_freq, sigma_time))
+
+                avg_power = np.zeros_like(smooth_power)
+                valid = smooth_count > 1e-6
+                avg_power[valid] = smooth_power[valid] / smooth_count[valid]
+            else:
+                # No smoothing — raw per-bin average
+                avg_power = np.zeros_like(hist_power)
+                nonzero = hist_count > 0
+                avg_power[nonzero] = hist_power[nonzero] / hist_count[nonzero]
+
+            del hist_power, hist_count
+
+            # Convert to float32 magnitude; set floor for near-zero bins to avoid
+            # -inf after dB conversion (which corrupts LANCZOS resize)
+            channel_data = np.sqrt(np.maximum(avg_power, 0)).astype(np.float32)
+            channel_data[channel_data < 1e-10] = 1e-10
+            channel_data = channel_data.reshape(1, *channel_data.shape)
+
+            if spectrogram_data is None:
+                spectrogram_data = channel_data
+            else:
+                spectrogram_data = np.concatenate([spectrogram_data, channel_data], axis=0)
+
+        return spectrogram_data
+
+    @staticmethod
+    def _centers_to_edges(centers: np.ndarray) -> np.ndarray:
+        """Convert bin center values to bin edges for np.histogram2d."""
+        if len(centers) < 2:
+            half = 0.5 if len(centers) == 0 else abs(centers[0]) * 0.5 or 0.5
+            return np.array([centers[0] - half, centers[0] + half]) if len(centers) == 1 else np.array([0.0, 1.0])
+        midpoints = (centers[:-1] + centers[1:]) / 2
+        first_edge = centers[0] - (centers[1] - centers[0]) / 2
+        last_edge = centers[-1] + (centers[-1] - centers[-2]) / 2
+        return np.concatenate(([first_edge], midpoints, [last_edge]))
 
     @classmethod
     def _get_frequency_max(cls, audio_data: np.ndarray, sample_rate: int,
@@ -263,8 +492,36 @@ class Spectrogram:
         if padding_factor is None:
             padding_factor = es.cfg['analysis.spectrogram.frequency-max-padding-factor']
 
-        frequencies, times, spectrogram_data = cls.generate_spectrogram_data(audio_data, sample_rate,
-                                                                             scaling=SpectrogramScaling.LINEAR)
+        # Subsample the audio to limit computation: take evenly spaced segments
+        # that add up to a bounded total (~5000 spectrogram frames worth of audio).
+        # This produces a representative frequency analysis without processing the
+        # entire file, which is critical for long files (10+ minutes).
+        window_size = es.cfg['analysis.window-size']
+        window_overlap = es.cfg['analysis.window-overlap']
+        hop = window_size - window_overlap
+        max_frames = 5000
+        max_samples = max_frames * hop + window_size
+        n_samples = audio_data.shape[1]
+
+        if n_samples > max_samples * 1.5:
+            # Take evenly spaced segments across the file
+            n_segments = 10
+            segment_samples = max_samples // n_segments
+            # Ensure segment is at least one window
+            segment_samples = max(segment_samples, window_size * 2)
+            spacing = n_samples // n_segments
+            segments = []
+            for s in range(n_segments):
+                start = s * spacing
+                end = min(start + segment_samples, n_samples)
+                segments.append(audio_data[:, start:end])
+            sampled_audio = np.concatenate(segments, axis=1)
+        else:
+            sampled_audio = audio_data
+
+        frequencies, times, spectrogram_data = cls.generate_spectrogram_data(sampled_audio, sample_rate,
+                                                                             scaling=SpectrogramScaling.LINEAR,
+                                                                             reassign=False)
         if len(spectrogram_data.shape) > 2:
             # Reshape spectrogram data to append all channels onto first
             # (since we want to determine the max frequency across all channels)
@@ -286,16 +543,10 @@ class Spectrogram:
             sorted_times = np.argsort(spectral_cumsum[frequency_max_index, :])
             spectral_cumsum = np.delete(spectral_cumsum, sorted_times[range(math.floor(0.1 * spectral_cumsum.shape[1]))], axis=1)
 
-            # Initialize vectors to store spectral edge frequency indicies for each time bin
-            spec_edge80_indices = np.zeros(spectral_cumsum.shape[1])
-            spec_edge95_indices = np.zeros(spectral_cumsum.shape[1])
-
-            for i_t in range(spectral_cumsum.shape[1]):
-                # Calculate the 80% and 95% spectral edge frequencies for each time bin
-                spec_edge80_indices[i_t] = np.argmax(
-                    spectral_cumsum[:, i_t] >= 0.8 * spectral_cumsum[frequency_max_index, i_t])
-                spec_edge95_indices[i_t] = np.argmax(
-                    spectral_cumsum[:, i_t] >= 0.95 * spectral_cumsum[frequency_max_index, i_t])
+            # Vectorized spectral edge computation across all time bins
+            totals = spectral_cumsum[frequency_max_index, :]
+            spec_edge80_indices = np.argmax(spectral_cumsum >= 0.8 * totals[np.newaxis, :], axis=0)
+            spec_edge95_indices = np.argmax(spectral_cumsum >= 0.95 * totals[np.newaxis, :], axis=0)
 
             # Identify the frequency index of either the 95th percentile of the 80% spectral edge frequency
             # or the 50th percentile of the 95% spectral edge frequency
@@ -334,6 +585,90 @@ class Spectrogram:
         return frequency_max
 
 
+def estimate_frequency_max_coarse(audio_data: np.ndarray, sample_rate: int,
+                                  padding_factor: float = None,
+                                  pretty_mode: bool = True) -> float:
+    """Quick frequency estimation using a handful of FFTs.
+
+    Samples ~20 evenly-spaced segments and computes periodograms with a
+    moderate FFT size (1024). Much faster than a full spectrogram analysis.
+    Used to determine optimal nfft before computing the full spectrogram.
+    """
+    if padding_factor is None:
+        padding_factor = es.cfg['analysis.spectrogram.frequency-max-padding-factor']
+
+    n_channels = audio_data.shape[0]
+    n_samples = audio_data.shape[1]
+
+    coarse_window_size = min(2048, n_samples)
+    coarse_nfft = max(coarse_window_size, 1024)
+
+    n_segments = min(20, max(1, n_samples // coarse_window_size))
+
+    if n_segments <= 1:
+        spacing = 0
+    else:
+        spacing = max(1, (n_samples - coarse_window_size) // (n_segments - 1))
+
+    h = scipy.signal.get_window('hann', coarse_window_size).astype(np.float32)
+    n_freqs = coarse_nfft // 2 + 1
+    power_sum = np.zeros(n_freqs, dtype=np.float64)
+
+    for i in range(n_segments):
+        start = min(i * spacing, n_samples - coarse_window_size)
+        for ch in range(n_channels):
+            segment = audio_data[ch, start:start + coarse_window_size]
+            spectrum = np.abs(np.fft.rfft(segment * h, n=coarse_nfft))
+            power_sum += spectrum.astype(np.float64) ** 2
+
+    power_sum /= (n_segments * n_channels)
+
+    # Spectral edge: find where 95% of cumulative energy is reached
+    cumsum = np.cumsum(power_sum)
+    total_energy = cumsum[-1]
+
+    if total_energy <= 0:
+        return math.floor(sample_rate / 2)
+
+    edge_idx = int(np.searchsorted(cumsum, 0.95 * total_energy))
+    freq_resolution = sample_rate / coarse_nfft
+    frequency_max = edge_idx * freq_resolution
+
+    frequency_max *= padding_factor
+
+    if pretty_mode:
+        if frequency_max < 1000:
+            nearest = 250
+        elif frequency_max < 2000:
+            nearest = 500
+        else:
+            nearest = 1000
+        frequency_max = nearest * math.ceil(frequency_max / nearest)
+
+    frequency_max = min(frequency_max, math.floor(sample_rate / 2))
+
+    return max(frequency_max, 1)
+
+
+def calculate_optimal_nfft(sample_rate: int, frequency_max: float,
+                           panel_height: float, window_size: int) -> int:
+    """Calculate the optimal nfft for a given display resolution and frequency range.
+
+    Targets approximately 1 frequency bin per pixel in the displayed frequency
+    range after any audio resampling, while respecting the minimum window_size
+    constraint and rounding up to the next power of 2 for FFT efficiency.
+    """
+    if frequency_max <= 0 or panel_height <= 0:
+        return window_size
+
+    nyquist = sample_rate / 2
+    target_nfft = panel_height * nyquist / frequency_max
+
+    nfft = 1 << math.ceil(math.log2(max(1, target_nfft)))
+
+    return max(window_size, nfft)
+
+
 def peak_envelope(es_audio: es.audio.Audio, start: int = 0, end: int = None, padding: int = 0,
                   window_size: int = None, step_size: int = None) -> Envelope:
     return Envelope(es_audio=es_audio, mode=EnvelopeModes.PEAK, start=start, end=end, padding=padding,
@@ -352,10 +687,18 @@ def spectrogram(es_audio: es.audio.Audio) -> Spectrogram:
 
 def _on_config_updated():
     if es.cfg['analysis.window-overlap'] is None:
-        es.cfg['analysis.window-overlap'] = es.cfg['analysis.window-size'] // 2
+        es.cfg['analysis.window-overlap'] = 3 * es.cfg['analysis.window-size'] // 4
 
+    # Set a 4x fallback for nfft (used when the analysis module is called
+    # directly, outside a visualization entry point). Visualization entry
+    # points override this with a resolution-aware value via set_optimal_nfft.
+    # nfft-auto tracks whether the user explicitly set nfft — if so, the
+    # resolution-aware override is skipped.
     if es.cfg['analysis.spectrogram.nfft'] is None:
-        es.cfg['analysis.spectrogram.nfft'] = es.cfg['analysis.window-size']
+        es.cfg['analysis.spectrogram.nfft'] = 4 * es.cfg['analysis.window-size']
+        es.cfg['analysis.spectrogram.nfft-auto'] = True
+    else:
+        es.cfg['analysis.spectrogram.nfft-auto'] = False
 
 
 es.add_event_listener('config.updated', _on_config_updated)

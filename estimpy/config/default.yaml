@@ -5,17 +5,23 @@ analysis:
     frequency-min: 0
     # The maximum frequency to show on the spectrogram. If None, will autoscale using the method from frequency-max-method.
     frequency-max: ~
-    # The method to use to determine the 
+    # The method to use to determine the maximum frequency when frequency-max is not set
     frequency-max-method: spectral_edge
     # The factor by which to multiply the autoscaled frequency max value (for visual padding)
     frequency-max-padding-factor: 1.1
-    # Length of the FFT. If None, defaults to analysis.window-size.
+    # Length of the FFT. If None, automatically sized based on the output resolution
+    # and estimated frequency content so that there is approximately one frequency
+    # bin per pixel in the spectrogram panel. Set an explicit value to override.
     nfft: ~
+    # Use reassigned spectrogram for sharper time-frequency localization
+    reassign: True
+    # Smoothing intensity for the reassigned spectrogram (0 = no smoothing, 1.0 = smooth to ~1 true frequency resolution bin)
+    reassign-smoothing: 1.0
     # Window function to use when generating spectrogram. See scipy.signal.get_window documentation for available options.
     window-function: hann
   # Window size to use when processing audio data (in number of samples)
   window-size: 2048
-  # Window overlap to use when processing audio data (in mumber of samples). Must be less than analysis.window-size. Defaults to analysis.window-size // 2
+  # Window overlap to use when processing audio data (in number of samples). Must be less than analysis.window-size. Defaults to 3 * analysis.window-size // 4
   window-overlap: ~
 files:
   input:
@@ -35,8 +41,11 @@ metadata:
 player:
   # Start playback immediately
   autoplay: False
-  # Repeat the file from the beginning upon completion
-  repeat: False
+  # Disable reassigned spectrogram for the player to speed up loading.
+  # Falls back to the standard spectrogram which is significantly faster to compute.
+  disable-spectrogram-reassign: True
+  # Repeat mode: none (play through playlist and stop), one (loop current file), all (loop playlist)
+  repeat: none
   # Amount of time to skip (in seconds)
   skip-length: 60
   # The amount of latency that is required to render the video (in seconds)
@@ -50,6 +59,8 @@ player:
   # Maximum amount of time to smoothly transition to a new volume (i.e. with a volume change of 100)
   volume-ramp-max-length: 5
 visualization:
+  # Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode
+  triphase: False
   # Configuration for image visualizations
   image:
     # Configuration for displaying image interactively
@@ -80,18 +91,25 @@ visualization:
       # First channel is mono/left, second is right (if stereo)
       channels:
         ch0:
-          # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
+          # The color to use for the background of the amplitude panel. If not defined will be based on base-color.
           background-color: ~
-          # The color to use for the peak amplitude envelope
-          peak-color: '#4dbeee'
-          # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
+          # The base color for the channel, used directly for the peak amplitude envelope
+          base-color: '#4799e8'
+          # The color to use for the RMS amplitude envelope. If not defined will be based on base-color.
           rms-color: ~
         ch1:
-          # The color to use for the background of the amplitude panel. If not defined will be based on peak-color.
+          # The color to use for the background of the amplitude panel. If not defined will be based on base-color.
           background-color: ~
-          # The color to use for the peak amplitude envelope
-          peak-color: '#b54dee'
-          # The color to use for the RMS amplitude envelope. If not defined will be based on peak-color.
+          # The base color for the channel, used directly for the peak amplitude envelope
+          base-color: '#b775ff'
+          # The color to use for the RMS amplitude envelope. If not defined will be based on base-color.
+          rms-color: ~
+        ch2:
+          # The color to use for the background of the amplitude panel. If not defined will be based on base-color.
+          background-color: ~
+          # The base color for the channel, used directly for the peak amplitude envelope
+          base-color: '#e06cb7'
+          # The color to use for the RMS amplitude envelope. If not defined will be based on base-color.
           rms-color: ~
       # Configuration for the axes of the amplitude panel
       axes:
@@ -139,15 +157,30 @@ visualization:
         weight: bold
     # Configuration for the spectrogram panels
     spectrogram:
-      # First channel is mono/left, second is right (if stereo)
+      # Base colormap from which per-channel spectrograms are derived.
+      # See matplotlib colormap documentation for a list of available options.
+      color-map: jet
+      # When True, the low-energy base region of the colormap is recolored to match
+      # each channel's amplitude base-color. When False, uses the base colormap
+      # directly for all channels.
+      match-amplitude-color: True
+      # Controls how much of the colormap's base region is recolored to the channel's
+      # base-color hue when match-amplitude-color is True. Specified in degrees of hue
+      # distance (0-180) from the colormap's starting hue. Only affects the darkest,
+      # low-energy portion of the colormap. Recolored samples are perceptually brightness-
+      # matched and darkened toward the amplitude panel background. Small values (3-8)
+      # produce a subtle tint; larger values extend recoloring into brighter regions.
+      match-amplitude-color-radius: 5
+      # Per-channel colormap overrides. When set, overrides the base colormap and
+      # color matching for that channel. When not set (~), the channel uses the
+      # base colormap with automatic color matching (if enabled).
       channels:
         ch0:
-          # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
-          color-map: jet
+          color-map: ~
         ch1:
-          # Colormap to use for the spectrogram. See matplotlib colormap documentation for a list of available options.
-          # If not defined will use color-map from first channel.
-          color-map: turbo
+          color-map: ~
+        ch2:
+          color-map: ~
       # Configuration for the axes of the spectrogram
       axes:
         # Show the frequency axis ticks and scale text
@@ -160,9 +193,11 @@ visualization:
       amplitude:
         mono: 3
         stereo: 1.25
+        triphase: 1.25
       spectrogram:
         mono: 6
         stereo: 3.25
+        triphase: 3.25
       controls: 0.75
     # Configuration for the title panel
     title:
@@ -206,8 +241,8 @@ visualization:
         '-y': ''
         '-pix_fmt': 'yuv420p'
         '-colorspace': 'bt709'
-        '-crf': 26
-        '-preset': slow
+        '-crf': 22
+        '-preset': medium
         '-tune': animation
       # Container format of the video
       format: mp4

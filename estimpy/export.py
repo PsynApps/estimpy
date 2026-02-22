@@ -1,4 +1,3 @@
-import datetime
 import math
 
 import matplotlib
@@ -36,6 +35,9 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
     width = es.cfg['visualization.image.export.width'] if width is None else width
     height = es.cfg['visualization.image.export.height'] if height is None else height
 
+    es.visualization.set_optimal_nfft(es_audio, figure_height=height,
+                                      title_enabled=es.cfg['visualization.image.export.title.enabled'])
+
     spinner = es.utils.Spinner(f'Preparing image visualization... ')
     visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
     visualization.make_figure()
@@ -54,7 +56,8 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
 def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format: str = None,
                 fps: float = None, width: int = None, height: int = None,
                 frame_start: int = None, segment_start: int = None,
-                image_file: str = None, overwrite: bool = None) -> str | None:
+                image_file: str = None, overwrite: bool = None,
+                profiling: bool = False) -> str | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     video_format = video_format if video_format is not None else es.cfg['visualization.video.export.format']
     segment_start = segment_start if segment_start is not None else 1
@@ -82,6 +85,10 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     width = es.cfg['visualization.video.export.width'] if width is None else width
     height = es.cfg['visualization.video.export.height'] if height is None else height
     image_format = es.cfg['visualization.image.export.format']
+
+    es.visualization.set_optimal_nfft(es_audio, figure_height=height,
+                                      title_enabled=es.cfg['visualization.video.export.title.enabled'],
+                                      include_scrub=True)
 
     # Set the total length of the video
     seconds_total = float(es.cfg['visualization.video.export.video-length-max']) if \
@@ -234,6 +241,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
         visualization.make_figure()
         visualization.resize_figure(width=width, height=height, dpi=_DPI)
+        visualization.prepare_direct_render(profiling=profiling)
         spinner.stop()
 
         # Get temporary file name to use during encoding
@@ -257,19 +265,62 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         # Initialize progress bar
         frames_progress_bar = tqdm.tqdm(total=frame_count, desc=segment_label, unit='frame')
 
-        def progress_callback(i, n):
-            frames_progress_bar.update(i - frames_progress_bar.n)  # Update based on the difference from the current count
+        # Render frames directly to FFmpeg via raw video pipe
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',
+            '-f', 'rawvideo',
+            '-vcodec', 'rawvideo',
+            '-s', f'{width}x{height}',
+            '-pix_fmt', 'rgb24',
+            '-r', str(es.cfg['visualization.video.export.fps']),
+            '-i', 'pipe:0',
+            '-c:v', es.cfg['visualization.video.export.codec'],
+            *ffmpeg_extra_args,
+            *ffmpeg_keyframe_args,
+            video_segment_encoding_file
+        ]
 
-        visualization.animation.save(
-            video_segment_encoding_file,
-            writer='ffmpeg',
-            fps=es.cfg['visualization.video.export.fps'],
-            codec=es.cfg['visualization.video.export.codec'],
-            extra_args=ffmpeg_extra_args + ffmpeg_keyframe_args,
-            progress_callback=progress_callback)
+        ffmpeg_process = subprocess.Popen(
+            ffmpeg_cmd, stdin=subprocess.PIPE,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-        # Update the progress bar for the last frame since the callback is not called when save() completes.
-        frames_progress_bar.update(1)
+        # Profiling accumulators for export loop
+        if profiling:
+            profile_tobytes = 0.0
+            profile_pipe_write = 0.0
+            profile_interval = 100
+            profile_count = 0
+
+        for frame in range(segment_frame_start, segment_frame_start + frame_count):
+            frame_rgb = visualization.render_frame_direct(frame)
+
+            if profiling:
+                t0 = time.perf_counter()
+            frame_bytes = frame_rgb.tobytes()
+            if profiling:
+                profile_tobytes += time.perf_counter() - t0
+
+                t0 = time.perf_counter()
+            ffmpeg_process.stdin.write(frame_bytes)
+            if profiling:
+                profile_pipe_write += time.perf_counter() - t0
+
+            frames_progress_bar.update(1)
+
+            if profiling:
+                profile_count += 1
+                if profile_count >= profile_interval:
+                    print(f'\n--- Export loop profile ({profile_count} frames) ---')
+                    print(f'  {"tobytes":20s}: {profile_tobytes / profile_count * 1000:7.2f} ms/frame')
+                    print(f'  {"pipe_write (ffmpeg)":20s}: {profile_pipe_write / profile_count * 1000:7.2f} ms/frame')
+                    print()
+                    profile_tobytes = 0.0
+                    profile_pipe_write = 0.0
+                    profile_count = 0
+
+        ffmpeg_process.stdin.close()
+        ffmpeg_process.wait()
+
         frames_progress_bar.close()
 
         # Move the temporary encoding file to the segment file name
@@ -340,6 +391,24 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     # This could avoid rounding errors with the argument potentially resulting in unintended truncation of the audio
     length_args = [] if seconds_total == es_audio.length else ['-t', str(seconds_total)]
 
+    # When stream-copying, only include global ffmpeg args (not codec-specific ones)
+    if concat_video_codec == 'copy':
+        # Global args that are safe regardless of codec mode
+        _global_ffmpeg_args = {'-hide_banner', '-loglevel', '-y'}
+        concat_extra_args = []
+        i = 0
+        while i < len(ffmpeg_extra_args):
+            arg = ffmpeg_extra_args[i]
+            if arg in _global_ffmpeg_args:
+                concat_extra_args.append(arg)
+                # Include the value if this arg has one
+                if i + 1 < len(ffmpeg_extra_args) and not ffmpeg_extra_args[i + 1].startswith('-'):
+                    concat_extra_args.append(ffmpeg_extra_args[i + 1])
+                    i += 1
+            i += 1
+    else:
+        concat_extra_args = ffmpeg_extra_args
+
     ffmpeg_command = [
         'ffmpeg',
         '-f', 'concat', '-safe', '0',  # "-safe 0" allows for absolute paths to files
@@ -349,7 +418,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         '-c:a', 'copy', '-strict', '-1',  # "-strict -1" allows for non-standard sample rates
         '-movflags', 'faststart',  # Improves playback and seeking efficiency
         *length_args,
-        *ffmpeg_extra_args,
+        *concat_extra_args,
         video_file
     ]
 

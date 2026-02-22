@@ -1,5 +1,65 @@
 # Changelog
 
+## [1.2.0] - 2026-02-11
+### Added
+- Reassigned spectrogram algorithm for sharper time-frequency localization, with configurable smoothing (`analysis.spectrogram.reassign`, `analysis.spectrogram.reassign-smoothing`)
+- Triphase visualization mode (`-t`/`--triphase`) for both `estimpy-visualizer` and `estimpy-player`, showing the derived common electrode signal -(A+B) alongside the A and B channels
+- Triphase toggle in the player UI for instant switching between stereo and triphase visualization during playback, with pre-computed 3-channel analysis data for stereo files
+- Per-channel colormap derivation from a single base colormap (`visualization.style.spectrogram.color-map`), with the low-energy region automatically recolored to match each channel's base color
+- Configurable colormap recoloring radius (`visualization.style.spectrogram.match-amplitude-color-radius`) with perceptual brightness matching using Rec. 709 relative luminance
+- Playlist management UI in the player with add, remove, reorder, and file selection
+- Repeat mode button in the player (none/one/all), toggled with the R key
+- Fullscreen mode in the player, toggled via button, F key, Alt+Enter, or double-clicking the visualization (Escape to exit)
+- Zoom controls in the player for adjusting the sliding window length
+- Qt-based player window replacing the matplotlib-only interactive player
+- Direct frame rendering pipeline for video export, bypassing matplotlib's animation framework and piping raw frames to ffmpeg
+- Profiling mode for video export (`-p`/`--profiling`) to diagnose per-frame timing
+- Third channel style configuration (`visualization.style.amplitude.channels.ch2`)
+- Triphase subplot height ratios (`visualization.style.subplot-height-ratios.amplitude.triphase`, `visualization.style.subplot-height-ratios.spectrogram.triphase`)
+- Pillow added as a package dependency
+- Configuration profiles for HEVC and ProRes VideoToolbox hardware encoding, and iPod Touch player
+- Configurable reassignment bypass for the player (`player.disable-spectrogram-reassign`, default True) to speed up loading by using the standard spectrogram
+- Resolution-aware FFT sizing for all visualization modes (player, image, and video export), using coarse frequency pre-analysis (~20 FFTs) and output panel dimensions to determine the optimal FFT size
+
+### Changed
+- Audio data stored as float32 instead of float64, halving memory usage for all audio operations
+- Spectrogram computation uses float32/complex64 throughout, halving memory for all intermediate and final arrays
+- Reassigned spectrogram computed in chunks to limit peak memory usage, with histograms accumulated across batches
+- Raw audio data (`data_raw`) reconstructed on demand instead of stored as a duplicate copy
+- Default FFT length automatically sized based on output resolution and frequency content, replacing the previous fixed 1x window size default
+- Default window overlap increased to 75% (3/4 window size) for better temporal resolution
+- Envelope computation vectorized using NumPy stride tricks, replacing per-window Python loop
+- Spectral edge frequency max computation vectorized and subsampled for faster loading of long files
+- Spectrogram colormap configuration simplified from per-channel colormaps to a single base colormap with automatic per-channel derivation
+- Renamed `peak-color` to `base-color` in channel style configuration
+- Default channel colors updated (`#4799e8`, `#b775ff`)
+- Triphase amplitude panel scaled to +6 dB (linear 2.0) to reflect the analog summation range
+- Video export default CRF changed from 26 to 22, preset from `slow` to `medium`
+- FFmpeg concat step now filters out codec-specific args when stream-copying segments
+- Font rendering uses explicit font properties throughout for consistent cross-platform text appearance
+- Reworked most video configuration profiles to improve processing speed and consistency of quality
+- Switched audio playback dependency from `pygame` to `pygame-ce` (community edition)
+- File selection dialogs now use Qt (`QFileDialog`) instead of tkinter, removing the tkinter dependency
+- Player controls reordered: playback | repeat | playlist | stretch | fullscreen | zoom | triphase | volume
+- Repeat config changed from boolean to string enum (`none`/`one`/`all`) with backward compatibility for boolean values
+- End-of-track handling now respects repeat mode: `one` loops the current file, `all` wraps around the playlist, `none` advances or stops
+
+### Removed
+- Removed legacy matplotlib-based interactive player (`VideoPlayerVisualization`), fully replaced by the Qt-based player
+- Removed tkinter dependency (file dialogs replaced with Qt)
+
+### Fixed
+- Pause/unpause no longer resets playback position (audio time is now captured before pausing)
+- Volume step of zero no longer causes infinite loop in volume ramping
+- Seeking to negative time values is now clamped to zero
+- NFFT size now scales proportionally with window size when audio is resampled, preventing excessive zero-padding
+- Audio pops eliminated: all volume transitions (increase, decrease, pause, unpause, stop, play, file switch) use smooth ramps instead of abrupt changes, with a synchronous 100ms fade-to-zero for stop and pause operations
+- Volume no longer decays on rapid seeking (target volumes from Player state are used instead of intermediate ramp values)
+- Per-channel volume controls now rebuild correctly when switching between files with different channel counts
+- Channel volume and mute state lists now resize when switching between files with different channel counts
+- Scrub bar position line no longer leaves a ghost artifact when zoom level is changed during playback
+- Zoom level is now preserved when switching between files in the playlist
+
 ## [1.1.3] - 2026-02-10
 ### Removed
 - Removed `flatdict` package requirement in favor of a custom implementation

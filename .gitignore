@@ -6,7 +6,8 @@ __pycache__/
 *.egg-info/
 dist/
 
-# Editor project files
+# Editor/agent project files
+.claude/
 .idea/
 .vscode/
 

@@ -33,21 +33,26 @@ Many commercial Estim units support custom stimulation signals using audio input
 - **Visualization analyses**: Visualizations are generated for each channel of audio data
   - **Amplitude Envelopes**: Generates peak and RMS amplitude envelopes, showing how intensity changes over time
   - **Spectrogram**: Visualizes the frequency content of the audio, showing how texture changes over time
+  - **Reassigned spectrogram**: Uses reassignment for sharper time-frequency localization, with configurable smoothing
+  - **Triphase mode**: Derives and visualizes the common electrode signal -(A+B) alongside the A and B channels for 3-electrode estim setups
+  - **Per-channel colormap derivation**: Automatically recolors the low-energy region of a single base colormap to match each channel's amplitude color
 - **Image visualization**: Generates a single-image visualization of a full audio file
   - **Image file export**: Image visualization can be saved to an image file
   - **Album art embedding**: Image visualization can be directly embedded in the metadata of the audio file
     - During playback, album art is often rendered at the same width as the time position slider. Using the image visualization as album art, the file can be easily navigated and upcoming changes in the session can be anticipated.
   - **Interactive display**: Image visualization can be rendered on an interactive plot to allow detailed inspection of the audio file
 - **Animated visualization**: Generates an animated sliding visualization of the audio file
-  - **Video file export**: Animated visualization can be saved to a video file
-  - **Interactive player**: Animated visualization used within experimental audio file player
+  - **Video file export**: Animated visualization can be saved to a video file using a direct frame rendering pipeline
+  - **Interactive player**: Animated visualization used within the Qt-based audio file player
 - **Audio player**: Plays Estim audio files for use with stereostim devices (***HIGHLY EXPERIMENTAL!***)
   - **Real-time visualization**: Based on the animated visualization
   - **Separate channel output control**: Allows signal gain of each channel to be independently controlled
   - **Smooth intensity transitions**: Ensures that any changes in playback will transition smoothly to avoid sudden changes in output intensity
     - This only affects changes in playback caused by interacting with the player (i.e. start, unpause, relocate time position, amplitude adjustment)
     - This will NOT alter sudden changes which are encoded directly in the audio data
-  - **Playlists**: Multiple files can be queued to play sequentially
+  - **Playlist management**: Add, remove, reorder, and select files within the player UI
+  - **Triphase toggle**: Instantly switch between stereo and triphase visualization during playback
+  - **Zoom controls**: Adjust the sliding window length during playback
 - **Highly configurable**: Nearly all parameters related to the rendering and export of visualizations are determined from an easily customizable configuration file
 
 ## Disclaimer
@@ -156,20 +161,6 @@ On Windows, you may get an error like: ```Microsoft Visual C++ 14.0 or greater i
 * Install the ["C++ development tools"](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (requires ~9 GB) from Microsoft Visual Studio
 * Downgrade your python version by one minor revision (e.g. 3.12 when 3.13 is the latest minor release)
 
-#### Mac/Linux installation error
-
-If you install python via ```brew``` on Mac or ```apt``` on Linux, tkinter may not be included by default.
-
-##### Mac
-```
-brew install python-tk
-```
-
-##### Linux
-```
-sudo apt install python3-tk
-```
-
 ## Usage
 
 EstimPy provides two command-line tools for generating visualizations.
@@ -211,12 +202,15 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 | `-c [CONFIG ...]`, `--config`                      | Apply additional configuration file(s).                                                                                |
 | `-co [CONFIG_OPTION VALUE ...]`, `--config-option` | Modify configuration option value(s).                                                                                  |
 | `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
+| `-t`, `--triphase`                                 | Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode.                   |
 | `-drange DYNAMIC_RANGE`, `--dynamic-range`         | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
 | `-fmin FREQUENCY_MIN`, `--frequency-min`           | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
 | `-fmax FREQUENCY_MAX`, `--frequency-max`           | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
 | `-rf RESUME_FRAME`, `--resume-frame`               | Specify the frame on which to resume video encoding (useful for resuming if encoding crashes).                         |
 | `-rs RESUME_SEGMENT`, `--resume-segment`           | Specify the segment on which to resume video encoding (useful for resuming if encoding crashes).                       |
+| `-p`, `--profiling`                                | Enable profiling output for video export. Prints per-frame timing breakdown to stdout.                                 |
 | `-y`, `--yes`                                      | Answers yes to all interactive prompts (overwrites existing output files by default).                                  |
+| `--version`                                        | Display version information and exit.                                                                                  |
 
 #### Examples
 
@@ -267,7 +261,7 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 
 - **Save image visualization to an image file overwriting specific configuration options**
   ```
-  estimpy-visualizer -wi -i input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.peak-color #93c3ff visualization.style.amplitude.channels.ch1.peak-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
+  estimpy-visualizer -wi -i input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.base-color #93c3ff visualization.style.amplitude.channels.ch1.base-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/11858185-c7f8-4084-8eb3-450d4bcb6ae9" width="720">
@@ -305,9 +299,11 @@ estimpy-player [options]
 | `-c [CONFIG ...]`, `--config`                      | Apply additional configuration file(s).                                                                                |
 | `-co [CONFIG_OPTION VALUE ...]`, `--config-option` | Modify configuration option value(s).                                                                                  |
 | `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
+| `-t`, `--triphase`                                 | Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode.                   |
 | `-drange DYNAMIC_RANGE`, `--dynamic-range`         | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
 | `-fmin FREQUENCY_MIN`, `--frequency-min`           | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
 | `-fmax FREQUENCY_MAX`, `--frequency-max`           | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
+| `--version`                                        | Display version information and exit.                                                                                  |
 
 #### Examples
 
@@ -339,19 +335,22 @@ The following additional configuration profiles are included with **EstimPy**:
 | Profile Name         | Description                                                    |
 |----------------------|----------------------------------------------------------------|
 | `default`            | The default base configuration (loaded automatically)          |
-| `image-4ksquare`     | Generate image visualization in 4K with a square aspect ratio  |
-| `image-8ksquare`     | Generate image visualization in 8K with a square aspect ratio  |
-| `image-videopreview` | Generate image visualization in 1440p with a 16:9 aspect ratio |
-| `notitle`            | Remove the title panel from all visualizations                 |
-| `player-cd028`       | Optimized settings for the CD-028 player                       |
-| `video-4k`           | Generate animated visualizations in 4K                         |
-| `video-8k`           | Generate animated visualizations in 8K                         |
-| `video-60fps`        | Generate animated visualizations in 60fps                      |
-| `video-120fps`       | Generate animated visualizations in 120fps                     |
-| `video-av1`          | Encode video with AV1 codec using CPU                          |
-| `video-av1_nvenc`    | Encode video with AV1 encoding using NVENC hardware            |
-| `video-hevc_nvenc`   | Encode video using x265 encoding with NVENC hardware           |
-| `video-vp9`          | Encode video with VP9 codec using CPU                          |
+| `image-4k-square`           | Generate image visualization in 4K with a square aspect ratio        |
+| `image-8k-square`           | Generate image visualization in 8K with a square aspect ratio        |
+| `image-videopreview`        | Generate image visualization in 1440p with a 16:9 aspect ratio       |
+| `notitle`                   | Remove the title panel from all visualizations                       |
+| `player-cd028`              | Optimized settings for the CD-028 player                             |
+| `player-ipodtouch`          | Optimized settings for the iPod Touch player                         |
+| `video-4k`                  | Generate animated visualizations in 4K                               |
+| `video-8k`                  | Generate animated visualizations in 8K                               |
+| `video-60fps`               | Generate animated visualizations in 60fps                            |
+| `video-120fps`              | Generate animated visualizations in 120fps                           |
+| `video-av1`                 | Encode video with AV1 codec using CPU                                |
+| `video-av1_nvenc`           | Encode video with AV1 encoding using NVENC hardware                  |
+| `video-hevc_nvenc`          | Encode video with HEVC encoding using NVENC hardware                 |
+| `video-hevc_videotoolbox`   | Encode video with HEVC encoding using VideoToolbox hardware (macOS)  |
+| `video-prores_videotoolbox` | Encode video with ProRes codec using VideoToolbox hardware (macOS)   |
+| `video-vp9`                 | Encode video with VP9 codec using CPU                                |
 
 ### Creating custom configuration files
 
@@ -375,28 +374,32 @@ For reference, the default configuration options and values are as follows:
 
 | Configuration Option                                         | Value                                        |
 |--------------------------------------------------------------|----------------------------------------------|
+| analysis.spectrogram.frequency-min                           | 0                                            |
 | analysis.spectrogram.frequency-max                           | None                                         |
 | analysis.spectrogram.frequency-max-method                    | spectral_edge                                |
 | analysis.spectrogram.frequency-max-padding-factor            | 1.1                                          |
-| analysis.spectrogram.frequency-min                           | 0                                            |
-| analysis.spectrogram.nfft                                    | 2048                                         |
+| analysis.spectrogram.nfft                                    | None                                         |
+| analysis.spectrogram.reassign                                | True                                         |
+| analysis.spectrogram.reassign-smoothing                      | 1.0                                          |
 | analysis.spectrogram.window-function                         | hann                                         |
-| analysis.window-overlap                                      | 1024                                         |
 | analysis.window-size                                         | 2048                                         |
+| analysis.window-overlap                                      | None                                         |
 | files.input.recursive                                        | False                                        |
+| files.output.path                                            | ./                                           |
 | files.output.overwrite-default                               | False                                        |
 | files.output.overwrite-prompt                                | True                                         |
-| files.output.path                                            | ./                                           |
 | metadata.default-genre                                       | Estim                                        |
 | metadata.file-path-pattern                                   | (?P<artist>[^\\\/]*?) - (?P<title>.*)        |
 | player.autoplay                                              | False                                        |
+| player.disable-spectrogram-reassign                          | True                                         |
 | player.repeat                                                | False                                        |
 | player.skip-length                                           | 60                                           |
 | player.video-render-latency                                  | 0.5                                          |
-| player.volume-ramp-max-length                                | 5                                            |
-| player.volume-ramp-min-length                                | 1                                            |
 | player.volume-start                                          | 50                                           |
 | player.volume-step                                           | 1                                            |
+| player.volume-ramp-min-length                                | 1                                            |
+| player.volume-ramp-max-length                                | 5                                            |
+| visualization.triphase                                       | False                                        |
 | visualization.image.display.size                             | 1080x1080                                    |
 | visualization.image.display.time.enabled                     | True                                         |
 | visualization.image.display.title.enabled                    | False                                        |
@@ -404,14 +407,17 @@ For reference, the default configuration options and values are as follows:
 | visualization.image.export.size                              | 1080x1080                                    |
 | visualization.image.export.time.enabled                      | True                                         |
 | visualization.image.export.title.enabled                     | True                                         |
-| visualization.style.amplitude.axes.enabled                   | True                                         |
-| visualization.style.amplitude.background-alpha               | 0.15                                         |
 | visualization.style.amplitude.channels.ch0.background-color  | None                                         |
-| visualization.style.amplitude.channels.ch0.peak-color        | #4dbeee                                      |
+| visualization.style.amplitude.channels.ch0.base-color        | #4799e8                                      |
 | visualization.style.amplitude.channels.ch0.rms-color         | None                                         |
 | visualization.style.amplitude.channels.ch1.background-color  | None                                         |
-| visualization.style.amplitude.channels.ch1.peak-color        | #b54dee                                      |
+| visualization.style.amplitude.channels.ch1.base-color        | #b775ff                                      |
 | visualization.style.amplitude.channels.ch1.rms-color         | None                                         |
+| visualization.style.amplitude.channels.ch2.background-color  | None                                         |
+| visualization.style.amplitude.channels.ch2.base-color        | #e06cb7                                      |
+| visualization.style.amplitude.channels.ch2.rms-color         | None                                         |
+| visualization.style.amplitude.axes.enabled                   | True                                         |
+| visualization.style.amplitude.background-alpha               | 0.15                                         |
 | visualization.style.amplitude.padding                        | 0.1                                          |
 | visualization.style.amplitude.rms-alpha                      | 0.5                                          |
 | visualization.style.amplitude.show-rms                       | True                                         |
@@ -425,16 +431,22 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.font.text.border-width                   | 1                                            |
 | visualization.style.font.text.family                         | Helvetica Neue, Helvetica, Arial, sans-serif |
 | visualization.style.font.text.weight                         | bold                                         |
+| visualization.style.spectrogram.color-map                    | jet                                          |
+| visualization.style.spectrogram.match-amplitude-color        | True                                         |
+| visualization.style.spectrogram.match-amplitude-color-radius | 5                                            |
+| visualization.style.spectrogram.channels.ch0.color-map       | None                                         |
+| visualization.style.spectrogram.channels.ch1.color-map       | None                                         |
+| visualization.style.spectrogram.channels.ch2.color-map       | None                                         |
 | visualization.style.spectrogram.axes.enabled                 | True                                         |
-| visualization.style.spectrogram.channels.ch0.color-map       | jet                                          |
-| visualization.style.spectrogram.channels.ch1.color-map       | turbo                                        |
 | visualization.style.spectrogram.dynamic-range                | 90                                           |
+| visualization.style.subplot-height-ratios.title              | 1                                            |
 | visualization.style.subplot-height-ratios.amplitude.mono     | 3                                            |
 | visualization.style.subplot-height-ratios.amplitude.stereo   | 1.25                                         |
-| visualization.style.subplot-height-ratios.controls           | 0.75                                         |
+| visualization.style.subplot-height-ratios.amplitude.triphase | 1.25                                         |
 | visualization.style.subplot-height-ratios.spectrogram.mono   | 6                                            |
 | visualization.style.subplot-height-ratios.spectrogram.stereo | 3.25                                         |
-| visualization.style.subplot-height-ratios.title              | 1                                            |
+| visualization.style.subplot-height-ratios.spectrogram.triphase | 3.25                                       |
+| visualization.style.subplot-height-ratios.controls           | 0.75                                         |
 | visualization.style.time.font-size                           | 24                                           |
 | visualization.style.title.background-color                   | #000000                                      |
 | visualization.style.title.color                              | #ffffff                                      |
@@ -446,20 +458,20 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.display.title.enabled                    | False                                        |
 | visualization.video.display.window-length                    | 20                                           |
 | visualization.video.export.codec                             | libx265                                      |
-| visualization.video.export.ffmpeg-extra-args.-colorspace     | bt709                                        |
-| visualization.video.export.ffmpeg-extra-args.-crf            | 26                                           |
 | visualization.video.export.ffmpeg-extra-args.-hide_banner    |                                              |
 | visualization.video.export.ffmpeg-extra-args.-loglevel       | error                                        |
-| visualization.video.export.ffmpeg-extra-args.-pix_fmt        | yuv420p                                      |
-| visualization.video.export.ffmpeg-extra-args.-preset         | slow                                         |
-| visualization.video.export.ffmpeg-extra-args.-tune           | animation                                    |
 | visualization.video.export.ffmpeg-extra-args.-y              |                                              |
+| visualization.video.export.ffmpeg-extra-args.-pix_fmt        | yuv420p                                      |
+| visualization.video.export.ffmpeg-extra-args.-colorspace     | bt709                                        |
+| visualization.video.export.ffmpeg-extra-args.-crf            | 22                                           |
+| visualization.video.export.ffmpeg-extra-args.-preset         | medium                                       |
+| visualization.video.export.ffmpeg-extra-args.-tune           | animation                                    |
 | visualization.video.export.format                            | mp4                                          |
 | visualization.video.export.fps                               | 30                                           |
 | visualization.video.export.keyframe-interval                 | None                                         |
 | visualization.video.export.preview.enabled                   | True                                         |
-| visualization.video.export.preview.fade-length               | 1                                            |
 | visualization.video.export.preview.length                    | 2                                            |
+| visualization.video.export.preview.fade-length               | 1                                            |
 | visualization.video.export.reencode-segments                 | False                                        |
 | visualization.video.export.segment-length                    | 3600                                         |
 | visualization.video.export.size                              | 1920x1080                                    |

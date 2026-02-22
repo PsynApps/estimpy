@@ -43,16 +43,15 @@ class Audio:
             self._metadata.set_metadata(file_metadata.get_metadata())
             self._metadata.set_file(file)
 
-        audio_data_raw = None
-
         if audio_data is not None:
             # Since we will be frequently slicing subsets of audio data from each channel, it will be more efficient
             # to store the audio data as C-contiguous ordering
-            audio_data_raw = np.ascontiguousarray(audio_data)
+            audio_data = np.ascontiguousarray(audio_data)
 
-            # Then, normalize audio data from 0 to 1 based upon the bitdepth of the file
-            # so divide by 2 to the power of the bit depth minus 1 (since signed int)
-            audio_data = np.divide(audio_data_raw, 2 ** (bit_depth - 1))
+            # Normalize audio data from 0 to 1 based upon the bitdepth of the file
+            # so divide by 2 to the power of the bit depth minus 1 (since signed int).
+            # Use float32 to halve memory usage — sufficient precision for visualization and analysis.
+            audio_data = np.divide(audio_data, 2 ** (bit_depth - 1), dtype=np.float32)
 
         self._file = file  # type: str
         self._format = format  # type: str
@@ -61,7 +60,6 @@ class Audio:
         self._bit_depth = bit_depth  # type: int
 
         self._data = audio_data  # type: np.ndarray[typing.Type[float]]
-        self._data_raw = audio_data_raw  # type: np.ndarray[typing.Type[int]]
         self._channels = audio_data.shape[0] if audio_data is not None else 0  # type: int
         self._sample_count = audio_data.shape[1] if audio_data is not None else 0  # type: int
 
@@ -98,9 +96,17 @@ class Audio:
         :return np.ndarray[typing.Type[int]]: A 2-dimensional array of audio samples with channels as rows and time
                                               as columns. This form of the data is integers of size specified
                                               by bit_depth, and is suitable for writing to files and realtime playback.
-                                              This array is C-contiguous.
+                                              Reconstructed on demand from normalized data to avoid storing a
+                                              separate copy in memory.
         """
-        return self._data_raw
+        if self._data is None:
+            return None
+        dtype = np.int16 if self._bit_depth <= 16 else np.int32
+        return np.ascontiguousarray(
+            (self._data * (2 ** (self._bit_depth - 1))).clip(
+                -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
+            ).astype(dtype)
+        )
 
     @property
     def file(self) -> str:
@@ -170,6 +176,31 @@ class Audio:
             raise Exception(f'Error saving metadata: File {self.file} does not exist.')
 
         self.metadata.save()
+
+    def with_triphase(self) -> 'Audio':
+        """Create a 3-channel Audio with channels [A, B, -(A+B)] for triphase visualization.
+
+        The triphase channel -(A+B) represents the signal at the common ground electrode
+        in a 3-electrode estim setup. By Kirchhoff's current law, the current at the
+        common node equals the negated sum of the currents from the two signal electrodes.
+
+        :return Audio: A new Audio instance with 3 channels
+        """
+        if self.channels != 2:
+            raise ValueError("Triphase requires stereo audio")
+
+        triphase_float = -(self.data[0] + self.data[1])
+
+        audio = Audio.__new__(Audio)
+        audio._metadata = self._metadata
+        audio._file = self._file
+        audio._format = self._format
+        audio._sample_rate = self._sample_rate
+        audio._bit_depth = self._bit_depth
+        audio._data = np.ascontiguousarray(np.vstack([self.data, triphase_float.reshape(1, -1)]))
+        audio._channels = 3
+        audio._sample_count = self._sample_count
+        return audio
 
     def time_to_data_index(self, time: float) -> int | None:
         """Converts a time (in seconds) from the start of the audio to the corresponding time index in the audio data

@@ -12,8 +12,10 @@ exclude *.pyc
 exclude *.pyo
 exclude *.pyd
 exclude *.egg-info/
+exclude .claude/
 exclude .git/
 exclude .idea/
+exclude .venv/
 exclude tests/*
 exclude assets/*
 exclude export/*

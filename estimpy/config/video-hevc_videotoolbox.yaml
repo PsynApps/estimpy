@@ -1,0 +1,14 @@
+---
+visualization:
+  video:
+    export:
+      codec: hevc_videotoolbox
+      ffmpeg-extra-args:
+        '-hide_banner': ''
+        '-loglevel': 'error'
+        '-y': ''
+        '-pix_fmt': 'yuv420p'
+        '-colorspace': 'bt709'
+        '-q:v': 40
+        '-tag:v': 'hvc1'
+        '-profile:v': 'main'

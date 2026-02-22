@@ -1,0 +1,13 @@
+---
+visualization:
+  video:
+    export:
+      codec: prores_videotoolbox
+      ffmpeg-extra-args:                                                                                                                                                                                    
+        '-crf': ~
+        '-preset': ~                                                                                                                                                                                        
+        '-tune': ~                                                                  
+        '-pix_fmt': 'yuv422p10le'
+        '-colorspace': 'bt709'
+        '-profile:v': 'hq'         
+      format: mov
