@@ -20,6 +20,8 @@
 - Configuration profiles for HEVC and ProRes VideoToolbox hardware encoding, and iPod Touch player
 - Configurable reassignment bypass for the player (`player.disable-spectrogram-reassign`, default True) to speed up loading by using the standard spectrogram
 - Resolution-aware FFT sizing for all visualization modes (player, image, and video export), using coarse frequency pre-analysis (~20 FFTs) and output panel dimensions to determine the optimal FFT size
+- Oscilloscope waveform overlay for video display and export, showing trigger-stabilized raw audio waveform per channel with automatic pulse detection that switches window length between tonal and pulsed content using coefficient of variation analysis (`visualization.video.display.oscilloscope.enabled`, `visualization.video.export.oscilloscope.enabled`, `analysis.oscilloscope.pulse-detection.*`)
+- Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
 
 ### Changed
 - Audio data stored as float32 instead of float64, halving memory usage for all audio operations
@@ -40,7 +42,7 @@
 - Reworked most video configuration profiles to improve processing speed and consistency of quality
 - Switched audio playback dependency from `pygame` to `pygame-ce` (community edition)
 - File selection dialogs now use Qt (`QFileDialog`) instead of tkinter, removing the tkinter dependency
-- Player controls reordered: playback | repeat | playlist | stretch | fullscreen | zoom | triphase | volume
+- Player controls reordered: playback | repeat | fullscreen | playlist | stretch | oscilloscope | zoom | triphase | volume
 - Repeat config changed from boolean to string enum (`none`/`one`/`all`) with backward compatibility for boolean values
 - End-of-track handling now respects repeat mode: `one` loops the current file, `all` wraps around the playlist, `none` advances or stops
 

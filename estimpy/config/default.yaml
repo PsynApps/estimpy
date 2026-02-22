@@ -1,5 +1,25 @@
 ---
 analysis:
+  oscilloscope:
+    # Display window duration for tonal content (milliseconds)
+    window-length: 10
+    # Pulse detection configuration
+    pulse-detection:
+      # Enable automatic pulse detection to switch oscilloscope window length
+      enabled: True
+      # Minimum number of pulses that must be detected within the lookahead window
+      # to activate pulse mode. Higher values reduce false positives from isolated transients.
+      count-threshold: 3
+      # Minimum coefficient of variation (std/mean) of 5ms sub-window RMS values required
+      # to confirm pulsed content. Pulses produce high CV (energy alternates between on/off
+      # states) while tonal content with smooth amplitude modulation has low CV.
+      cv-threshold: 1.0
+      # Display window duration for pulsed content (milliseconds)
+      window-length: 500
+    # Minimum RMS energy threshold (fraction of full scale) below which flat line is shown
+    silence-threshold: 0.01
+    # Hysteresis threshold for trigger detection (fraction of peak amplitude)
+    trigger-hysteresis: 0.05
   spectrogram:
     # The minimum frequency to show on the spectrogram
     frequency-min: 0
@@ -155,6 +175,20 @@ visualization:
         family: Helvetica Neue, Helvetica, Arial, sans-serif
         # The font weight to use for text
         weight: bold
+    # Configuration for the oscilloscope waveform overlay
+    oscilloscope:
+      # Border width in pixels
+      border-width: 5
+      # Font size for the duration label
+      font-size: 12
+      # Height of box as fraction of combined amplitude+spectrogram panel height
+      height-ratio: 0.66
+      # Line width for the waveform in pixels
+      line-width: 10
+      # Background opacity (0.0 = fully transparent, 1.0 = fully opaque)
+      opacity: 0.95
+      # Width of box as fraction of panel width
+      width-ratio: 0.25
     # Configuration for the spectrogram panels
     spectrogram:
       # Base colormap from which per-channel spectrograms are derived.
@@ -228,7 +262,10 @@ visualization:
       # Configuration for the title panel
       title:
         enabled: False
-        # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
+      # Configuration for the oscilloscope waveform overlay
+      oscilloscope:
+        enabled: True
+      # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
       window-length: 20
     # Configuration for exporting video
     export:
@@ -270,6 +307,9 @@ visualization:
       # Configuration for the title panel for videos
       title:
         enabled: False
+      # Configuration for the oscilloscope waveform overlay
+      oscilloscope:
+        enabled: True
       # Maximum length of video to encode
       video-length-max: ~
       # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)

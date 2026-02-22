@@ -11,13 +11,17 @@ from PyQt6.QtCore import Qt, QTimer, QRect
 from PyQt6.QtGui import QImage, QPainter, QKeyEvent, QWheelEvent, QMouseEvent
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QPushButton, QSlider, QLabel, QStyle, QApplication, QSizePolicy
+    QPushButton, QSlider, QLabel, QStyle, QApplication, QSizePolicy,
+    QCheckBox
 )
 
 import estimpy as es
 
 # Predefined zoom levels (window lengths in seconds)
 ZOOM_LEVELS = [1, 2, 5, 10, 20, 30, 40, 60, 120, 300, 600, 1200, 1800, 2400, 3600]
+
+# Predefined oscilloscope duration steps (in milliseconds)
+OSC_DURATIONS = [1, 2, 3, 5, 10, 15, 20, 25, 50, 75, 100, 150, 200, 250, 500, 1000]
 
 # Module-level reference to QApplication to prevent garbage collection.
 # In PyQt6, QApplication is destroyed when its Python reference is lost,
@@ -123,6 +127,15 @@ class PlayerWindow(QMainWindow):
         # Initialize zoom
         self._init_zoom_levels(es_audio.length)
 
+        # Initialize oscilloscope duration controls
+        self._osc_auto = True
+        # Default to oscilloscope window-length index
+        default_tone = es.cfg.get('analysis.oscilloscope.window-length', 10)
+        self._osc_duration_index = 0
+        for i, d in enumerate(OSC_DURATIONS):
+            if d <= default_tone:
+                self._osc_duration_index = i
+
         # Set up the window
         self.setWindowTitle(es_audio.get_string())
         self._setup_ui()
@@ -177,6 +190,13 @@ class PlayerWindow(QMainWindow):
 
         # One-time setup: capture chrome, axis overlays, initialize shift-and-paint state
         self._visualization.prepare_direct_render()
+        self._visualization._osc_enabled = es.cfg.get(
+            'visualization.video.display.oscilloscope.enabled', False)
+        # Restore manual oscilloscope duration if set
+        if hasattr(self, '_osc_auto'):
+            self._visualization._osc_manual_duration = (
+                None if self._osc_auto
+                else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
 
         # Hide the matplotlib figure window (frames are displayed in the Qt widget)
         fig = self._visualization._handles['figure']
@@ -280,6 +300,17 @@ class PlayerWindow(QMainWindow):
         self._update_repeat_button()
         button_row.addWidget(self._btn_repeat)
 
+        self._add_separator(button_row)
+
+        # --- Fullscreen button ---
+        self._btn_fullscreen = self._make_text_button(
+            '\u26F6', 28, 'Fullscreen (F)',
+            lambda: self._player.toggle_full_screen())
+        self._btn_fullscreen.setCheckable(True)
+        button_row.addWidget(self._btn_fullscreen)
+
+        self._add_separator(button_row)
+
         # --- Playlist button ---
         self._btn_playlist = self._make_text_button(
             '\u2630', 28, 'Playlist (P)',
@@ -288,12 +319,8 @@ class PlayerWindow(QMainWindow):
 
         button_row.addStretch(1)
 
-        # --- Fullscreen button ---
-        self._btn_fullscreen = self._make_text_button(
-            '\u26F6', 28, 'Fullscreen (F)',
-            lambda: self._player.toggle_full_screen())
-        self._btn_fullscreen.setCheckable(True)
-        button_row.addWidget(self._btn_fullscreen)
+        # --- Oscilloscope duration controls ---
+        self._add_osc_controls(button_row)
 
         self._add_separator(button_row)
 
@@ -536,6 +563,90 @@ class PlayerWindow(QMainWindow):
                 return f'{int(seconds)}s'
             return f'{seconds:.1f}s'
 
+    def _add_osc_controls(self, layout):
+        """Add oscilloscope duration controls (auto checkbox + buttons + value)."""
+        btn_size = 24
+
+        self._chk_osc_auto = QCheckBox('Osc auto')
+        self._chk_osc_auto.setChecked(self._osc_auto)
+        self._chk_osc_auto.setToolTip('Automatic oscilloscope duration')
+        self._chk_osc_auto.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._chk_osc_auto.stateChanged.connect(self._on_osc_auto_changed)
+        layout.addWidget(self._chk_osc_auto)
+
+        self._btn_osc_minus = self._make_text_button(
+            '\u2212', btn_size, 'Decrease oscilloscope duration',
+            lambda: self._on_osc_decrease())
+        layout.addWidget(self._btn_osc_minus)
+
+        dur_ms = OSC_DURATIONS[self._osc_duration_index]
+        self._osc_label = QLabel(self._format_osc_label(dur_ms))
+        self._osc_label.setFixedWidth(48)
+        self._osc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._osc_label.setToolTip('Oscilloscope display duration')
+        layout.addWidget(self._osc_label)
+
+        self._btn_osc_plus = self._make_text_button(
+            '+', btn_size, 'Increase oscilloscope duration',
+            lambda: self._on_osc_increase())
+        layout.addWidget(self._btn_osc_plus)
+
+        self._update_osc_controls()
+
+    def _on_osc_auto_changed(self, state):
+        """Handle oscilloscope auto checkbox toggle."""
+        self._osc_auto = (state == Qt.CheckState.Checked.value)
+        self._update_osc_controls()
+        self._apply_osc_duration()
+
+    def _on_osc_decrease(self):
+        """Decrease oscilloscope duration to previous step."""
+        if self._osc_duration_index > 0:
+            self._osc_duration_index -= 1
+            self._update_osc_controls()
+            self._apply_osc_duration()
+
+    def _on_osc_increase(self):
+        """Increase oscilloscope duration to next step."""
+        if self._osc_duration_index < len(OSC_DURATIONS) - 1:
+            self._osc_duration_index += 1
+            self._update_osc_controls()
+            self._apply_osc_duration()
+
+    def _apply_osc_duration(self):
+        """Apply the current oscilloscope duration setting to the visualization."""
+        if self._osc_auto:
+            self._visualization._osc_manual_duration = None
+            self._osc_label.setText('Auto')
+        else:
+            dur_ms = OSC_DURATIONS[self._osc_duration_index]
+            self._visualization._osc_manual_duration = dur_ms / 1000.0
+            self._osc_label.setText(self._format_osc_label(dur_ms))
+
+        # Invalidate correlation template since duration changed
+        self._visualization._dr_osc_prev_waveform.clear()
+
+        # Re-render current frame
+        current_time = self._player.get_time()
+        self._render_frame_at_time(current_time)
+
+    def _update_osc_controls(self):
+        """Enable/disable oscilloscope +/- buttons based on auto mode and index."""
+        manual = not self._osc_auto
+        self._btn_osc_minus.setEnabled(manual and self._osc_duration_index > 0)
+        self._btn_osc_plus.setEnabled(manual and self._osc_duration_index < len(OSC_DURATIONS) - 1)
+        if self._osc_auto:
+            self._osc_label.setText('Auto')
+        else:
+            self._osc_label.setText(self._format_osc_label(OSC_DURATIONS[self._osc_duration_index]))
+
+    @staticmethod
+    def _format_osc_label(ms):
+        """Format an oscilloscope duration in ms as a label."""
+        if ms >= 1000:
+            return f'{ms / 1000:.0f} s'
+        return f'{int(ms)} ms'
+
     def _cycle_repeat(self):
         """Cycle through repeat modes: none → all → one → none."""
         mode = self._player.get_repeat_mode()
@@ -597,6 +708,13 @@ class PlayerWindow(QMainWindow):
         self._visualization.resize_figure(width=width, height=height)
 
         self._visualization.prepare_direct_render()
+        self._visualization._osc_enabled = es.cfg.get(
+            'visualization.video.display.oscilloscope.enabled', False)
+        # Restore manual oscilloscope duration if set
+        if hasattr(self, '_osc_auto'):
+            self._visualization._osc_manual_duration = (
+                None if self._osc_auto
+                else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
 
         fig = self._visualization._handles['figure']
         if fig and fig.canvas and fig.canvas.manager:
