@@ -25,6 +25,7 @@
 - Resolution-aware FFT sizing for all visualization modes (player, image, and video export), using coarse frequency pre-analysis (~20 FFTs) and output panel dimensions to determine the optimal FFT size
 - Oscilloscope waveform overlay for video display and export, showing trigger-stabilized raw audio waveform per channel with automatic pulse detection that switches window length between tonal and pulsed content using coefficient of variation analysis (`visualization.video.display.oscilloscope.enabled`, `visualization.video.export.oscilloscope.enabled`, `analysis.oscilloscope.pulse-detection.*`)
 - Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
+- Automated test suite (105 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed
 - Audio data stored as float32 instead of float64, halving memory usage for all audio operations
