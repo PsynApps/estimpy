@@ -70,6 +70,8 @@
 - Channel volume and mute state lists now resize when switching between files with different channel counts
 - Scrub bar position line no longer leaves a ghost artifact when zoom level is changed during playback
 - Zoom level is now preserved when switching between files in the playlist
+- `Audio.resample()` now passes audio data to the resample function (was missing first argument) and updates `sample_count` after resampling
+- LICENSE file updated from GPL-3.0 to MIT to match pyproject.toml declaration
 
 ## [1.1.3] - 2026-02-10
 ### Removed
