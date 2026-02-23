@@ -12,9 +12,19 @@ authors = [
     {name = 'Psynapse', email = 'psynapse@psynapse.gay'}
 ]
 classifiers = [
-    'Programming Language :: Python :: 3',
+    'Development Status :: 5 - Production/Stable',
+    'Environment :: X11 Applications :: Qt',
+    'Intended Audience :: End Users/Desktop',
     'License :: OSI Approved :: MIT License',
-    'Operating System :: OS Independent'
+    'Operating System :: OS Independent',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
+    'Topic :: Multimedia :: Sound/Audio',
+    'Topic :: Multimedia :: Sound/Audio :: Analysis',
+    'Topic :: Scientific/Engineering :: Visualization',
 ]
 requires-python = '>=3.11'
 
