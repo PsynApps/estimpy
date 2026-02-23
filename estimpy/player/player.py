@@ -45,7 +45,7 @@ class Player:
 
     def get_repeat_mode(self) -> str:
         """Get the current repeat mode, with backward compatibility for boolean values."""
-        mode = es.cfg.get('player.repeat', 'none')
+        mode = es.cfg['player.repeat']
         if mode is True:
             return 'one'
         elif mode is False or mode is None:

@@ -93,7 +93,10 @@ def play(audio_time: float = 0, target_volumes: typing.List[float] = None):
     # set_volume() take effect every ~5.8ms instead of every ~11.6ms (default
     # 512). This doubles the granularity of fade-to-zero transitions in stop(),
     # making individual volume steps small enough (~6%) to be inaudible.
-    pygame.mixer.init(frequency=_es_audio.sample_rate, size=-_es_audio.bit_depth, channels=2, buffer=256)
+    # Always use 16-bit signed audio for playback. The data_raw property
+    # converts normalized float data back to integers, and pygame only
+    # supports 8-bit and 16-bit sizes.
+    pygame.mixer.init(frequency=_es_audio.sample_rate, size=-16, channels=2, buffer=256)
 
     repeat_mode = _get_repeat_mode()
     loops = -1 if repeat_mode == 'one' else 0
@@ -107,9 +110,13 @@ def play(audio_time: float = 0, target_volumes: typing.List[float] = None):
     for channel in range(_es_audio.channels):
         _channels.append(pygame.mixer.Channel(channel))
 
+        # Convert to 16-bit for playback (data_raw may return int32 for high bit-depth files).
         # Even though we are playing through just one channel, Sound() buffer expects interleaved stereo audio
         # data, so we have to duplicate every sample.
-        sound = pygame.mixer.Sound(buffer=np.repeat(_es_audio.data_raw[channel, sample_time:], 2).tobytes())
+        raw_samples = _es_audio.data_raw[channel, sample_time:]
+        if raw_samples.dtype != np.int16:
+            raw_samples = np.clip(raw_samples, -32768, 32767).astype(np.int16)
+        sound = pygame.mixer.Sound(buffer=np.repeat(raw_samples, 2).tobytes())
 
         # Set channel volume to 0 before playing to prevent a brief burst at
         # the default volume (1.0) before the ramp thread starts.
@@ -255,7 +262,7 @@ def toggle_playing():
 
 def _get_repeat_mode() -> str:
     """Get the current repeat mode, with backward compatibility for boolean values."""
-    mode = es.cfg.get('player.repeat', 'none')
+    mode = es.cfg['player.repeat']
     if mode is True:
         return 'one'
     elif mode is False or mode is None:

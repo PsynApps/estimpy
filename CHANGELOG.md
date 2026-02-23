@@ -1,9 +1,12 @@
 # Changelog
 
-## [1.2.0] - 2026-02-11
+## [2.0.0] - 2026-02-11
 ### Added
+- Unified `estimpy` CLI replacing `estimpy-visualizer` and `estimpy-player` with subcommands: `play` (default), `show-image`, `save-image`, `save-video`, `save-metadata`
+- Positional file arguments (e.g., `estimpy play song.mp3` instead of `estimpy-player -i song.mp3`)
+
 - Reassigned spectrogram algorithm for sharper time-frequency localization, with configurable smoothing (`analysis.spectrogram.reassign`, `analysis.spectrogram.reassign-smoothing`)
-- Triphase visualization mode (`-t`/`--triphase`) for both `estimpy-visualizer` and `estimpy-player`, showing the derived common electrode signal -(A+B) alongside the A and B channels
+- Triphase visualization mode (`-t`/`--triphase`) showing the derived common electrode signal -(A+B) alongside the A and B channels
 - Triphase toggle in the player UI for instant switching between stereo and triphase visualization during playback, with pre-computed 3-channel analysis data for stereo files
 - Per-channel colormap derivation from a single base colormap (`visualization.style.spectrogram.color-map`), with the low-energy region automatically recolored to match each channel's base color
 - Configurable colormap recoloring radius (`visualization.style.spectrogram.match-amplitude-color-radius`) with perceptual brightness matching using Rec. 709 relative luminance
@@ -47,6 +50,9 @@
 - End-of-track handling now respects repeat mode: `one` loops the current file, `all` wraps around the playlist, `none` advances or stops
 
 ### Removed
+- Removed `estimpy-visualizer` and `estimpy-player` CLI entry points, replaced by unified `estimpy` command
+- Removed `-i`/`--input-files` flag (replaced by positional file arguments)
+- Removed shorthand flags (`-si`, `-wi`, `-wv`, `-wm`, `-drange`, `-fmin`, `-fmax`, `-rf`, `-rs`)
 - Removed legacy matplotlib-based interactive player (`VideoPlayerVisualization`), fully replaced by the Qt-based player
 - Removed tkinter dependency (file dialogs replaced with Qt)
 

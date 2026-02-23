@@ -14,8 +14,9 @@
 - [Getting started](#getting-started)
 - [Installation](#installation)
 - [Usage](#usage)
-  - [estimpy-visualizer](#estimpy-visualizer)
-  - [estimpy-player](#estimpy-player)
+  - [Commands](#commands)
+  - [Global options](#global-options)
+  - [Examples](#examples)
 - [Configuration](#configuration)
 
 ## Visualization library
@@ -163,60 +164,76 @@ On Windows, you may get an error like: ```Microsoft Visual C++ 14.0 or greater i
 
 ## Usage
 
-EstimPy provides two command-line tools for generating visualizations.
+EstimPy provides a unified command-line interface for visualization and playback.
 
-- `estimpy-visualizer`: Generates image and video visualizations of Estim audio files
-- `estimpy-player`: Provides a highly experimental real-time player for Estim audio files
-
-### `estimpy-visualizer`
-
-- `estimpy-visualizer` performs one or more actions using one or more input files.
-- Multiple actions can be performed in a single command, allowing for flexibility in generating visualizations, saving files, and embedding metadata. 
-- If no input file is specified, a file dialog will be shown to allow you to select one or more input files.
-- If no action is specified, the script will use the `show-image` action.
-
-#### Basic usage
 ```
-estimpy-visualizer [actions] [options]
+estimpy [command] [files...] [options]
 ```
 
-#### Actions
+If no command is given, the player is launched. If no files are given, a file dialog will prompt for file selection.
 
-| Action                                 | Description                                                                                                                                         |
-|----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
-| `-si`, `--show-image`                  | Display an interactive window with the image visualization of the input file(s). This is the default behavior if no action is specified.            |
-| `-wi`, `--write-image`                 | Save an image file with visualizations of the input file(s). The output file will use the same base name as the input file.                         |
-| `-wm`, `--write-metadata`              | Modify the input file(s) to add or replace the album art metadata with the image visualization. This is only supported for mp3, mp4, and m4a files. |
-| `-wv`, `--write-video`                 | Save a video file with an animated visualization of the input file(s). The output file will use the input file as the audio track with base name.   |
+### Commands
 
-Note: If multiple actions are specified, the order does not matter. Actions will always execute in the order of `write-image`, `write-metadata`, `write-video`, and `show-image`. 
+| Command           | Description                                                                                                        |
+|-------------------|--------------------------------------------------------------------------------------------------------------------|
+| `play`            | Launch the interactive player (default if no command is given)                                                      |
+| `show-image`      | Display an interactive window with the image visualization of the input file(s)                                    |
+| `save-image`      | Save an image file with visualization of the input file(s). Output uses the same base name as the input file.      |
+| `save-video`      | Save a video file with an animated visualization. Output uses the input file as the audio track.                   |
+| `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, and m4a files.      |
 
-#### Options
+### Global options
 
 | Option                                             | Description                                                                                                            |
 |----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
 | `-h`, `--help`                                     | Show the help message and exit.                                                                                        |
-| `-i [INPUT_FILES ...]`, `--input-files`            | Input file(s). Supports wildcards for batch processing. If not provided, a file dialog will prompt for file selection. |
-| `-r`, `--recursive`                                | Load input files recursively from the specified directories.                                                           |
-| `-o OUTPUT_PATH`, `--output-path`                  | Specify the path to save the output file(s). If not specified, files will be saved to the current path.                |
-| `-c [CONFIG ...]`, `--config`                      | Apply additional configuration file(s).                                                                                |
-| `-co [CONFIG_OPTION VALUE ...]`, `--config-option` | Modify configuration option value(s).                                                                                  |
-| `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
-| `-t`, `--triphase`                                 | Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode.                   |
-| `-drange DYNAMIC_RANGE`, `--dynamic-range`         | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
-| `-fmin FREQUENCY_MIN`, `--frequency-min`           | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
-| `-fmax FREQUENCY_MAX`, `--frequency-max`           | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
-| `-rf RESUME_FRAME`, `--resume-frame`               | Specify the frame on which to resume video encoding (useful for resuming if encoding crashes).                         |
-| `-rs RESUME_SEGMENT`, `--resume-segment`           | Specify the segment on which to resume video encoding (useful for resuming if encoding crashes).                       |
-| `-p`, `--profiling`                                | Enable profiling output for video export. Prints per-frame timing breakdown to stdout.                                 |
-| `-y`, `--yes`                                      | Answers yes to all interactive prompts (overwrites existing output files by default).                                  |
 | `--version`                                        | Display version information and exit.                                                                                  |
+| `-t`, `--triphase`                                 | Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode.                   |
+| `-r`, `--recursive`                                | Load input files recursively from the specified directories.                                                           |
+| `-c PROFILE [...]`, `--config`                     | Apply additional configuration profile(s).                                                                             |
+| `-co K V [...]`, `--config-option`                 | Override specific configuration option(s).                                                                             |
+| `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
+| `--dynamic-range DB`                               | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
+| `--frequency-min HZ`                               | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
+| `--frequency-max HZ`                               | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
 
-#### Examples
+### Save options
+
+These options are available on `save-image`, `save-video`, and `save-metadata`:
+
+| Option                                 | Description                                                                                            |
+|----------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `-o PATH`, `--output-path`             | Path to save output file(s). If not specified, uses the current directory.                             |
+| `-y`, `--yes`                          | Answers yes to all interactive prompts (overwrites existing output files by default).                  |
+
+### Save-video options
+
+These options are only available on `save-video`:
+
+| Option                                 | Description                                                                                            |
+|----------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `--resume-frame N`                     | Frame on which to resume video encoding (useful for resuming if encoding crashes).                     |
+| `--resume-segment N`                   | Segment on which to resume video encoding (useful for resuming if encoding crashes).                   |
+| `-p`, `--profiling`                    | Enable profiling output for video export. Prints per-frame timing breakdown to stdout.                 |
+
+### Examples
+
+- **Launch the player with an audio file**
+  ```
+  estimpy input.mp3
+  ```
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/61907a99-b35d-4d3e-aac4-50c9226306a8" width="720">
+</p>
+
+- **Launch the player with multiple files as a playlist**
+  ```
+  estimpy input1.mp3 input2.mp3 input3.mp3
+  ```
 
 - **Show image visualization interactively**
   ```
-  estimpy-visualizer -si -i input.mp3
+  estimpy show-image input.mp3
   ```
 
 <p align="center">
@@ -225,7 +242,7 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 
 - **Save image visualization to an image file**
   ```
-  estimpy-visualizer -wi -i input.mp3
+  estimpy save-image input.mp3
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/629bc729-280a-43ce-9866-f30f8719275a" width="480">
@@ -233,7 +250,7 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 
 - **Save image visualization to the metadata of an audio file**
   ```
-  estimpy-visualizer -wm -i input.mp3
+  estimpy save-metadata input.mp3
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/c7762554-dd73-4d5f-a988-2fb1a0a60ba6" width="480">
@@ -241,12 +258,12 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 
 - **Save image visualization to the metadata of all supported files in a path recursively**
   ```
-  estimpy-visualizer -wm -i ../library/* -r
+  estimpy save-metadata ../library/* -r
   ```
 
 - **Save animated visualization to a video file**
   ```
-  estimpy-visualizer -wv -i input.mp3
+  estimpy save-video input.mp3
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/a74e0039-8cca-4149-bdbb-3a97e2659ba7">
@@ -254,71 +271,17 @@ Note: If multiple actions are specified, the order does not matter. Actions will
 
 - **Save animated visualization to a 8k 60fps video file**
   ```
-  estimpy-visualizer -wv -i input.mp3 -c video-8k video-60fps
+  estimpy save-video input.mp3 -c video-8k video-60fps
   ```
   **<a href="https://youtu.be/7zNsNnao8KU" target="_blank">Example high-resolution video (via YouTube)</a>**
 
-
-- **Save image visualization to an image file overwriting specific configuration options**
+- **Save image visualization to an image file with custom configuration options**
   ```
-  estimpy-visualizer -wi -i input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.base-color #93c3ff visualization.style.amplitude.channels.ch1.base-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
+  estimpy save-image input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.base-color #93c3ff visualization.style.amplitude.channels.ch1.base-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/11858185-c7f8-4084-8eb3-450d4bcb6ae9" width="720">
 </p>
-
-- **Perform multiple actions in one command**
-  ```
-  estimpy-visualizer -si -wi -wm -wv -i input.mp3
-  ```
-  This command will:
-  - Save an image visualization to input.png
-  - Embed the image visualization as album art in the metadata of input.mp3
-  - Save an animated visualization to input.mp4
-  - Display the image visualization interactively
-    
-### `estimpy-player`
-
-- `estimpy-player` provides a real-time player for Estim audio files with an animated visualization
-- Provides independent control of channel volume output. Changes in output levels are always gradually ramped to avoid sudden changes in stimulation level.
-- If no input file is specified, a file dialog will be shown where one or more files can be selected.
-- If multiple input files are specified, a playlist will be created, and files will be played in the specified order.
-
-#### Basic usage
-```
-estimpy-player [options]
-```
-
-#### Options
-
-| Option                                             | Description                                                                                                            |
-|----------------------------------------------------|------------------------------------------------------------------------------------------------------------------------|
-| `-h`, `--help`                                     | Show the help message and exit.                                                                                        |
-| `-i [INPUT_FILES ...]`, `--input-files`            | Input file(s). Supports wildcards for batch processing. If not provided, a file dialog will prompt for file selection. |
-| `-r`, `--recursive`                                | Load input files recursively from the specified directories.                                                           |
-| `-c [CONFIG ...]`, `--config`                      | Apply additional configuration file(s).                                                                                |
-| `-co [CONFIG_OPTION VALUE ...]`, `--config-option` | Modify configuration option value(s).                                                                                  |
-| `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
-| `-t`, `--triphase`                                 | Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode.                   |
-| `-drange DYNAMIC_RANGE`, `--dynamic-range`         | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
-| `-fmin FREQUENCY_MIN`, `--frequency-min`           | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
-| `-fmax FREQUENCY_MAX`, `--frequency-max`           | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
-| `--version`                                        | Display version information and exit.                                                                                  |
-
-#### Examples
-
-- **Launch the player and load an Estim audio file**
-  ```
-  estimpy-player -i input.mp3
-  ```
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/61907a99-b35d-4d3e-aac4-50c9226306a8" width="720">
-</p>
-
-- **Launch the player and load multiple Estim audio files into a playlist**
-  ```
-  estimpy-player -i input1.mp3 input2.mp3 input3.mp3
-  ```
   
 ## Configuration
 
@@ -359,9 +322,9 @@ The best way to create a custom configuration profile to ensure it follows the c
 2. Remove the configuration options you don't wish to change
 3. Edit the values of the remaining options and save the file
 
-You can then apply your configuration using the `--config` command-line option of EstimPy's scripts using
+You can then apply your configuration using the `--config` command-line option:
 ```
-estimpy-visualizer [actions] [options] --config path_to/config_file.yaml
+estimpy <command> [files...] --config path_to/config_file.yaml
 ```
 
 ### Overwriting configuration option values
@@ -392,7 +355,7 @@ For reference, the default configuration options and values are as follows:
 | metadata.file-path-pattern                                   | (?P<artist>[^\\\/]*?) - (?P<title>.*)        |
 | player.autoplay                                              | False                                        |
 | player.disable-spectrogram-reassign                          | True                                         |
-| player.repeat                                                | False                                        |
+| player.repeat                                                | none                                         |
 | player.skip-length                                           | 60                                           |
 | player.video-render-latency                                  | 0.5                                          |
 | player.volume-start                                          | 50                                           |

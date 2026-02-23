@@ -1,8 +1,6 @@
 """Module for miscellaneous shared functionality"""
 
-import argparse
 import glob
-import importlib.metadata
 import itertools
 import numpy as np
 import os
@@ -56,50 +54,6 @@ class Spinner:
             sys.stdout.flush()
 
 
-def add_parser_arguments(parser: argparse.ArgumentParser, args: list = None) -> None:
-    """Adds shared parser arguments to the argument parser
-
-    :param argparse.ArgumentParser parser: A reference to the argument parser
-    :param list args: A list of arguments to be added
-    :return: None
-    """
-    if args is None:
-        return
-
-    if 'version' in args:
-        parser.add_argument('--version', action='store_true', help='Display version information and exit.')
-
-    if 'input_files' in args:
-        parser.add_argument('-i', '--input-files', default=None, nargs='*', help='Input file(s). Supports wildcards.')
-
-    if 'recursive' in args:
-        parser.add_argument('-r', '--recursive', action='store_true', help='Load input files recursively')
-
-    if 'output_path' in args:
-        parser.add_argument('-o', '--output-path', default='./', help='Path to save output file(s). If not specified, uses the current path.')
-
-    if 'config' in args:
-        parser.add_argument('-c', '--config', default=None, nargs='*', help='Apply additional configuration profile(s).')
-
-    if 'config_option' in args:
-        parser.add_argument('-co', '--config-option', default=None, nargs='*', help='Overwrite specific configuration option(s). Applies after all configuration files have been processed. Configuration options follow the structure from default.yaml using dots in place of indents with values after a space.')
-
-    if 'config_option_list' in args:
-        parser.add_argument('-col', '--config-option-list', action='store_true', help='List all valid config options and exit')
-
-    if 'dynamic_range' in args:
-        parser.add_argument('-drange', '--dynamic-range', type=int,
-                            help='Dynamic range to display on spectrogram (in decibels). Default is defined in default.yaml configuration file.')
-
-    if 'frequency_min' in args:
-        parser.add_argument('-fmin', '--frequency-min', type=int,
-                            help='Minimum frequency to display on spectrogram. Default is defined in default.yaml configuration file.')
-
-    if 'frequency_max' in args:
-        parser.add_argument('-fmax', '--frequency-max', type=int,
-                            help='Maximum frequency to display on spectrogram. If not defined, spectrogram will be autoscaled.')
-
-
 def add_temp_file(temp_file):
     if temp_file is not None:
         _temp_files.append(temp_file)
@@ -111,11 +65,6 @@ def delete_temp_files():
             os.remove(temp_file)
 
     _temp_files.clear()
-
-
-def get_default_parser_arguments() -> list:
-    return ['version', 'input_files', 'recursive', 'config', 'config_option', 'config_option_list',
-            'dynamic_range', 'frequency_min', 'frequency_max']
 
 
 def get_file_list(file_patterns: typing.Iterable, recursive: bool = None) -> list:
@@ -181,84 +130,6 @@ def get_temp_file_path(temp_file_name: str = None) -> str:
     if temp_file_name is not None:
         temp_file_path += f'{os.sep}{temp_file_name}'
     return temp_file_path
-
-
-def handle_parser_arguments(args: dict) -> None:
-    """Handles shared parser arguments
-
-    :param dict args: A dictionary with arguments as keys and values as values.
-    :return: None
-    """
-    if args is None:
-        return
-
-    argkeys = args.keys()
-
-    argkey = 'version'
-    if argkey in argkeys and args[argkey]:
-        print(importlib.metadata.version('estimpy'))
-        sys.exit()
-
-    # Important to load config files
-    argkey = 'config'
-    if argkey in argkeys and args[argkey]:
-        es.load_configs(args[argkey])
-
-    # Allows overriding any configuration option(s) by specifying a key value pair(s)
-    # e.g. -config_option
-    argkey = 'config_option'
-    if argkey in argkeys and args[argkey] is not None:
-        config_options = args[argkey].copy()
-
-        config_option_values = {}
-        while len(config_options) > 0:
-            # Configuration options must have a key and a value pair
-            if len(config_options) < 2:
-                raise Exception(f'No value specified for configuration option "{config_options[0]}".')
-
-            key, value, *config_options = config_options
-            config_option_values[key] = value
-
-        es.update_config_values(config_option_values)
-
-    # List all config options
-    argkey = 'config_option_list'
-    if argkey in argkeys and args[argkey]:
-        # Calculate the maximum width for keys and values
-        key_width = max(len(key) for key in es.base_cfg)
-
-        header_text = f'{"Configuration option".ljust(key_width)}  {"Value"}'
-        print(header_text)
-        print('=' * len(header_text))
-
-        # Iterate and print keys and values left-justified
-        # Note we are only showing keys in base_cfg since derived keys
-        # from config.updated event handlers will be overwritten from base values.
-        for key in sorted(es.base_cfg):
-            print(f"{key.ljust(key_width)}: {str(es.cfg[key])}")
-
-        sys.exit()
-
-    # Configuration option shortcuts
-    argkey = 'recursive'
-    if argkey in argkeys and args[argkey] is not None:
-        es.cfg['files.input.recursive'] = args[argkey]
-
-    argkey = 'output_path'
-    if argkey in argkeys and args[argkey] is not None:
-        es.cfg['files.output.path'] = args[argkey]
-
-    argkey = 'dynamic_range'
-    if argkey in argkeys and args[argkey] is not None:
-        es.cfg['visualization.style.spectrogram.dynamic-range'] = args[argkey]
-
-    argkey = 'frequency_min'
-    if argkey in argkeys and args[argkey] is not None:
-        es.cfg['analysis.spectrogram.frequency-min'] = args[argkey]
-
-    argkey = 'frequency_max'
-    if argkey in argkeys and args[argkey] is not None:
-        es.cfg['analysis.spectrogram.frequency-max'] = args[argkey]
 
 
 def log10_quiet(x: int | float | np.ndarray | typing.Iterable, *args: typing.Any, **kwargs: typing.Any) -> np.ndarray:

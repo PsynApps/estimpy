@@ -8,7 +8,7 @@ import math
 import sys
 
 from PyQt6.QtCore import Qt, QTimer, QRect
-from PyQt6.QtGui import QImage, QPainter, QKeyEvent, QWheelEvent, QMouseEvent
+from PyQt6.QtGui import QImage, QPainter, QKeyEvent, QWheelEvent, QMouseEvent, QPixmap, QColor, QIcon
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QSlider, QLabel, QStyle, QApplication, QSizePolicy,
@@ -78,6 +78,7 @@ class VisualizationWidget(QWidget):
 
     def mousePressEvent(self, event: QMouseEvent):
         if event.button() == Qt.MouseButton.LeftButton:
+            self._last_click_pos = event.position()
             self._click_timer.start()
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
@@ -86,7 +87,45 @@ class VisualizationWidget(QWidget):
             self._player_window._player.toggle_full_screen()
 
     def _on_single_click(self):
+        # Check if the click was on a scrub panel — if so, seek to that time
+        pos = getattr(self, '_last_click_pos', None)
+        if pos is not None:
+            t = self._hit_test_scrub(pos.x(), pos.y())
+            if t is not None:
+                self._player_window._player.set_time(t)
+                return
         self._player_window._player.toggle_playing()
+
+    def _hit_test_scrub(self, widget_x, widget_y):
+        """Map a widget click position to a time if it falls within a scrub panel.
+        Returns the time in seconds, or None if not in a scrub region."""
+        viz = self._player_window._visualization
+        if viz is None or not hasattr(viz, '_scrub_regions') or self._qimage is None:
+            return None
+
+        # Map widget coordinates to frame buffer pixel coordinates
+        dpr = self._qimage.devicePixelRatio()
+        img_w = self._qimage.width() / dpr
+        img_h = self._qimage.height() / dpr
+        widget_w, widget_h = self.width(), self.height()
+        scale = min(widget_w / img_w, widget_h / img_h)
+        scaled_w = img_w * scale
+        scaled_h = img_h * scale
+        offset_x = (widget_w - scaled_w) / 2
+        offset_y = (widget_h - scaled_h) / 2
+
+        # Convert widget coords to image coords
+        buf_x = (widget_x - offset_x) / scale * dpr
+        buf_y = (widget_y - offset_y) / scale * dpr
+
+        # Check each scrub region
+        audio_length = self._player_window._es_audio.length
+        for key, (x0, y0, x1, y1) in viz._scrub_regions.items():
+            if x0 <= buf_x <= x1 and y0 <= buf_y <= y1:
+                frac = (buf_x - x0) / (x1 - x0)
+                return max(0, min(audio_length, frac * audio_length))
+
+        return None
 
     def wheelEvent(self, event: QWheelEvent):
         delta = event.angleDelta().y()
@@ -130,7 +169,7 @@ class PlayerWindow(QMainWindow):
         # Initialize oscilloscope duration controls
         self._osc_auto = True
         # Default to oscilloscope window-length index
-        default_tone = es.cfg.get('analysis.oscilloscope.window-length', 10)
+        default_tone = es.cfg['analysis.oscilloscope.window-length']
         self._osc_duration_index = 0
         for i, d in enumerate(OSC_DURATIONS):
             if d <= default_tone:
@@ -159,12 +198,12 @@ class PlayerWindow(QMainWindow):
 
         # Apply player-specific spectrogram optimizations before creating the
         # visualization (which triggers spectrogram computation)
-        if es.cfg.get('player.disable-spectrogram-reassign', True):
+        if es.cfg['player.disable-spectrogram-reassign']:
             es.cfg['analysis.spectrogram.reassign'] = False
 
         es.visualization.set_optimal_nfft(
             es_audio, figure_height=es.cfg['visualization.video.display.height'] * self._device_pixel_ratio,
-            title_enabled=es.cfg.get('visualization.video.display.title.enabled', False),
+            title_enabled=es.cfg['visualization.video.display.title.enabled'],
             include_scrub=True)
 
         spinner = es.utils.Spinner('Preparing player visualization... ')
@@ -190,8 +229,7 @@ class PlayerWindow(QMainWindow):
 
         # One-time setup: capture chrome, axis overlays, initialize shift-and-paint state
         self._visualization.prepare_direct_render()
-        self._visualization._osc_enabled = es.cfg.get(
-            'visualization.video.display.oscilloscope.enabled', False)
+        self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
         # Restore manual oscilloscope duration if set
         if hasattr(self, '_osc_auto'):
             self._visualization._osc_manual_duration = (
@@ -334,7 +372,7 @@ class PlayerWindow(QMainWindow):
             'Triphase', 28, 'Triphase (T)',
             lambda: self._toggle_triphase(), width=70)
         self._btn_triphase.setCheckable(True)
-        self._btn_triphase.setChecked(es.cfg.get('visualization.triphase', False))
+        self._btn_triphase.setChecked(es.cfg['visualization.triphase'])
         self._btn_triphase.setEnabled(self._es_audio.channels == 2)
         button_row.addWidget(self._btn_triphase)
 
@@ -358,14 +396,24 @@ class PlayerWindow(QMainWindow):
         layout.addWidget(self._controls)
 
     def _make_icon_button(self, icon_pixmap, size, tooltip, callback):
-        """Create a QPushButton with a standard icon."""
+        """Create a QPushButton with a standard icon recolored for the dark theme."""
         btn = QPushButton()
-        btn.setIcon(self.style().standardIcon(icon_pixmap))
+        btn.setIcon(self._recolor_icon(icon_pixmap))
         btn.setFixedSize(size, size)
         btn.setToolTip(tooltip)
         btn.clicked.connect(callback)
         btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         return btn
+
+    def _recolor_icon(self, icon_pixmap, color=QColor(0xcc, 0xcc, 0xcc)):
+        """Recolor a standard icon to match the dark theme text color."""
+        icon = self.style().standardIcon(icon_pixmap)
+        pixmap = icon.pixmap(64, 64)
+        painter = QPainter(pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(pixmap.rect(), color)
+        painter.end()
+        return QIcon(pixmap)
 
     def _make_text_button(self, text, size, tooltip, callback, width=None):
         """Create a QPushButton with text label."""
@@ -708,8 +756,7 @@ class PlayerWindow(QMainWindow):
         self._visualization.resize_figure(width=width, height=height)
 
         self._visualization.prepare_direct_render()
-        self._visualization._osc_enabled = es.cfg.get(
-            'visualization.video.display.oscilloscope.enabled', False)
+        self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
         # Restore manual oscilloscope duration if set
         if hasattr(self, '_osc_auto'):
             self._visualization._osc_manual_duration = (
@@ -722,7 +769,7 @@ class PlayerWindow(QMainWindow):
 
     def _toggle_triphase(self):
         """Toggle triphase visualization mode."""
-        new_state = not es.cfg.get('visualization.triphase', False)
+        new_state = not es.cfg['visualization.triphase']
         es.cfg['visualization.triphase'] = new_state
         self._btn_triphase.setChecked(new_state)
 
@@ -923,7 +970,7 @@ class PlayerWindow(QMainWindow):
         if es_audio.channels != 2:
             self._btn_triphase.setChecked(False)
         else:
-            self._btn_triphase.setChecked(es.cfg.get('visualization.triphase', False))
+            self._btn_triphase.setChecked(es.cfg['visualization.triphase'])
 
         # Rebuild per-channel volume controls if channel count changed
         self._rebuild_channel_volumes()
@@ -962,32 +1009,32 @@ class PlayerWindow(QMainWindow):
         key = 'master' if channel is None else channel
         if key in self._volume_widgets:
             self._volume_widgets[key]['mute_btn'].setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_MediaVolumeMuted))
+                self._recolor_icon(QStyle.StandardPixmap.SP_MediaVolumeMuted))
 
     def unmute(self, channel=None):
         """Update mute button icon to unmuted state."""
         key = 'master' if channel is None else channel
         if key in self._volume_widgets:
             self._volume_widgets[key]['mute_btn'].setIcon(
-                self.style().standardIcon(QStyle.StandardPixmap.SP_MediaVolume))
+                self._recolor_icon(QStyle.StandardPixmap.SP_MediaVolume))
 
     def pause(self):
         """Stop the frame timer and show play icon."""
         self._timer.stop()
         self._btn_play_pause.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            self._recolor_icon(QStyle.StandardPixmap.SP_MediaPlay))
 
     def play(self):
         """Start the frame timer and show pause icon."""
         self._timer.start()
         self._btn_play_pause.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPause))
+            self._recolor_icon(QStyle.StandardPixmap.SP_MediaPause))
 
     def stop(self):
         """Stop the frame timer and show play icon."""
         self._timer.stop()
         self._btn_play_pause.setIcon(
-            self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay))
+            self._recolor_icon(QStyle.StandardPixmap.SP_MediaPlay))
 
     def set_time(self, t):
         """Render frame at the given time and update seek/time UI."""

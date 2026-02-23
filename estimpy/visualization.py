@@ -15,6 +15,7 @@ import matplotlib.widgets
 from PIL import Image, ImageDraw, ImageFont
 
 _DPI = 100
+_font_face_index = 0  # TTC face index, computed during font initialization
 
 class AxisScaleText(enum.Enum):
     BOTTOM = {
@@ -80,7 +81,7 @@ class Visualization:
     @property
     def _channel_layout(self):
         """Display order and inversion for each channel: list of (channel_id, invert)."""
-        if es.cfg.get('visualization.triphase', False) and self.es_audio.channels == 3:
+        if es.cfg['visualization.triphase'] and self.es_audio.channels == 3:
             return [(0, False), (1, True), (2, False)]
         elif self.es_audio.channels >= 2:
             return [(0, False), (1, True)]
@@ -98,7 +99,7 @@ class Visualization:
     @property
     def _layout_ratio_key(self):
         """Config key suffix for height ratios."""
-        if es.cfg.get('visualization.triphase', False) and self.es_audio.channels == 3:
+        if es.cfg['visualization.triphase'] and self.es_audio.channels == 3:
             return 'triphase'
         elif self.es_audio.channels >= 2:
             return 'stereo'
@@ -372,7 +373,7 @@ class Visualization:
         in the analog domain without clipping.
         """
         padding = es.cfg['visualization.style.amplitude.padding']
-        if es.cfg.get('visualization.triphase', False) and self.es_audio.channels == 3 and channel_id == 2:
+        if es.cfg['visualization.triphase'] and self.es_audio.channels == 3 and channel_id == 2:
             return 2 * (1 + padding)
         return 1 + padding
 
@@ -773,8 +774,7 @@ class VideoVisualization(Visualization):
             self._dr_time_font_size_px = max(1, int(round(time_fontsize_pt * fig.dpi / 72)))
 
             font_file = es.cfg['visualization.style.font.text.file']
-            font_face_index = es.cfg.get('visualization.style.font.text.face-index', 0)
-            self._dr_time_font = ImageFont.truetype(font_file, self._dr_time_font_size_px, index=font_face_index)
+            self._dr_time_font = ImageFont.truetype(font_file, self._dr_time_font_size_px, index=_font_face_index)
 
             time_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.axes.color'])
             self._dr_time_color = tuple(int(c * 255) for c in time_color_rgb)
@@ -872,21 +872,24 @@ class VideoVisualization(Visualization):
         self.__precolored_spectrograms = None
 
         # Oscilloscope state
-        self._osc_enabled = es.cfg.get('visualization.video.export.oscilloscope.enabled', False)
+        self._osc_enabled = es.cfg['visualization.video.export.oscilloscope.enabled']
         self._osc_manual_duration = None  # None = auto mode, float seconds = manual override
         self._dr_osc_boxes = {}
         self._dr_osc_prev_waveform = {}  # per-channel template for correlation trigger
         self._dr_osc_mode = {}  # per-channel: 'tone' or 'pulse'
-        self._dr_osc_mode_hold_until = {}  # per-channel: time before which we won't switch back from pulse
-        self._dr_osc_mode_pending = {}  # per-channel: (mode, switch_time) deferred switch
+        # Initialize hold to force tone mode until enough audio has played for
+        # the centered analysis window to have a full backward half
+        pulse_count_threshold = es.cfg['analysis.oscilloscope.pulse-detection.count-threshold']
+        pulse_window_length_init = es.cfg['analysis.oscilloscope.pulse-detection.window-length'] / 1000.0
+        initial_hold = pulse_count_threshold * pulse_window_length_init
+        self._dr_osc_mode_hold_until = {ch: initial_hold for ch, _ in self._channel_layout}
         self._dr_osc_last_time = {}  # per-channel: last seen time for detecting seeks
 
         # Oscilloscope duration label font setup
-        osc_font_size_pt = es.cfg.get('visualization.style.oscilloscope.font-size', 12)
+        osc_font_size_pt = es.cfg['visualization.style.oscilloscope.font-size']
         self._dr_osc_font_size_px = max(1, int(round(osc_font_size_pt * fig.dpi / 72)))
         font_file = es.cfg['visualization.style.font.text.file']
-        font_face_index = es.cfg.get('visualization.style.font.text.face-index', 0)
-        self._dr_osc_font = ImageFont.truetype(font_file, self._dr_osc_font_size_px, index=font_face_index)
+        self._dr_osc_font = ImageFont.truetype(font_file, self._dr_osc_font_size_px, index=_font_face_index)
         axes_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.axes.color'])
         self._dr_osc_label_color = tuple(int(c * 255) for c in axes_color_rgb)
         border_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.font.text.border-color'])
@@ -895,8 +898,8 @@ class VideoVisualization(Visualization):
 
         # Pre-render duration label images
         self._dr_osc_label_cache = {}
-        duration_tone = es.cfg.get('analysis.oscilloscope.window-length', 10)
-        duration_pulse = es.cfg.get('analysis.oscilloscope.pulse-detection.window-length', 250)
+        duration_tone = es.cfg['analysis.oscilloscope.window-length']
+        duration_pulse = es.cfg['analysis.oscilloscope.pulse-detection.window-length']
         for dur_ms in (duration_tone, duration_pulse):
             label = f'{int(dur_ms)} ms' if dur_ms == int(dur_ms) else f'{dur_ms} ms'
             self._dr_osc_label_cache[float(dur_ms)] = self._dr_osc_render_label(label)
@@ -1403,8 +1406,8 @@ class VideoVisualization(Visualization):
         available_width = pos_x - panel_x0
 
         # Box dimensions from config
-        width_ratio = es.cfg.get('visualization.style.oscilloscope.width-ratio', 0.25)
-        height_ratio = es.cfg.get('visualization.style.oscilloscope.height-ratio', 0.66)
+        width_ratio = es.cfg['visualization.style.oscilloscope.width-ratio']
+        height_ratio = es.cfg['visualization.style.oscilloscope.height-ratio']
 
         box_width = int(width_ratio * panel_width)
         box_width = min(box_width, available_width)
@@ -1429,15 +1432,15 @@ class VideoVisualization(Visualization):
 
     def _dr_osc_detect_mode(self, channel_id, current_time):
         """Detect whether the signal is tonal or pulsed using coefficient of variation
-        analysis across multiple sub-windows. Uses lookahead to find the precise
-        transition point and defers switching until playback reaches that moment."""
-        pulse_window_length = es.cfg.get('analysis.oscilloscope.pulse-detection.window-length', 250) / 1000.0
-        pulse_cv_threshold = es.cfg.get('analysis.oscilloscope.pulse-detection.cv-threshold', 1.0)
-        pulse_count_threshold = es.cfg.get('analysis.oscilloscope.pulse-detection.count-threshold', 2)
-        silence_threshold = es.cfg.get('analysis.oscilloscope.silence-threshold', 0.01)
+        analysis across a centered window around the current playback position.
+        The centered window ensures mode switches happen at/near the actual transition
+        — the backward half must show the new signal character before detection fires."""
+        pulse_window_length = es.cfg['analysis.oscilloscope.pulse-detection.window-length'] / 1000.0
+        pulse_cv_threshold = es.cfg['analysis.oscilloscope.pulse-detection.cv-threshold']
+        pulse_count_threshold = es.cfg['analysis.oscilloscope.pulse-detection.count-threshold']
         sample_rate = self._es_audio.sample_rate
         total_samples = self._es_audio.data.shape[1]
-        sub_window_seconds = 0.002  # 2ms sub-windows for CV and transition detection
+        sub_window_seconds = 0.002  # 2ms sub-windows for CV analysis
 
         current_mode = self._dr_osc_mode.get(channel_id, 'tone')
 
@@ -1446,37 +1449,23 @@ class VideoVisualization(Visualization):
         self._dr_osc_last_time[channel_id] = current_time
         if current_time < last_time - 0.1:
             self._dr_osc_mode[channel_id] = 'tone'
-            self._dr_osc_mode_hold_until.pop(channel_id, None)
-            self._dr_osc_mode_pending.pop(channel_id, None)
+            self._dr_osc_mode_hold_until[channel_id] = current_time + pulse_count_threshold * pulse_window_length
             self._dr_osc_prev_waveform.pop(channel_id, None)
             current_mode = 'tone'
 
-        # Check for a pending deferred switch
-        pending = self._dr_osc_mode_pending.get(channel_id)
-        if pending is not None:
-            pending_mode, switch_time = pending
-            if current_time >= switch_time:
-                # Time to switch
-                self._dr_osc_mode[channel_id] = pending_mode
-                self._dr_osc_prev_waveform.pop(channel_id, None)
-                self._dr_osc_mode_pending[channel_id] = None
-                if pending_mode == 'pulse':
-                    self._dr_osc_mode_hold_until[channel_id] = current_time + pulse_window_length
-                return pending_mode
-            else:
-                # Not yet — keep current mode
-                return current_mode
-
-        # Don't switch back from pulse until hold period expires
+        # Don't switch modes until hold period expires
         hold_until = self._dr_osc_mode_hold_until.get(channel_id, 0)
-        if current_mode == 'pulse' and current_time < hold_until:
-            return 'pulse'
+        if current_time < hold_until:
+            return current_mode
 
-        # Analyze a lookahead window of 2 * count-threshold * pulse window-length
-        lookahead_length = 2 * pulse_count_threshold * pulse_window_length
-        analysis_samples = max(10, int(lookahead_length * sample_rate))
-        start_sample = int(current_time * sample_rate)
-        end_sample = min(total_samples, start_sample + analysis_samples)
+        # Slightly backward-weighted analysis window: 55% behind, 45% ahead.
+        analysis_length = 2 * pulse_count_threshold * pulse_window_length
+        analysis_samples = max(10, int(analysis_length * sample_rate))
+        backward_samples = int(analysis_samples * 0.55)
+        forward_samples = analysis_samples - backward_samples
+        center_sample = int(current_time * sample_rate)
+        start_sample = max(0, center_sample - backward_samples)
+        end_sample = min(total_samples, center_sample + forward_samples)
 
         if end_sample - start_sample < 10:
             return current_mode
@@ -1492,8 +1481,8 @@ class VideoVisualization(Visualization):
         trimmed = buffer[:n_windows * sub_window_samples].reshape(n_windows, sub_window_samples)
         sub_rms = np.sqrt(np.mean(trimmed ** 2, axis=1))
 
-        # Divide the lookahead into sub-windows of pulse window-length and compute
-        # CV for each. Require at least count-threshold sub-windows to exceed
+        # Divide the analysis window into chunks of pulse window-length and compute
+        # CV for each. Require at least count-threshold chunks to exceed
         # cv-threshold, confirming sustained pulsing rather than an isolated transient.
         pulse_sub_window_samples = max(1, int(pulse_window_length * sample_rate))
         pulse_sub_rms_windows = pulse_sub_window_samples // sub_window_samples
@@ -1507,62 +1496,34 @@ class VideoVisualization(Visualization):
             if chunk_mean > 1e-10:
                 cv = np.std(chunk) / chunk_mean
                 if cv >= pulse_cv_threshold:
-                    pulse_count += 1
+                    # Verify sharp energy transitions exist (not smooth AM envelope).
+                    # Pulse edges create large frame-to-frame RMS jumps; smooth AM
+                    # tones change gradually.
+                    chunk_diff = np.abs(np.diff(chunk))
+                    chunk_peak = np.max(chunk)
+                    max_edge = np.max(chunk_diff) / chunk_peak if chunk_peak > 1e-10 else 0
+                    if max_edge >= 0.15:
+                        pulse_count += 1
 
         detected_mode = 'pulse' if pulse_count >= pulse_count_threshold else 'tone'
 
         if detected_mode != current_mode:
-            # Find the precise transition point within the lookahead
-            switch_sample_offset = self._dr_osc_find_transition(
-                sub_rms, current_mode, detected_mode, silence_threshold)
-            switch_time = current_time + (switch_sample_offset * sub_window_samples) / sample_rate
-
-            if switch_time <= current_time:
-                # Transition is at or before current time — switch immediately
-                self._dr_osc_mode[channel_id] = detected_mode
-                self._dr_osc_prev_waveform.pop(channel_id, None)
-                if detected_mode == 'pulse':
-                    self._dr_osc_mode_hold_until[channel_id] = current_time + pulse_window_length
-                return detected_mode
-            else:
-                # Defer the switch until playback reaches the transition point
-                self._dr_osc_mode_pending[channel_id] = (detected_mode, switch_time)
+            self._dr_osc_mode[channel_id] = detected_mode
+            self._dr_osc_prev_waveform.pop(channel_id, None)
+            # Hold the new mode for one pulse window to prevent rapid toggling
+            self._dr_osc_mode_hold_until[channel_id] = current_time + pulse_window_length
+            return detected_mode
 
         return current_mode
-
-    def _dr_osc_find_transition(self, sub_rms, from_mode, to_mode, silence_threshold):
-        """Find the sub-window index where the signal character transitions.
-        For tone→pulse: find the first significant silence gap (energy drop).
-        For pulse→tone: find where energy becomes sustained."""
-        if to_mode == 'pulse':
-            # Find the first sub-window where energy drops below the silence threshold,
-            # indicating the start of a pulse gap (the tone has ended)
-            for i in range(len(sub_rms)):
-                if sub_rms[i] < silence_threshold:
-                    return i
-            return 0
-        else:
-            # Find where energy becomes sustained (no gaps) — scan for the first
-            # run of consecutive above-threshold sub-windows
-            min_sustained = max(3, len(sub_rms) // 4)
-            run = 0
-            for i in range(len(sub_rms)):
-                if sub_rms[i] >= silence_threshold:
-                    run += 1
-                    if run >= min_sustained:
-                        return i - min_sustained + 1
-                else:
-                    run = 0
-            return 0
 
     def _dr_osc_find_trigger_zero_crossing(self, waveform):
         """Fallback trigger: rising zero-crossing with hysteresis."""
         peak = np.max(np.abs(waveform))
-        silence_threshold = es.cfg.get('analysis.oscilloscope.silence-threshold', 0.01)
+        silence_threshold = es.cfg['analysis.oscilloscope.silence-threshold']
         if peak < silence_threshold:
             return 0
 
-        hysteresis = es.cfg.get('analysis.oscilloscope.trigger-hysteresis', 0.05)
+        hysteresis = es.cfg['analysis.oscilloscope.trigger-hysteresis']
         arm_level = -hysteresis * peak
 
         armed = False
@@ -1617,24 +1578,31 @@ class VideoVisualization(Visualization):
         quality is too low."""
         if self._osc_manual_duration is not None:
             duration = self._osc_manual_duration
-        elif es.cfg.get('analysis.oscilloscope.pulse-detection.enabled', True):
+        elif es.cfg['analysis.oscilloscope.pulse-detection.enabled']:
             mode = self._dr_osc_detect_mode(channel_id, current_time)
             if mode == 'pulse':
-                duration = es.cfg.get('analysis.oscilloscope.pulse-detection.window-length', 250) / 1000.0
+                duration = es.cfg['analysis.oscilloscope.pulse-detection.window-length'] / 1000.0
             else:
-                duration = es.cfg.get('analysis.oscilloscope.window-length', 10) / 1000.0
+                duration = es.cfg['analysis.oscilloscope.window-length'] / 1000.0
         else:
-            duration = es.cfg.get('analysis.oscilloscope.window-length', 10) / 1000.0
-        silence_threshold = es.cfg.get('analysis.oscilloscope.silence-threshold', 0.01)
+            duration = es.cfg['analysis.oscilloscope.window-length'] / 1000.0
+        silence_threshold = es.cfg['analysis.oscilloscope.silence-threshold']
 
         sample_rate = self._es_audio.sample_rate
         display_samples = max(10, int(duration * sample_rate))
 
-        # Extract buffer with extra margin for trigger search (2x display duration)
-        search_margin = display_samples * 2
+        # Extract buffer near current_time with margin for trigger alignment.
+        # In tone mode (short display), a small margin suffices. In pulse mode
+        # (long display), the backward margin must span a full display period so
+        # the correlation trigger can always find a pattern-aligned match — when
+        # the match point drifts past the buffer start, a periodic match exists
+        # one period later within the search range.
+        # Forward margin is kept small to avoid displaying future audio.
         center_sample = int(current_time * sample_rate)
-        buf_start = max(0, center_sample - search_margin)
-        buf_end = min(self._es_audio.data.shape[1], center_sample + display_samples)
+        backward_margin = max(int(0.005 * sample_rate), 2 * display_samples)
+        trigger_margin = int(0.020 * sample_rate)
+        buf_start = max(0, center_sample - backward_margin)
+        buf_end = min(self._es_audio.data.shape[1], center_sample + display_samples + trigger_margin)
 
         if buf_end - buf_start < display_samples:
             self._dr_osc_prev_waveform.pop(channel_id, None)
@@ -1659,9 +1627,21 @@ class VideoVisualization(Visualization):
         prev_template = self._dr_osc_prev_waveform.get(channel_id)
 
         if prev_template is not None and len(prev_template) == display_samples:
-            # Correlation-based trigger using previous frame's waveform as template
-            corr_offset, corr_quality = self._dr_osc_find_trigger_correlation(
-                buffer[:trigger_search_end + display_samples], prev_template)
+            # Correlation-based trigger using previous frame's waveform as template.
+            # For long display windows (pulse mode), decimate both signals to keep
+            # the O(n²) cross-correlation fast. Target ~1000 samples per template.
+            dec_factor = max(1, display_samples // 1000)
+            if dec_factor > 1:
+                dec_buffer = buffer[::dec_factor]
+                dec_template = prev_template[::dec_factor]
+                dec_search_end = trigger_search_end // dec_factor
+                dec_display = len(dec_template)
+                corr_offset, corr_quality = self._dr_osc_find_trigger_correlation(
+                    dec_buffer[:dec_search_end + dec_display], dec_template)
+                corr_offset *= dec_factor  # Scale back to full resolution
+            else:
+                corr_offset, corr_quality = self._dr_osc_find_trigger_correlation(
+                    buffer[:trigger_search_end + display_samples], prev_template)
 
             if corr_quality > 0.3:
                 trigger_idx = corr_offset
@@ -1717,14 +1697,14 @@ class VideoVisualization(Visualization):
         waveform, duration = self._dr_osc_extract_waveform(channel_id, current_time)
 
         # Alpha-blend background
-        opacity = es.cfg.get('visualization.style.oscilloscope.opacity', 0.8)
+        opacity = es.cfg['visualization.style.oscilloscope.opacity']
         bg_rgb = self._dr_amp_bg_rgb[channel_id].astype(np.float32)
         region = self._dr_frame_buffer[by0:by1, bx0:bx1].astype(np.float32)
         blended = region * (1.0 - opacity) + bg_rgb * opacity
         self._dr_frame_buffer[by0:by1, bx0:bx1] = blended.astype(np.uint8)
 
         # Draw border using channel base color at 5x the background opacity
-        border_width = es.cfg.get('visualization.style.oscilloscope.border-width', 2)
+        border_width = es.cfg['visualization.style.oscilloscope.border-width']
         if border_width > 0:
             border_opacity = min(1.0, opacity * 5.0)
             border_rgb = self._dr_amp_peak_rgb[channel_id].astype(np.float32)
@@ -1759,7 +1739,7 @@ class VideoVisualization(Visualization):
 
         # Map waveform to pixel coordinates
         line_color = self._dr_amp_peak_rgb[channel_id]
-        line_width = es.cfg.get('visualization.style.oscilloscope.line-width', 2)
+        line_width = es.cfg['visualization.style.oscilloscope.line-width']
         half_lw = max(0, line_width // 2)
         padding_frac = 0.05
 
@@ -2149,11 +2129,11 @@ def set_optimal_nfft(es_audio: es.audio.Audio, figure_height: float,
     :param title_enabled: Whether the title panel is shown.
     :param include_scrub: Whether scrub panels are included (video mode).
     """
-    if not es.cfg.get('analysis.spectrogram.nfft-auto', False):
+    if not es.analysis.nfft_auto:
         return
 
     if triphase is None:
-        triphase = es.cfg.get('visualization.triphase', False)
+        triphase = es.cfg['visualization.triphase']
 
     freq_max = es.cfg['analysis.spectrogram.frequency-max']
     if freq_max is None:
@@ -2203,7 +2183,8 @@ def _on_config_updated():
         es.cfg['visualization.style.font.text.properties'])
     # Determine the correct face index for TTC (TrueType Collection) files
     # Pillow defaults to index 0 (usually Regular); we need to find the matching face
-    es.cfg['visualization.style.font.text.face-index'] = 0
+    global _font_face_index
+    _font_face_index = 0
     _font_file = es.cfg['visualization.style.font.text.file']
     if _font_file.lower().endswith('.ttc'):
         _target_weight = _weight.lower()
@@ -2212,7 +2193,7 @@ def _on_config_updated():
                 _face = ImageFont.truetype(_font_file, 12, index=_i)
                 _style = _face.getname()[1].lower()
                 if _target_weight in _style:
-                    es.cfg['visualization.style.font.text.face-index'] = _i
+                    _font_face_index = _i
                     break
             except OSError:
                 break
@@ -2313,13 +2294,13 @@ def _on_config_updated():
     # 1. If an explicit per-channel override is set, use it directly
     # 2. Otherwise, derive from the base colormap (with color matching if enabled)
     base_cmap_name = es.cfg['visualization.style.spectrogram.color-map']
-    match_amplitude_color = es.cfg.get('visualization.style.spectrogram.match-amplitude-color', True)
+    match_amplitude_color = es.cfg['visualization.style.spectrogram.match-amplitude-color']
     n_amplitude_channels = len(es.cfg['visualization.style.amplitude.channels'])
 
     resolved_channels = [None] * n_amplitude_channels
     for i_channel in range(n_amplitude_channels):
         # Check for explicit per-channel colormap override from config
-        channel_override = es.cfg.get(f'visualization.style.spectrogram.channels.ch{i_channel}.color-map')
+        channel_override = es.cfg[f'visualization.style.spectrogram.channels.ch{i_channel}.color-map']
 
         if channel_override is not None:
             # Explicit override — use the specified colormap directly
@@ -2334,7 +2315,7 @@ def _on_config_updated():
             if match_amplitude_color:
                 peak_color = es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color']
                 background_color = es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color']
-                radius = es.cfg.get('visualization.style.spectrogram.match-amplitude-color-radius', 30)
+                radius = es.cfg['visualization.style.spectrogram.match-amplitude-color-radius']
                 derived_cmap = _derive_channel_colormap(base_cmap_name, peak_color,
                                                          background_color=background_color,
                                                          radius_degrees=radius)

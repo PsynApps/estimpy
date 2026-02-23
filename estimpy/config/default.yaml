@@ -9,7 +9,7 @@ analysis:
       enabled: True
       # Minimum number of pulses that must be detected within the lookahead window
       # to activate pulse mode. Higher values reduce false positives from isolated transients.
-      count-threshold: 3
+      count-threshold: 5
       # Minimum coefficient of variation (std/mean) of 5ms sub-window RMS values required
       # to confirm pulsed content. Pulses produce high CV (energy alternates between on/off
       # states) while tonal content with smooth amplitude modulation has low CV.
@@ -182,7 +182,7 @@ visualization:
       # Font size for the duration label
       font-size: 12
       # Height of box as fraction of combined amplitude+spectrogram panel height
-      height-ratio: 0.66
+      height-ratio: 0.5
       # Line width for the waveform in pixels
       line-width: 10
       # Background opacity (0.0 = fully transparent, 1.0 = fully opaque)

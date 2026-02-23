@@ -8,6 +8,9 @@ import numpy as np
 import scipy
 
 
+nfft_auto = False  # True when nfft was auto-calculated (user didn't set it explicitly)
+
+
 class EnvelopeModes(enum.StrEnum):
     PEAK = 'peak'
     RMS = 'rms'
@@ -222,7 +225,7 @@ class Spectrogram:
                 if es.cfg['analysis.spectrogram.frequency-max'] is not None else math.floor(sample_rate / 2)
 
         if reassign is None:
-            reassign = es.cfg.get('analysis.spectrogram.reassign', False)
+            reassign = es.cfg['analysis.spectrogram.reassign']
 
         nfft = max(nfft, window_size)
 
@@ -438,7 +441,7 @@ class Spectrogram:
             # reassigned points while preserving per-source magnitude (no dilution).
             # Frequency sigma scales with zero-padding ratio so smoothing width
             # is relative to the true frequency resolution regardless of nfft.
-            smoothing = es.cfg.get('analysis.spectrogram.reassign-smoothing', 0.5)
+            smoothing = es.cfg['analysis.spectrogram.reassign-smoothing']
 
             if smoothing > 0:
                 zp_ratio = nfft / window_size
@@ -692,13 +695,14 @@ def _on_config_updated():
     # Set a 4x fallback for nfft (used when the analysis module is called
     # directly, outside a visualization entry point). Visualization entry
     # points override this with a resolution-aware value via set_optimal_nfft.
-    # nfft-auto tracks whether the user explicitly set nfft — if so, the
+    # nfft_auto tracks whether the user explicitly set nfft — if so, the
     # resolution-aware override is skipped.
+    global nfft_auto
     if es.cfg['analysis.spectrogram.nfft'] is None:
         es.cfg['analysis.spectrogram.nfft'] = 4 * es.cfg['analysis.window-size']
-        es.cfg['analysis.spectrogram.nfft-auto'] = True
+        nfft_auto = True
     else:
-        es.cfg['analysis.spectrogram.nfft-auto'] = False
+        nfft_auto = False
 
 
 es.add_event_listener('config.updated', _on_config_updated)
