@@ -27,6 +27,18 @@ estimpy/
 └── config/
     ├── default.yaml         # Canonical defaults (single source of truth)
     └── *.yaml               # Named profiles: video codecs, resolutions, player presets
+
+scripts/
+└── generate_test2.py        # Generates test2.wav from diverse audio segments
+
+tests/
+├── conftest.py              # Pytest fixtures: synthetic audio, config isolation
+├── test_audio.py            # Audio loading, normalization, triphase, resampling
+├── test_analysis.py         # Envelope computation, spectrogram generation, FFT sizing
+├── test_config.py           # Config loading, updates, type casting, event system
+├── test_metadata.py         # Tag read/write, image format detection
+├── test_utils.py            # Formatting, file path helpers
+└── input/                   # Test audio fixtures (WAV)
 ```
 
 **Why this layout:** The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `visualization/` and `player/` packages are separate subpackages because they have significant internal structure — visualization splits rendering concerns across static images, video pipeline, and oscilloscope overlay, while player manages GUI dependencies (PyQt6, pygame) with its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.
@@ -230,12 +242,10 @@ analysis:                             # analysis.spectrogram.reassign: True
 
 ## Known Limitations / Technical Debt
 
-**No automated tests.** The `tests/` directory contains only reference audio files for manual testing. The DSP pipeline (analysis), rendering pipeline (visualization), and config system would benefit from unit tests, especially given the complexity of the reassigned spectrogram and oscilloscope trigger stabilization.
-
 **Global mutable state in `player/audio.py`.** The pygame audio engine uses module-level globals (`_is_playing`, `_channels`, `_volumes`, etc.) instead of a class instance. This precludes multiple simultaneous players and makes the module harder to reason about.
 
 **Config system has no schema validation.** Invalid keys are caught at `update_config_values()` time, but type mismatches between YAML values and code expectations (e.g., a string where an int is expected) are only caught at point of use. A schema or typed config class would catch errors earlier.
 
-**Circular import avoidance via lazy import.** `Player.__init__()` does `from estimpy.player.window import PlayerWindow` inside the constructor because `player` is imported before `visualization` in `__init__.py`. This works but is fragile — import order in `__init__.py` matters and isn't documented.
+**Circular import avoidance via lazy import.** `Player.__init__()` does `from estimpy.player.window import PlayerWindow` inside the constructor because `player` is imported before `visualization` in `__init__.py` (see Directory Structure above). This works but is fragile — import order matters and changes to it can surface as circular import errors.
 
 **Video export memory usage scales with segment length.** Each segment creates a new `VideoVisualization` that holds the full spectrogram in memory. For very long files, this can consume significant RAM despite the chunked reassignment computation.

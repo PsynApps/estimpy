@@ -337,6 +337,13 @@ For reference, the default configuration options and values are as follows:
 
 | Configuration Option                                         | Value                                        |
 |--------------------------------------------------------------|----------------------------------------------|
+| analysis.oscilloscope.pulse-detection.count-threshold        | 5                                            |
+| analysis.oscilloscope.pulse-detection.cv-threshold           | 1.0                                          |
+| analysis.oscilloscope.pulse-detection.enabled                | True                                         |
+| analysis.oscilloscope.pulse-detection.window-length          | 500                                          |
+| analysis.oscilloscope.silence-threshold                      | 0.01                                         |
+| analysis.oscilloscope.trigger-hysteresis                     | 0.05                                         |
+| analysis.oscilloscope.window-length                          | 10                                           |
 | analysis.spectrogram.frequency-min                           | 0                                            |
 | analysis.spectrogram.frequency-max                           | None                                         |
 | analysis.spectrogram.frequency-max-method                    | spectral_edge                                |
@@ -394,6 +401,12 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.font.text.border-width                   | 1                                            |
 | visualization.style.font.text.family                         | Helvetica Neue, Helvetica, Arial, sans-serif |
 | visualization.style.font.text.weight                         | bold                                         |
+| visualization.style.oscilloscope.border-width                | 5                                            |
+| visualization.style.oscilloscope.font-size                   | 12                                           |
+| visualization.style.oscilloscope.height-ratio                | 0.5                                          |
+| visualization.style.oscilloscope.line-width                  | 10                                           |
+| visualization.style.oscilloscope.opacity                     | 0.95                                         |
+| visualization.style.oscilloscope.width-ratio                 | 0.25                                         |
 | visualization.style.spectrogram.color-map                    | jet                                          |
 | visualization.style.spectrogram.match-amplitude-color        | True                                         |
 | visualization.style.spectrogram.match-amplitude-color-radius | 5                                            |
@@ -416,6 +429,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.title.font-size                          | 24                                           |
 | visualization.style.title.width-factor-max                   | 0.9                                          |
 | visualization.style.video.position-line-color                | #ffffff                                      |
+| visualization.video.display.oscilloscope.enabled             | True                                         |
 | visualization.video.display.size                             | 1920x1080                                    |
 | visualization.video.display.time.enabled                     | False                                        |
 | visualization.video.display.title.enabled                    | False                                        |
@@ -431,6 +445,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.export.ffmpeg-extra-args.-tune           | animation                                    |
 | visualization.video.export.format                            | mp4                                          |
 | visualization.video.export.fps                               | 30                                           |
+| visualization.video.export.oscilloscope.enabled              | True                                         |
 | visualization.video.export.keyframe-interval                 | None                                         |
 | visualization.video.export.preview.enabled                   | True                                         |
 | visualization.video.export.preview.length                    | 2                                            |
