@@ -1,5 +1,6 @@
 import copy
 import os
+import shutil
 import tempfile
 import wave
 
@@ -12,6 +13,7 @@ from estimpy.audio import Audio
 
 TEST_INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
 TEST_WAV = os.path.join(TEST_INPUT_DIR, 'test.wav')
+TEST_MP3 = os.path.join(TEST_INPUT_DIR, 'test.mp3')
 
 SAMPLE_RATE = 44100
 DURATION = 1.0
@@ -67,6 +69,19 @@ def tmp_wav_file():
         wf.setsampwidth(2)
         wf.setframerate(SAMPLE_RATE)
         wf.writeframes(interleaved.tobytes())
+
+    yield path
+
+    if os.path.exists(path):
+        os.remove(path)
+
+
+@pytest.fixture
+def tmp_mp3_file():
+    """Copy test.mp3 to a temp file for destructive tests. Cleaned up after test."""
+    fd, path = tempfile.mkstemp(suffix='.mp3')
+    os.close(fd)
+    shutil.copy2(TEST_MP3, path)
 
     yield path
 

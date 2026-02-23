@@ -163,8 +163,9 @@ class Audio:
         :param int new_sample_rate:
         :return None:
         """
-        self._data = resample_audio_data(self.sample_rate, new_sample_rate)
+        self._data = resample_audio_data(self._data, self.sample_rate, new_sample_rate)
         self._sample_rate = new_sample_rate
+        self._sample_count = self._data.shape[1]
 
     def save_metadata(self) -> None:
         """Save metadata to the audio file for the instance

@@ -17,6 +17,7 @@ dist/
 /export/
 /tests/input/*
 !/tests/input/test.wav
+!/tests/input/test.mp3
 !/tests/input/test2.wav
 /tests/output/
 todo.txt
