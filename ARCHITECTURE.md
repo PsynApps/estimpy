@@ -5,7 +5,7 @@ EstimPy is a Python toolkit for visualizing and playing back estim audio files. 
 ## Directory Structure
 
 ```
-estimpy/
+src/estimpy/
 ├── __init__.py              # Package init, config system, event bus, dependency checks
 ├── cli.py                   # CLI entry point — argument parsing and command routing
 ├── audio.py                 # Audio loading, normalization, resampling
@@ -28,9 +28,6 @@ estimpy/
     ├── default.yaml         # Canonical defaults (single source of truth)
     └── *.yaml               # Named profiles: video codecs, resolutions, player presets
 
-scripts/
-└── generate_test2.py        # Generates test2.wav from diverse audio segments
-
 tests/
 ├── conftest.py              # Pytest fixtures: synthetic audio, config isolation
 ├── test_audio.py            # Audio loading, normalization, triphase, resampling
@@ -38,7 +35,7 @@ tests/
 ├── test_config.py           # Config loading, updates, type casting, event system
 ├── test_metadata.py         # Tag read/write, image format detection
 ├── test_utils.py            # Formatting, file path helpers
-└── input/                   # Test audio fixtures (WAV)
+└── input/                   # Test audio fixtures (WAV, MP3)
 ```
 
 **Why this layout:** The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `visualization/` and `player/` packages are separate subpackages because they have significant internal structure — visualization splits rendering concerns across static images, video pipeline, and oscilloscope overlay, while player manages GUI dependencies (PyQt6, pygame) with its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.
@@ -219,7 +216,7 @@ analysis:                             # analysis.spectrogram.reassign: True
 3. Register the format extension in `Metadata.__init__()`.
 
 **Adding a new config profile:**
-1. Create a `.yaml` file in `estimpy/config/` with only the keys you want to override.
+1. Create a `.yaml` file in `src/estimpy/config/` with only the keys you want to override.
 2. Users load it via `estimpy -c profile_name` (file extension is optional).
 
 ## Key Design Decisions

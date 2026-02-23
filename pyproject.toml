@@ -55,7 +55,7 @@ PyPI = 'https://pypi.org/project/estimpy/'
 estimpy = 'estimpy.cli:main'
 
 [tool.setuptools.packages.find]
-exclude = ['assets*', 'export*', 'tests*']
+where = ['src']
 
 [tool.setuptools.package-data]
 estimpy = ['config/*.yaml']
