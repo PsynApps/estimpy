@@ -18,6 +18,9 @@ classifiers = [
 ]
 requires-python = '>=3.11'
 
+[project.optional-dependencies]
+dev = ['pytest']
+
 dependencies = [
     'audioop-lts; python_version >= "3.13"',
     'colorama',
@@ -50,3 +53,6 @@ exclude = ['assets*', 'export*', 'tests*']
 
 [tool.setuptools.package-data]
 estimpy = ['config/*.yaml']
+
+[tool.pytest.ini_options]
+testpaths = ['tests']

@@ -15,6 +15,9 @@ dist/
 .venv/
 /assets/
 /export/
-/tests/
+/tests/input/*
+!/tests/input/test.wav
+!/tests/input/test2.wav
+/tests/output/
 todo.txt
 *.swp
