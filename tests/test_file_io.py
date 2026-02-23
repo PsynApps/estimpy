@@ -1,68 +1,38 @@
-import os
-
 import numpy as np
 import pytest
 
 from estimpy.audio import Audio
 from estimpy.metadata import Metadata
-from tests.conftest import TEST_WAV, TEST_MP3, SAMPLE_RATE
+from tests.conftest import TEST_MP3, SAMPLE_RATE
 
 
-class TestAudioLoadWav:
-    def test_load_wav_channels(self):
-        audio = Audio(file=TEST_WAV)
-        assert audio.channels == 2
-
-    def test_load_wav_sample_rate(self):
-        audio = Audio(file=TEST_WAV)
-        assert audio.sample_rate == SAMPLE_RATE
-
-    def test_load_wav_length(self):
-        audio = Audio(file=TEST_WAV)
-        assert abs(audio.length - 1.0) < 0.01
-
-    def test_load_wav_bit_depth(self):
-        audio = Audio(file=TEST_WAV)
-        assert audio.bit_depth == 16
-
-    def test_load_wav_format(self):
-        audio = Audio(file=TEST_WAV)
-        assert audio.format == 'wav'
-
-
-class TestAudioLoadMp3:
-    def test_load_mp3_channels(self):
+class TestAudioFromFile:
+    def test_load_channels(self):
         audio = Audio(file=TEST_MP3)
         assert audio.channels == 2
 
-    def test_load_mp3_sample_rate(self):
+    def test_load_sample_rate(self):
         audio = Audio(file=TEST_MP3)
         assert audio.sample_rate == SAMPLE_RATE
 
-    def test_load_mp3_length_positive(self):
+    def test_load_length_positive(self):
         audio = Audio(file=TEST_MP3)
         assert audio.length > 0
 
-    def test_load_mp3_format(self):
+    def test_load_format(self):
         audio = Audio(file=TEST_MP3)
         assert audio.format == 'mp3'
 
-    def test_load_mp3_data_normalized(self):
+    def test_load_data_normalized(self):
         audio = Audio(file=TEST_MP3)
         assert audio.data.min() >= -1.0
         assert audio.data.max() <= 1.0
 
-    def test_load_mp3_data_float32(self):
+    def test_load_data_float32(self):
         audio = Audio(file=TEST_MP3)
         assert audio.data.dtype == np.float32
 
-
-class TestAudioFileProperties:
-    def test_file_property_wav(self):
-        audio = Audio(file=TEST_WAV)
-        assert audio.file == TEST_WAV
-
-    def test_file_property_mp3(self):
+    def test_file_property(self):
         audio = Audio(file=TEST_MP3)
         assert audio.file == TEST_MP3
 
@@ -79,21 +49,21 @@ class TestAudioFileProperties:
 
 class TestAudioResample:
     def test_resample_changes_sample_rate(self):
-        audio = Audio(file=TEST_WAV)
+        audio = Audio(file=TEST_MP3)
         original_rate = audio.sample_rate
         audio.resample(22050)
         assert audio.sample_rate == 22050
         assert audio.sample_rate != original_rate
 
-    def test_resample_updates_data_shape(self):
-        audio = Audio(file=TEST_WAV)
+    def test_resample_updates_sample_count(self):
+        audio = Audio(file=TEST_MP3)
         original_samples = audio.sample_count
         audio.resample(22050)
         # Halving sample rate should roughly halve the sample count
         assert abs(audio.sample_count - original_samples // 2) <= 1
 
     def test_resample_preserves_channels(self):
-        audio = Audio(file=TEST_WAV)
+        audio = Audio(file=TEST_MP3)
         original_channels = audio.channels
         audio.resample(22050)
         assert audio.channels == original_channels

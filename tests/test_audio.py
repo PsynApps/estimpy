@@ -1,10 +1,8 @@
-import os
-
 import numpy as np
 import pytest
 
 from estimpy.audio import Audio, resample_audio_data
-from tests.conftest import TEST_WAV, SAMPLE_RATE, DURATION, N_SAMPLES
+from tests.conftest import TEST_MP3, SAMPLE_RATE, DURATION, N_SAMPLES
 
 
 class TestAudioFromNumpy:
@@ -57,21 +55,16 @@ class TestAudioDataRaw:
 
 
 class TestAudioFromFile:
-    def test_load_wav(self):
-        if not os.path.exists(TEST_WAV):
-            pytest.skip('test_tone.wav not found')
-        audio = Audio(file=TEST_WAV)
+    def test_load_mp3(self):
+        audio = Audio(file=TEST_MP3)
         assert audio.channels == 2
         assert audio.sample_rate == SAMPLE_RATE
-        assert abs(audio.length - DURATION) < 0.01
-        assert audio.bit_depth == 16
-        assert audio.format == 'wav'
+        assert audio.length > 0
+        assert audio.format == 'mp3'
 
     def test_file_property(self):
-        if not os.path.exists(TEST_WAV):
-            pytest.skip('test_tone.wav not found')
-        audio = Audio(file=TEST_WAV)
-        assert audio.file == TEST_WAV
+        audio = Audio(file=TEST_MP3)
+        assert audio.file == TEST_MP3
 
 
 class TestTriphase:

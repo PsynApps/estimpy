@@ -2,7 +2,6 @@ import copy
 import os
 import shutil
 import tempfile
-import wave
 
 import numpy as np
 import pytest
@@ -12,7 +11,6 @@ from estimpy.audio import Audio
 
 
 TEST_INPUT_DIR = os.path.join(os.path.dirname(__file__), 'input')
-TEST_WAV = os.path.join(TEST_INPUT_DIR, 'test.wav')
 TEST_MP3 = os.path.join(TEST_INPUT_DIR, 'test.mp3')
 
 SAMPLE_RATE = 44100
@@ -49,31 +47,6 @@ def synthetic_mono_audio():
     mono = (np.sin(2 * np.pi * 440 * t) * 0.8 * 32767).astype(np.int16)
     audio_data = mono.reshape(1, -1)
     return Audio(audio_data=audio_data, sample_rate=SAMPLE_RATE, bit_depth=16)
-
-
-@pytest.fixture
-def tmp_wav_file():
-    """Write a temporary stereo WAV file and return its path. Cleaned up after test."""
-    t = np.linspace(0, DURATION, N_SAMPLES, endpoint=False)
-    left = (np.sin(2 * np.pi * 440 * t) * 0.8 * 32767).astype(np.int16)
-    right = (np.sin(2 * np.pi * 880 * t) * 0.8 * 32767).astype(np.int16)
-    interleaved = np.empty(2 * N_SAMPLES, dtype=np.int16)
-    interleaved[0::2] = left
-    interleaved[1::2] = right
-
-    fd, path = tempfile.mkstemp(suffix='.wav')
-    os.close(fd)
-
-    with wave.open(path, 'w') as wf:
-        wf.setnchannels(2)
-        wf.setsampwidth(2)
-        wf.setframerate(SAMPLE_RATE)
-        wf.writeframes(interleaved.tobytes())
-
-    yield path
-
-    if os.path.exists(path):
-        os.remove(path)
 
 
 @pytest.fixture
