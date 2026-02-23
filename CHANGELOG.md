@@ -48,6 +48,8 @@
 - Player controls reordered: playback | repeat | fullscreen | playlist | stretch | oscilloscope | zoom | triphase | volume
 - Repeat config changed from boolean to string enum (`none`/`one`/`all`) with backward compatibility for boolean values
 - End-of-track handling now respects repeat mode: `one` loops the current file, `all` wraps around the playlist, `none` advances or stops
+- Refactored `visualization.py` into a `visualization/` subpackage with separate modules: `base.py` (static images), `video.py` (direct render pipeline), `oscilloscope.py` (waveform overlay mixin)
+- Font face index for TTC files now stored as derived config key (`visualization.style.font.text.face-index`) instead of a module-level variable
 
 ### Removed
 - Removed `estimpy-visualizer` and `estimpy-player` CLI entry points, replaced by unified `estimpy` command

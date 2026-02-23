@@ -10,7 +10,11 @@ estimpy/
 ├── cli.py                   # CLI entry point — argument parsing and command routing
 ├── audio.py                 # Audio loading, normalization, resampling
 ├── analysis.py              # DSP: spectrograms (standard + reassigned), envelopes
-├── visualization.py         # All rendering: figures, direct frame painting, oscilloscope
+├── visualization/
+│   ├── __init__.py          # Re-exports, config event handler, colormap derivation
+│   ├── base.py              # Visualization class (static images), enums, show_image, set_optimal_nfft
+│   ├── video.py             # VideoVisualization: direct render pipeline, shift-and-paint
+│   └── oscilloscope.py      # OscilloscopeMixin: per-channel waveform overlay
 ├── export.py                # File export: images (matplotlib) and videos (ffmpeg pipe)
 ├── metadata.py              # ID3/MP4 tag reading/writing via mutagen
 ├── utils.py                 # Shared helpers: file dialogs, spinners, temp files, formatting
@@ -25,7 +29,7 @@ estimpy/
     └── *.yaml               # Named profiles: video codecs, resolutions, player presets
 ```
 
-**Why this layout:** The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `player/` package is separate because it introduces GUI dependencies (PyQt6, pygame) and has its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.
+**Why this layout:** The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `visualization/` and `player/` packages are separate subpackages because they have significant internal structure — visualization splits rendering concerns across static images, video pipeline, and oscilloscope overlay, while player manages GUI dependencies (PyQt6, pygame) with its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.
 
 ## Key Modules & Their Roles
 
@@ -49,13 +53,13 @@ estimpy/
 - **Dependents:** visualization (lazy-loaded via properties).
 - **Notable:** Reassigned spectrograms use three FFTs per frame, 2D histogram accumulation, and Nadaraya-Watson kernel smoothing. Processes in memory-bounded chunks (~500MB limit).
 
-### `visualization.py` — Rendering (2300+ lines, largest module)
+### `visualization/` — Rendering Subpackage
 - **Responsibility:** All visual output — matplotlib figure creation, per-frame direct pixel rendering, oscilloscope overlay, colormap derivation, axis formatting.
-- **Key classes:**
-  - `Visualization` — Base class for static images. Creates matplotlib figure with amplitude + spectrogram panels per channel. Handles layout, styling, axis formatting.
-  - `VideoVisualization(Visualization)` — Extends base with time-windowed sliding view, frame-by-frame rendering, and a high-performance **direct render pipeline** that bypasses matplotlib for per-frame updates.
-- **Key module functions:** `show_image()`, `set_optimal_nfft()`, `_derive_channel_colormap()`, `_resolve_visualization_config()`.
-- **Dependencies:** matplotlib, PIL (ImageFont for direct text rendering), numpy, scipy, colorsys.
+- **`__init__.py`** — Re-exports the public API (`Visualization`, `VideoVisualization`, `VisualizationMode`, `show_image`, `set_optimal_nfft`), handles `config.updated` events (resolution parsing, font initialization, channel color derivation, colormap generation), and contains internal helpers (`_alpha_color`, `_derive_channel_colormap`, `_parse_resolution`, `_calculate_spectrogram_panel_height`).
+- **`base.py`** — `Visualization` class for static image rendering: matplotlib figure construction with amplitude + spectrogram panels per channel, layout, styling, axis formatting. Also contains `AxisScaleText`, `AxisTypes`, `VisualizationMode` enums, `show_image()`, and `set_optimal_nfft()`.
+- **`video.py`** — `VideoVisualization(Visualization, OscilloscopeMixin)` extends base with time-windowed sliding view, the shift-and-paint direct render pipeline (`prepare_direct_render()`, `render_frame_direct()`), and all shift/paint/overlay methods for per-frame updates.
+- **`oscilloscope.py`** — `OscilloscopeMixin` provides per-channel oscilloscope waveform overlays with trigger stabilization (zero-crossing and correlation-based), pulse detection via CV analysis, and duration label rendering. Used as a mixin because the methods share extensive instance state with `VideoVisualization`.
+- **Dependencies:** matplotlib, PIL (ImageFont for direct text rendering), numpy, colorsys.
 - **Dependents:** export, player/window.
 
 ### `export.py` — File Output
@@ -95,7 +99,7 @@ sequenceDiagram
     participant CLI as cli.py
     participant Audio as audio.py
     participant Analysis as analysis.py
-    participant Viz as visualization.py
+    participant Viz as visualization/
     participant Window as player/window.py
     participant Engine as player/audio.py
 
@@ -124,7 +128,7 @@ sequenceDiagram
 sequenceDiagram
     participant CLI as cli.py
     participant Export as export.py
-    participant Viz as visualization.py
+    participant Viz as visualization/
     participant FFmpeg as ffmpeg (subprocess)
 
     CLI->>Export: write_video(es_audio)
@@ -187,10 +191,10 @@ analysis:                             # analysis.spectrogram.reassign: True
 3. Write a `_run_<command>()` handler.
 
 **Adding a new visualization panel:**
-1. Add an `AxisTypes` enum value in `visualization.py`.
+1. Add an `AxisTypes` enum value in `visualization/base.py`.
 2. Add height ratio config in `default.yaml` under `visualization.style.subplot-height-ratios`.
-3. Create the subplot in `Visualization._make_figure_subplots()`.
-4. For video mode: add strip-painting logic in `VideoVisualization` following the amplitude/spectrogram pattern.
+3. Create the subplot in `Visualization._make_figure_subplots()` in `visualization/base.py`.
+4. For video mode: add strip-painting logic in `VideoVisualization` (`visualization/video.py`) following the amplitude/spectrogram pattern.
 
 **Adding a new config option:**
 1. Add the key with its default value in `default.yaml`. This is the only place defaults should exist.
@@ -208,7 +212,7 @@ analysis:                             # analysis.spectrogram.reassign: True
 
 ## Key Design Decisions
 
-**Direct pixel rendering instead of matplotlib animation:** The `render_frame_direct()` pipeline was built because matplotlib's `FuncAnimation` is far too slow for real-time 30fps playback and produces unnecessarily large video files. The direct pipeline captures the static "chrome" (axes, labels, borders) once, then shifts and paints only the data pixels each frame. This achieves ~10-50x speedup over matplotlib's per-frame redraw.
+**Direct pixel rendering instead of matplotlib animation:** The `render_frame_direct()` pipeline (in `visualization/video.py`) was built because matplotlib's `FuncAnimation` is far too slow for real-time 30fps playback and produces unnecessarily large video files. The direct pipeline captures the static "chrome" (axes, labels, borders) once, then shifts and paints only the data pixels each frame. This achieves ~10-50x speedup over matplotlib's per-frame redraw.
 
 **Flat config dictionary:** YAML is nested for readability, but `es.cfg` is flattened with dot-delimited keys (`visualization.style.amplitude.padding`). This makes config access a simple dict lookup without nested traversal, and allows CLI overrides with a single `key value` syntax.
 
@@ -220,11 +224,11 @@ analysis:                             # analysis.spectrogram.reassign: True
 
 **Triphase as a virtual 3rd channel:** Instead of a separate rendering path, triphase mode (`-(A+B)`) creates a 3-channel `Audio` object. The rest of the pipeline (analysis, visualization) handles it generically through `_channel_layout`, which simply reports 3 channels instead of 2.
 
+**Oscilloscope as a mixin class:** The oscilloscope overlay (`OscilloscopeMixin` in `visualization/oscilloscope.py`) is a mixin rather than a standalone class or utility module because its methods share extensive instance state with `VideoVisualization` — the frame buffer, data regions, amplitude colors, spectrogram times, channel layout, and font state. A standalone approach would require passing 10+ parameters to every function call. The mixin keeps the oscilloscope code cleanly separated (~450 lines) while giving it natural access to the host's instance state.
+
 **Volume ramping in daemon threads:** Abrupt volume changes cause audible clicks. Every volume change (including stop) ramps smoothly over configurable durations using background threads that call `pygame.mixer.Channel.set_volume()` at 20ms intervals. The small 256-sample audio buffer ensures volume changes take effect within ~6ms.
 
 ## Known Limitations / Technical Debt
-
-**`visualization.py` is too large (2300+ lines).** It contains the base `Visualization` class, `VideoVisualization` subclass, the entire direct render pipeline, the oscilloscope overlay system, colormap derivation, axis formatting, and module-level functions. The oscilloscope code alone (~350 lines) and the direct render pipeline (~400 lines) could be extracted into separate modules.
 
 **No automated tests.** The `tests/` directory contains only reference audio files for manual testing. The DSP pipeline (analysis), rendering pipeline (visualization), and config system would benefit from unit tests, especially given the complexity of the reassigned spectrogram and oscilloscope trigger stabilization.
 
