@@ -9,5 +9,4 @@ recursive-include estimpy/config *.yaml
 # Exclude unnecessary directories
 prune assets
 prune export
-prune scripts
 prune tests
