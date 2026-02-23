@@ -7,15 +7,12 @@ name = 'estimpy'
 version = '2.0.0'
 description = 'A package for Estim audio playback and visualization'
 readme = 'README.md'
-license = {text = 'MIT'}
-authors = [
-    {name = 'Psynapse', email = 'psynapse@psynapse.gay'}
-]
+license = 'MIT'
+authors = [{name = 'Psynapse'}]
 classifiers = [
     'Development Status :: 5 - Production/Stable',
     'Environment :: X11 Applications :: Qt',
     'Intended Audience :: End Users/Desktop',
-    'License :: OSI Approved :: MIT License',
     'Operating System :: OS Independent',
     'Programming Language :: Python :: 3',
     'Programming Language :: Python :: 3.11',
@@ -27,10 +24,6 @@ classifiers = [
     'Topic :: Scientific/Engineering :: Visualization',
 ]
 requires-python = '>=3.11'
-
-[project.optional-dependencies]
-dev = ['pytest']
-
 dependencies = [
     'audioop-lts; python_version >= "3.13"',
     'colorama',
@@ -43,14 +36,17 @@ dependencies = [
     'pyqt6',
     'pyyaml',
     'scipy',
-    'tqdm'
+    'tqdm',
 ]
+
+[project.optional-dependencies]
+dev = ['pytest']
 
 [project.urls]
 Homepage = 'https://github.com/PsynApps/estimpy'
 Documentation = 'https://github.com/PsynApps/estimpy/blob/main/README.md'
-Source = 'https://github.com/PsynApps/estimpy'
-Tracker = 'https://github.com/PsynApps/estimpy/issues'
+Repository = 'https://github.com/PsynApps/estimpy'
+Issues = 'https://github.com/PsynApps/estimpy/issues'
 Changelog = 'https://github.com/PsynApps/estimpy/blob/main/CHANGELOG.md'
 Discussions = 'https://github.com/PsynApps/estimpy/discussions'
 PyPI = 'https://pypi.org/project/estimpy/'
@@ -59,7 +55,7 @@ PyPI = 'https://pypi.org/project/estimpy/'
 estimpy = 'estimpy.cli:main'
 
 [tool.setuptools.packages.find]
-exclude = ['assets*', 'export*', 'tests*']
+exclude = ['assets*', 'export*', 'scripts*', 'tests*']
 
 [tool.setuptools.package-data]
 estimpy = ['config/*.yaml']

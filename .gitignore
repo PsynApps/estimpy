@@ -11,6 +11,10 @@ dist/
 .idea/
 .vscode/
 
+# OS-specific files
+.DS_Store
+Thumbs.db
+
 # Development-only directories/files
 .venv/
 /assets/

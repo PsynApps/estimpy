@@ -7,15 +7,7 @@ include LICENSE
 recursive-include estimpy/config *.yaml
 
 # Exclude unnecessary directories
-exclude __pycache__/
-exclude *.pyc
-exclude *.pyo
-exclude *.pyd
-exclude *.egg-info/
-exclude .claude/
-exclude .git/
-exclude .idea/
-exclude .venv/
-exclude tests/*
-exclude assets/*
-exclude export/*
+prune assets
+prune export
+prune scripts
+prune tests
