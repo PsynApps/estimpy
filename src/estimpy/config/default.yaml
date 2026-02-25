@@ -10,10 +10,10 @@ analysis:
       # Minimum number of pulses that must be detected within the lookahead window
       # to activate pulse mode. Higher values reduce false positives from isolated transients.
       count-threshold: 5
-      # Minimum coefficient of variation (std/mean) of 5ms sub-window RMS values required
+      # Minimum coefficient of variation (std/mean) of 2ms sub-window RMS values required
       # to confirm pulsed content. Pulses produce high CV (energy alternates between on/off
       # states) while tonal content with smooth amplitude modulation has low CV.
-      cv-threshold: 1.0
+      cv-threshold: 1.5
       # Display window duration for pulsed content (milliseconds)
       window-length: 500
     # Minimum RMS energy threshold (fraction of full scale) below which flat line is shown

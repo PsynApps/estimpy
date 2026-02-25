@@ -190,8 +190,10 @@ class OscilloscopeMixin:
         if detected_mode != current_mode:
             self._dr_osc_mode[channel_id] = detected_mode
             self._dr_osc_prev_waveform.pop(channel_id, None)
-            # Hold the new mode for one pulse window to prevent rapid toggling
-            self._dr_osc_mode_hold_until[channel_id] = current_time + pulse_window_length
+            # Hold the new mode for the full analysis window length so the detector
+            # sees entirely new data before reconsidering — prevents oscillation when
+            # signals are borderline (e.g., AM-modulated tonal content).
+            self._dr_osc_mode_hold_until[channel_id] = current_time + analysis_length
             return detected_mode
 
         return current_mode
