@@ -54,6 +54,10 @@ class OscilloscopeMixin:
         border_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.font.text.border-color'])
         self._dr_osc_label_border_color = tuple(int(c * 255) for c in border_color_rgb)
         self._dr_osc_label_border_width = max(1, int(round(self._text_border_width * fig.dpi / 72)))
+        self._dr_osc_border_width_px = max(1, int(round(
+            es.cfg['visualization.style.oscilloscope.border-width'] * fig.dpi / 72)))
+        self._dr_osc_line_width_px = max(1, int(round(
+            es.cfg['visualization.style.oscilloscope.line-width'] * fig.dpi / 72)))
 
         # Pre-render duration label images
         self._dr_osc_label_cache = {}
@@ -389,7 +393,7 @@ class OscilloscopeMixin:
         self._dr_frame_buffer[by0:by1, bx0:bx1] = blended.astype(np.uint8)
 
         # Draw border using channel base color at 5x the background opacity
-        border_width = es.cfg['visualization.style.oscilloscope.border-width']
+        border_width = self._dr_osc_border_width_px
         if border_width > 0:
             border_opacity = min(1.0, opacity * 5.0)
             border_rgb = self._dr_amp_peak_rgb[channel_id].astype(np.float32)
@@ -424,7 +428,7 @@ class OscilloscopeMixin:
 
         # Map waveform to pixel coordinates
         line_color = self._dr_amp_peak_rgb[channel_id]
-        line_width = es.cfg['visualization.style.oscilloscope.line-width']
+        line_width = self._dr_osc_line_width_px
         half_lw = max(0, line_width // 2)
         padding_frac = 0.05
 
