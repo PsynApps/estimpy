@@ -45,7 +45,7 @@ class OscilloscopeMixin:
 
         # Oscilloscope duration label font setup
         osc_font_size_pt = es.cfg['visualization.style.oscilloscope.font-size']
-        self._dr_osc_font_size_px = max(1, int(round(osc_font_size_pt * fig.dpi / 72)))
+        self._dr_osc_font_size_px = max(1, int(round(osc_font_size_pt * self._pt_to_px)))
         font_file = es.cfg['visualization.style.font.text.file']
         face_index = es.cfg['visualization.style.font.text.face-index']
         self._dr_osc_font = ImageFont.truetype(font_file, self._dr_osc_font_size_px, index=face_index)
@@ -53,11 +53,11 @@ class OscilloscopeMixin:
         self._dr_osc_label_color = tuple(int(c * 255) for c in axes_color_rgb)
         border_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.font.text.border-color'])
         self._dr_osc_label_border_color = tuple(int(c * 255) for c in border_color_rgb)
-        self._dr_osc_label_border_width = max(1, int(round(self._text_border_width * fig.dpi / 72)))
+        self._dr_osc_label_border_width = max(1, int(round(self._text_border_width * self._pt_to_px)))
         self._dr_osc_border_width_px = max(1, int(round(
-            es.cfg['visualization.style.oscilloscope.border-width'] * fig.dpi / 72)))
+            es.cfg['visualization.style.oscilloscope.border-width'] * self._pt_to_px)))
         self._dr_osc_line_width_px = max(1, int(round(
-            es.cfg['visualization.style.oscilloscope.line-width'] * fig.dpi / 72)))
+            es.cfg['visualization.style.oscilloscope.line-width'] * self._pt_to_px)))
 
         # Pre-render duration label images
         self._dr_osc_label_cache = {}

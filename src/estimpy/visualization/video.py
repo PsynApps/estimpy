@@ -200,6 +200,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         fig = self._handles['figure']
         fig.canvas.draw()
         fig_width, fig_height = fig.canvas.get_width_height()
+        self._pt_to_px = fig.dpi / 72  # points-to-pixels conversion factor
 
         # Identify data subplot keys (only for displayed channels)
         self._dr_data_axes_keys = []
@@ -257,7 +258,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         # --- Position line width ---
         if self._handles['position_lines']:
             lw_pt = self._handles['position_lines'][0].get_linewidth()
-            self._position_line_width_px = max(1, int(round(lw_pt * fig.dpi / 72)))
+            self._position_line_width_px = max(1, int(round(lw_pt * self._pt_to_px)))
         else:
             self._position_line_width_px = 1
 
@@ -269,7 +270,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
         if self._dr_time_enabled and self._handles['time'] is not None:
             time_fontsize_pt = self._handles['time'].get_fontsize()
-            self._dr_time_font_size_px = max(1, int(round(time_fontsize_pt * fig.dpi / 72)))
+            self._dr_time_font_size_px = max(1, int(round(time_fontsize_pt * self._pt_to_px)))
 
             font_file = es.cfg['visualization.style.font.text.file']
             face_index = es.cfg['visualization.style.font.text.face-index']
@@ -280,7 +281,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
             border_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.font.text.border-color'])
             self._dr_time_border_color = tuple(int(c * 255) for c in border_color_rgb)
-            self._dr_time_border_width = max(1, int(round(self._text_border_width * fig.dpi / 72)))
+            self._dr_time_border_width = max(1, int(round(self._text_border_width * self._pt_to_px)))
 
             # Position: bottom-right of figure (matching matplotlib's x=1, y=0, ha='right', va='bottom')
             self._dr_time_position = (fig_width, fig_height)
