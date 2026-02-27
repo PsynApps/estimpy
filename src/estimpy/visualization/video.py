@@ -267,6 +267,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
         # --- Time text rendering setup ---
         self._dr_time_enabled = self._time_enabled()
+        self._dr_time_position_top = (self._time_position() == 'top')
 
         if self._dr_time_enabled and self._handles['time'] is not None:
             time_fontsize_pt = self._handles['time'].get_fontsize()
@@ -282,9 +283,6 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             border_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.font.text.border-color'])
             self._dr_time_border_color = tuple(int(c * 255) for c in border_color_rgb)
             self._dr_time_border_width = max(1, int(round(self._text_border_width * self._pt_to_px)))
-
-            # Position: bottom-right of figure (matching matplotlib's x=1, y=0, ha='right', va='bottom')
-            self._dr_time_position = (fig_width, fig_height)
 
         # --- Pre-compute axis overlay masks for data regions (for efficient compositing) ---
         self._axis_overlay_masks = {}
@@ -756,7 +754,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             th, tw = text_img.shape[:2]
             margin = max(2, self._dr_time_font_size_px // 8)
             tx = self._dr_fig_width - tw - margin
-            ty = self._dr_fig_height - th - margin
+            ty = margin if self._dr_time_position_top else self._dr_fig_height - th - margin
             tx = max(0, tx)
             ty = max(0, ty)
             tx_end = min(self._dr_fig_width, tx + tw)
@@ -808,7 +806,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         th, tw = text_img.shape[:2]
         margin = max(2, self._dr_time_font_size_px // 8)
         tx = self._dr_fig_width - tw - margin
-        ty = self._dr_fig_height - th - margin
+        ty = margin if self._dr_time_position_top else self._dr_fig_height - th - margin
 
         tx = max(0, tx)
         ty = max(0, ty)
@@ -969,6 +967,10 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
     @classmethod
     def _time_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:
         return es.cfg['visualization.video.export.time.enabled']
+
+    @classmethod
+    def _time_position(cls) -> str:
+        return es.cfg['visualization.video.export.time.position']
 
     @classmethod
     def _title_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:

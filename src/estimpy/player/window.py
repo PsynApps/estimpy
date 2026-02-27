@@ -212,6 +212,7 @@ class PlayerWindow(QMainWindow):
 
         # Override to use display settings (not export)
         self._visualization._time_enabled = lambda mode=None: es.cfg['visualization.video.display.time.enabled']
+        self._visualization._time_position = lambda: es.cfg['visualization.video.display.time.position']
         self._visualization._title_enabled = lambda mode=None: es.cfg['visualization.video.display.title.enabled']
         self._visualization._window_length = es.cfg['visualization.video.display.window-length']
         self._visualization._fps = self._fps

@@ -178,13 +178,13 @@ visualization:
     # Configuration for the oscilloscope waveform overlay
     oscilloscope:
       # Border width in pixels
-      border-width: 5
+      border-width: 10
       # Font size for the duration label
       font-size: 12
       # Height of box as fraction of combined amplitude+spectrogram panel height
       height-ratio: 0.5
       # Line width for the waveform in pixels
-      line-width: 10
+      line-width: 15
       # Background opacity (0.0 = fully transparent, 1.0 = fully opaque)
       opacity: 0.95
       # Width of box as fraction of panel width
@@ -259,6 +259,7 @@ visualization:
       # Configuration for the time display
       time:
         enabled: False
+        position: top
       # Configuration for the title panel
       title:
         enabled: False
@@ -304,6 +305,7 @@ visualization:
       # Configuration for the time display
       time:
         enabled: True
+        position: top
       # Configuration for the title panel for videos
       title:
         enabled: False
