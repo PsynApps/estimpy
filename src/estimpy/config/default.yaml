@@ -90,6 +90,7 @@ visualization:
       # Configuration for the time display
       time:
         enabled: True
+        position: bottom
       # Configuration for the title panel
       title:
         enabled: False
@@ -102,6 +103,7 @@ visualization:
       # Configuration for the time display
       time:
         enabled: True
+        position: bottom
       # Configuration for the title panel
       title:
         enabled: True

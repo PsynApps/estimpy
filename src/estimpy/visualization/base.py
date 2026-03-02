@@ -250,9 +250,11 @@ class Visualization:
             return
 
         time_string = self._get_time_text() if self._time_enabled(mode=self._mode) else ''
+        position_top = (self._time_position(mode=self._mode) == 'top')
         # Add the time text to the figure
         self._handles['time'] = self._handles['figure'].text(
-            x=1, y=0, s=time_string, ha='right', va='bottom',
+            x=1, y=1 if position_top else 0, s=time_string,
+            ha='right', va='top' if position_top else 'bottom',
             fontsize=es.cfg['visualization.style.time.font-size'],
             fontproperties=es.cfg['visualization.style.font.text.mpl-fontproperties'],
             color=es.cfg['visualization.style.axes.color'])
@@ -506,6 +508,11 @@ class Visualization:
             es.cfg['visualization.image.display.time.enabled']
 
     @classmethod
+    def _time_position(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> str:
+        return es.cfg['visualization.image.export.time.position'] if mode is VisualizationMode.EXPORT else \
+            es.cfg['visualization.image.display.time.position']
+
+    @classmethod
     def _title_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:
         return es.cfg['visualization.image.export.title.enabled'] if mode is VisualizationMode.EXPORT else \
             es.cfg['visualization.image.display.title.enabled']
@@ -514,9 +521,8 @@ class Visualization:
 def show_image(es_audio: es.audio.Audio):
     set_optimal_nfft(es_audio, figure_height=es.cfg['visualization.image.display.height'],
                      title_enabled=es.cfg['visualization.image.display.title.enabled'])
-    spinner = es.utils.Spinner(f'Preparing image visualization... ')
-    visualization = Visualization(es_audio=es_audio)
-    spinner.stop()
+    with es.utils.Spinner(f'Preparing image visualization... '):
+        visualization = Visualization(es_audio=es_audio)
 
     visualization.show_figure()
 

@@ -969,7 +969,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         return es.cfg['visualization.video.export.time.enabled']
 
     @classmethod
-    def _time_position(cls) -> str:
+    def _time_position(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> str:
         return es.cfg['visualization.video.export.time.position']
 
     @classmethod

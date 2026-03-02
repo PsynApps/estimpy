@@ -206,43 +206,40 @@ class PlayerWindow(QMainWindow):
             title_enabled=es.cfg['visualization.video.display.title.enabled'],
             include_scrub=True)
 
-        spinner = es.utils.Spinner('Preparing player visualization... ')
+        with es.utils.Spinner('Preparing player visualization... '):
+            self._visualization = es.visualization.VideoVisualization(es_audio=es_audio)
 
-        self._visualization = es.visualization.VideoVisualization(es_audio=es_audio)
+            # Override to use display settings (not export)
+            self._visualization._time_enabled = lambda mode=None: es.cfg['visualization.video.display.time.enabled']
+            self._visualization._time_position = lambda mode=None: es.cfg['visualization.video.display.time.position']
+            self._visualization._title_enabled = lambda mode=None: es.cfg['visualization.video.display.title.enabled']
+            self._visualization._window_length = es.cfg['visualization.video.display.window-length']
+            self._visualization._fps = self._fps
+            self._visualization._frames = range(self._total_frames)
 
-        # Override to use display settings (not export)
-        self._visualization._time_enabled = lambda mode=None: es.cfg['visualization.video.display.time.enabled']
-        self._visualization._time_position = lambda: es.cfg['visualization.video.display.time.position']
-        self._visualization._title_enabled = lambda mode=None: es.cfg['visualization.video.display.title.enabled']
-        self._visualization._window_length = es.cfg['visualization.video.display.window-length']
-        self._visualization._fps = self._fps
-        self._visualization._frames = range(self._total_frames)
+            # Create matplotlib figure for chrome capture (skip initial frame rendering
+            # since prepare_direct_render will paint frames on-demand, avoiding the
+            # expensive full-spectrogram colormap allocation that make_frame(0) triggers)
+            self._visualization.make_figure(skip_initial_frame=True)
 
-        # Create matplotlib figure for chrome capture (skip initial frame rendering
-        # since prepare_direct_render will paint frames on-demand, avoiding the
-        # expensive full-spectrogram colormap allocation that make_frame(0) triggers)
-        self._visualization.make_figure(skip_initial_frame=True)
+            # Render at physical pixel resolution to avoid blurry text on HiDPI/Retina displays
+            width = int(es.cfg['visualization.video.display.width'] * self._device_pixel_ratio)
+            height = int(es.cfg['visualization.video.display.height'] * self._device_pixel_ratio)
+            self._visualization.resize_figure(width=width, height=height)
 
-        # Render at physical pixel resolution to avoid blurry text on HiDPI/Retina displays
-        width = int(es.cfg['visualization.video.display.width'] * self._device_pixel_ratio)
-        height = int(es.cfg['visualization.video.display.height'] * self._device_pixel_ratio)
-        self._visualization.resize_figure(width=width, height=height)
+            # One-time setup: capture chrome, axis overlays, initialize shift-and-paint state
+            self._visualization.prepare_direct_render()
+            self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
+            # Restore manual oscilloscope duration if set
+            if hasattr(self, '_osc_auto'):
+                self._visualization._osc_manual_duration = (
+                    None if self._osc_auto
+                    else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
 
-        # One-time setup: capture chrome, axis overlays, initialize shift-and-paint state
-        self._visualization.prepare_direct_render()
-        self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
-        # Restore manual oscilloscope duration if set
-        if hasattr(self, '_osc_auto'):
-            self._visualization._osc_manual_duration = (
-                None if self._osc_auto
-                else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
-
-        # Hide the matplotlib figure window (frames are displayed in the Qt widget)
-        fig = self._visualization._handles['figure']
-        if fig and fig.canvas and fig.canvas.manager:
-            fig.canvas.manager.window.hide()
-
-        spinner.stop()
+            # Hide the matplotlib figure window (frames are displayed in the Qt widget)
+            fig = self._visualization._handles['figure']
+            if fig and fig.canvas and fig.canvas.manager:
+                fig.canvas.manager.window.hide()
 
     def _get_viz_audio(self):
         """Get the audio for visualization (always 3-channel for stereo to enable instant triphase toggle)."""

@@ -200,9 +200,8 @@ def _get_files(args):
 
 def _load_audio(file, triphase=False):
     """Load an audio file and optionally apply triphase transformation."""
-    spinner = es.utils.Spinner(f'Loading file {file}... ')
-    es_audio = es.audio.Audio(file=file)
-    spinner.stop()
+    with es.utils.Spinner(f'Loading file {file}... '):
+        es_audio = es.audio.Audio(file=file)
 
     if triphase and es_audio.channels == 2:
         es_audio = es_audio.with_triphase()

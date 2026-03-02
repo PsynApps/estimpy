@@ -16,6 +16,16 @@ _temp_files = []
 
 
 class Spinner:
+    """Terminal spinner that shows a rotating character alongside a message.
+
+    Can be used as a context manager to guarantee cleanup on exceptions::
+
+        with Spinner('Loading... ') as s:
+            do_work()
+    """
+
+    _CLEAR_LINE = '\033[2K\r'
+
     def __init__(self, message: str = '', autostart: bool = True, rate: float = 0.1):
         """
         Initialize the spinner.
@@ -32,11 +42,18 @@ class Spinner:
         if autostart:
             self.start()
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop()
+        return False
+
     def start(self):
         """Start the spinner in a separate thread."""
         def run_spinner():
             while self.running.is_set():
-                sys.stdout.write(f"\r{self.message}{next(self.spinner)}")  # Overwrite the line
+                sys.stdout.write(f"{self._CLEAR_LINE}{self.message}{next(self.spinner)}")
                 sys.stdout.flush()
                 time.sleep(self.rate)
 
@@ -50,7 +67,7 @@ class Spinner:
         if self.running.is_set():
             self.running.clear()
             self.thread.join()
-            sys.stdout.write(f"\r{self.message}{stop_message} \n")  # Clear spinner character
+            sys.stdout.write(f"{self._CLEAR_LINE}{self.message}{stop_message}\n")
             sys.stdout.flush()
 
 

@@ -364,9 +364,8 @@ def write_metadata(es_audio, image_file: str = None):
     image_data = open(image_file, 'rb').read()
     es_audio.metadata.image = image_data
 
-    spinner = es.utils.Spinner(f'Writing metadata... ')
-    es_audio.metadata.save()
-    spinner.stop()
+    with es.utils.Spinner(f'Writing metadata... '):
+        es_audio.metadata.save()
 
     es.utils.delete_temp_files()
 

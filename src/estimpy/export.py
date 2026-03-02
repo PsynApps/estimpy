@@ -38,15 +38,13 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
     es.visualization.set_optimal_nfft(es_audio, figure_height=height,
                                       title_enabled=es.cfg['visualization.image.export.title.enabled'])
 
-    spinner = es.utils.Spinner(f'Preparing image visualization... ')
-    visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
-    visualization.make_figure()
-    visualization.resize_figure(width=width, height=height, dpi=_DPI)
-    spinner.stop()
+    with es.utils.Spinner(f'Preparing image visualization... '):
+        visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
+        visualization.make_figure()
+        visualization.resize_figure(width=width, height=height, dpi=_DPI)
 
-    spinner = es.utils.Spinner(f'Saving image file... ')
-    matplotlib.pyplot.savefig(image_file, dpi=_DPI, pil_kwargs={'optimize': True})
-    spinner.stop()
+    with es.utils.Spinner(f'Saving image file... '):
+        matplotlib.pyplot.savefig(image_file, dpi=_DPI, pil_kwargs={'optimize': True})
 
     print('Done!')
 
@@ -232,17 +230,15 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             # Define the segment number and label to use for the progress bar
             segment_label = f'Segment {video_segment_number}/{numeric_segments_total}'
 
-        spinner = es.utils.Spinner(f'Preparing video visualization for {segment_label.lower()}... ')
+        with es.utils.Spinner(f'Preparing video visualization for {segment_label.lower()}... '):
+            visualization = es.visualization.VideoVisualization(
+                es_audio=es_audio,
+                fps=fps,
+                frames=range(segment_frame_start, segment_frame_start + frame_count))
 
-        visualization = es.visualization.VideoVisualization(
-            es_audio=es_audio,
-            fps=fps,
-            frames=range(segment_frame_start, segment_frame_start + frame_count))
-
-        visualization.make_figure()
-        visualization.resize_figure(width=width, height=height, dpi=_DPI)
-        visualization.prepare_direct_render(profiling=profiling)
-        spinner.stop()
+            visualization.make_figure()
+            visualization.resize_figure(width=width, height=height, dpi=_DPI)
+            visualization.prepare_direct_render(profiling=profiling)
 
         # Get temporary file name to use during encoding
         # This is necessary to ensure proper handling of resuming if encoding is stopped or crashes
