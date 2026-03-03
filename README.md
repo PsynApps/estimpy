@@ -338,7 +338,7 @@ For reference, the default configuration options and values are as follows:
 | Configuration Option                                         | Value                                        |
 |--------------------------------------------------------------|----------------------------------------------|
 | analysis.oscilloscope.pulse-detection.count-threshold        | 5                                            |
-| analysis.oscilloscope.pulse-detection.cv-threshold           | 1.0                                          |
+| analysis.oscilloscope.pulse-detection.cv-threshold           | 1.5                                          |
 | analysis.oscilloscope.pulse-detection.enabled                | True                                         |
 | analysis.oscilloscope.pulse-detection.window-length          | 500                                          |
 | analysis.oscilloscope.silence-threshold                      | 0.01                                         |
@@ -372,10 +372,12 @@ For reference, the default configuration options and values are as follows:
 | visualization.triphase                                       | False                                        |
 | visualization.image.display.size                             | 1080x1080                                    |
 | visualization.image.display.time.enabled                     | True                                         |
+| visualization.image.display.time.position                    | bottom                                       |
 | visualization.image.display.title.enabled                    | False                                        |
 | visualization.image.export.format                            | png                                          |
 | visualization.image.export.size                              | 1080x1080                                    |
 | visualization.image.export.time.enabled                      | True                                         |
+| visualization.image.export.time.position                     | bottom                                       |
 | visualization.image.export.title.enabled                     | True                                         |
 | visualization.style.amplitude.channels.ch0.background-color  | None                                         |
 | visualization.style.amplitude.channels.ch0.base-color        | #4799e8                                      |
@@ -401,10 +403,10 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.font.text.border-width                   | 1                                            |
 | visualization.style.font.text.family                         | Helvetica Neue, Helvetica, Arial, sans-serif |
 | visualization.style.font.text.weight                         | bold                                         |
-| visualization.style.oscilloscope.border-width                | 5                                            |
+| visualization.style.oscilloscope.border-width                | 10                                           |
 | visualization.style.oscilloscope.font-size                   | 12                                           |
 | visualization.style.oscilloscope.height-ratio                | 0.5                                          |
-| visualization.style.oscilloscope.line-width                  | 10                                           |
+| visualization.style.oscilloscope.line-width                  | 15                                           |
 | visualization.style.oscilloscope.opacity                     | 0.95                                         |
 | visualization.style.oscilloscope.width-ratio                 | 0.25                                         |
 | visualization.style.spectrogram.color-map                    | jet                                          |
@@ -432,6 +434,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.display.oscilloscope.enabled             | True                                         |
 | visualization.video.display.size                             | 1920x1080                                    |
 | visualization.video.display.time.enabled                     | False                                        |
+| visualization.video.display.time.position                    | top                                          |
 | visualization.video.display.title.enabled                    | False                                        |
 | visualization.video.display.window-length                    | 20                                           |
 | visualization.video.export.codec                             | libx265                                      |
@@ -454,6 +457,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.export.segment-length                    | 3600                                         |
 | visualization.video.export.size                              | 1920x1080                                    |
 | visualization.video.export.time.enabled                      | True                                         |
+| visualization.video.export.time.position                     | top                                          |
 | visualization.video.export.title.enabled                     | False                                        |
 | visualization.video.export.video-length-max                  | None                                         |
 | visualization.video.export.window-length                     | 20                                           |

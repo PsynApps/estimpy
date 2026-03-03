@@ -52,16 +52,6 @@ def get_current_volume(channel: int) -> float:
     return _volumes[channel]
 
 
-def get_volume(channel: int) -> float:
-    """Return the current volume (0-100) for a channel, reflecting any in-progress ramp."""
-    return _volumes[channel]
-
-
-def get_volumes() -> typing.List[float]:
-    """Return a copy of all channel volumes."""
-    return _volumes.copy()
-
-
 def initialize() -> None:
     """Initialize volume and thread-time arrays for the maximum channel count."""
     global _volumes, _volume_thread_times
