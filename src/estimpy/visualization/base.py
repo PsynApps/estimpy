@@ -15,7 +15,8 @@ import matplotlib.patheffects
 import matplotlib.pyplot
 import numpy as np
 
-_DPI = 100
+# DPI for interactive display — high enough for accurate font rendering at screen resolution
+_DISPLAY_DPI = 100
 
 
 class AxisScaleText(enum.Enum):
@@ -150,9 +151,9 @@ class Visualization:
 
         # Use hardcoded size and dpi to ensure relative scaling of fonts, lines, ticks, etc. is correct
         self._handles['figure'] = matplotlib.pyplot.figure(num=1, clear=True)
-        self._handles['figure'].set_dpi(_DPI)
-        self._handles['figure'].set_size_inches(es.cfg['visualization.image.display.width'] / _DPI,
-                                                es.cfg['visualization.image.display.height'] / _DPI)
+        self._handles['figure'].set_dpi(_DISPLAY_DPI)
+        self._handles['figure'].set_size_inches(es.cfg['visualization.image.display.width'] / _DISPLAY_DPI,
+                                                es.cfg['visualization.image.display.height'] / _DISPLAY_DPI)
 
         self._handles['figure'].canvas.manager.window.setWindowTitle(self.es_audio.get_string())
         self._make_figure_subplots()

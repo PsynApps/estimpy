@@ -9,7 +9,9 @@ import tqdm
 
 import estimpy as es
 
-_DPI = 8
+# Low DPI for export — figures are created at this DPI then resized to exact pixel dimensions,
+# keeping matplotlib element proportions (fonts, lines, ticks) correct via the scale factor
+_EXPORT_DPI = 8
 
 
 def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format: str = None,
@@ -41,10 +43,10 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
     with es.utils.Spinner(f'Preparing image visualization... '):
         visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
         visualization.make_figure()
-        visualization.resize_figure(width=width, height=height, dpi=_DPI)
+        visualization.resize_figure(width=width, height=height, dpi=_EXPORT_DPI)
 
     with es.utils.Spinner(f'Saving image file... '):
-        matplotlib.pyplot.savefig(image_file, dpi=_DPI, pil_kwargs={'optimize': True})
+        matplotlib.pyplot.savefig(image_file, dpi=_EXPORT_DPI, pil_kwargs={'optimize': True})
 
     print('Done!')
 
@@ -186,8 +188,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     # Create animation
     for video_segment_id in video_segment_ids:
-        #segment_time_start = time.time()
-
         if video_segment_id == 'preview':
             print(f'Creating video preview image...')
 
@@ -237,7 +237,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 frames=range(segment_frame_start, segment_frame_start + frame_count))
 
             visualization.make_figure()
-            visualization.resize_figure(width=width, height=height, dpi=_DPI)
+            visualization.resize_figure(width=width, height=height, dpi=_EXPORT_DPI)
             visualization.prepare_direct_render(profiling=profiling)
 
         # Get temporary file name to use during encoding
@@ -354,9 +354,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 video_file_temp_with_preview
             ]
 
-            # Debug print for constructed command
-            #print("FFmpeg command:", ' '.join(ffmpeg_command))
-
             # Add the preview image using ffmpeg
             subprocess.run(ffmpeg_command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -419,9 +416,6 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     ]
 
     print(f'Combining segments into final video file.')
-
-    # Debug print for constructed command
-    #print('FFmpeg command:', ' '.join(ffmpeg_command))
 
     subprocess.run(ffmpeg_command, check=True)
 

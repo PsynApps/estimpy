@@ -223,8 +223,7 @@ class MetadataFormat(abc.ABC):
                 if file_tag_field in file_tags and file_tags[file_tag_field][0]:
                     tags[tag] = file_tags[file_tag_field][0]
             except Exception:
-                # There are weird bugs that can happen when trying to access tag fields,
-                # so if any one tag doesn't read properly, just skip it.
+                # Mutagen can raise on malformed tag fields; skip unreadable tags
                 pass
 
         image = cls._get_metadata_image(file_tags)

@@ -964,6 +964,11 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         else:
             self._handles['time'].set_text('')
 
+    # --- Display/export mode classmethods ---
+    # These return export-path config by default. The player overrides them
+    # on the instance with lambdas that read display-path config instead
+    # (see player/window.py _init_visualization).
+
     @classmethod
     def _time_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:
         return es.cfg['visualization.video.export.time.enabled']

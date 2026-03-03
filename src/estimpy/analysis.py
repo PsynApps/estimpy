@@ -17,6 +17,17 @@ class EnvelopeModes(enum.StrEnum):
 
 
 class Envelope:
+    """Amplitude envelope of an audio signal, computed via sliding windows.
+
+    :param es_audio: Audio source to analyze.
+    :param mode: Envelope type — peak (max absolute value) or RMS per window.
+    :param start: Start sample index.
+    :param end: End sample index (defaults to full length).
+    :param padding: Number of zero-value samples to prepend and append.
+    :param window_size: Samples per window (defaults to ``analysis.window-size`` config).
+    :param step_size: Hop size between windows (defaults to ``analysis.window-overlap`` config).
+    """
+
     def __init__(self, es_audio: es.audio.Audio, mode: EnvelopeModes = EnvelopeModes.PEAK,
                  start: int = 0, end: int = None, padding: int = 0, window_size: int = None, step_size: int = None):
         self._mode = mode
@@ -96,11 +107,17 @@ class SpectrogramScaling(enum.StrEnum):
     DB = 'db'
 
 class Spectrogram:
+    """Spectrogram of an audio signal with optional reassignment.
+
+    Resamples audio if the max frequency is below Nyquist to reduce computation.
+    Automatically detects max frequency from content if not configured.
+    """
+
     def __init__(self, es_audio: es.audio.Audio, frequency_min: int = None, frequency_max: int = None):
         """
-        :param es_audio:
-        :param frequency_min:
-        :param frequency_max:
+        :param es_audio: Audio source to analyze.
+        :param frequency_min: Low frequency cutoff in Hz (defaults to config).
+        :param frequency_max: High frequency cutoff in Hz (defaults to config, or auto-detected).
         """
         audio_data = es_audio.data
         sample_rate = es_audio.sample_rate
@@ -181,18 +198,19 @@ class Spectrogram:
                                   scaling: SpectrogramScaling = SpectrogramScaling.DB,
                                   reassign: bool = None) -> \
                                       typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        :param audio_data:
-        :param sample_rate:
-        :param window_function:
-        :param window_size:
-        :param window_overlap:
-        :param nfft:
-        :param frequency_min:
-        :param frequency_max:
-        :param scaling:
-        :param reassign:
-        :return:
+        """Compute a spectrogram (standard or reassigned) from raw audio data.
+
+        :param audio_data: Array of shape (channels, samples).
+        :param sample_rate: Sample rate in Hz.
+        :param window_function: Window function name for scipy.signal (defaults to config).
+        :param window_size: Samples per STFT window (defaults to config).
+        :param window_overlap: Overlap in samples between consecutive windows (defaults to config).
+        :param nfft: FFT size, scaled proportionally with window_size (defaults to config).
+        :param frequency_min: Low frequency cutoff in Hz (defaults to config).
+        :param frequency_max: High frequency cutoff in Hz (defaults to config or Nyquist).
+        :param scaling: Output scaling — dB (log) or linear.
+        :param reassign: Use reassigned spectrogram algorithm (defaults to config).
+        :return: Tuple of (frequencies, times, spectrogram_data).
         """
         frequencies = None
         times = None

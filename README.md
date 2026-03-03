@@ -361,7 +361,7 @@ For reference, the default configuration options and values are as follows:
 | metadata.default-genre                                       | Estim                                        |
 | metadata.file-path-pattern                                   | (?P<artist>[^\\\/]*?) - (?P<title>.*)        |
 | player.autoplay                                              | False                                        |
-| player.disable-spectrogram-reassign                          | True                                         |
+| player.spectrogram-reassign                                  | False                                        |
 | player.repeat                                                | none                                         |
 | player.skip-length                                           | 60                                           |
 | player.video-render-latency                                  | 0.5                                          |

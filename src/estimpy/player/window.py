@@ -198,7 +198,7 @@ class PlayerWindow(QMainWindow):
 
         # Apply player-specific spectrogram optimizations before creating the
         # visualization (which triggers spectrogram computation)
-        if es.cfg['player.disable-spectrogram-reassign']:
+        if not es.cfg['player.spectrogram-reassign']:
             es.cfg['analysis.spectrogram.reassign'] = False
 
         es.visualization.set_optimal_nfft(
@@ -230,11 +230,9 @@ class PlayerWindow(QMainWindow):
             # One-time setup: capture chrome, axis overlays, initialize shift-and-paint state
             self._visualization.prepare_direct_render()
             self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
-            # Restore manual oscilloscope duration if set
-            if hasattr(self, '_osc_auto'):
-                self._visualization._osc_manual_duration = (
-                    None if self._osc_auto
-                    else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
+            self._visualization._osc_manual_duration = (
+                None if self._osc_auto
+                else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
 
             # Hide the matplotlib figure window (frames are displayed in the Qt widget)
             fig = self._visualization._handles['figure']
@@ -755,11 +753,9 @@ class PlayerWindow(QMainWindow):
 
         self._visualization.prepare_direct_render()
         self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
-        # Restore manual oscilloscope duration if set
-        if hasattr(self, '_osc_auto'):
-            self._visualization._osc_manual_duration = (
-                None if self._osc_auto
-                else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
+        self._visualization._osc_manual_duration = (
+            None if self._osc_auto
+            else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
 
         fig = self._visualization._handles['figure']
         if fig and fig.canvas and fig.canvas.manager:

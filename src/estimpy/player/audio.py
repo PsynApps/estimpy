@@ -1,3 +1,13 @@
+"""Low-level audio playback via pygame-ce's SDL2 mixer.
+
+Provides module-level functions for loading, playing, stopping, and volume
+control of audio channels. Uses daemon threads for smooth volume ramping.
+Per-channel stereo panning is handled by routing each logical channel to a
+separate pygame Channel with left/right volume set accordingly.
+
+Note: module-level globals preclude multiple simultaneous players, which is
+acceptable since the application is single-player by design.
+"""
 import os
 import threading
 import time
@@ -25,6 +35,7 @@ _es_audio = None  # type: es.audio.Audio | None
 
 
 def get_time() -> float:
+    """Return the current playback position in seconds, accounting for looping."""
     global _audio_time, _clock_time
 
     if is_playing():
@@ -42,14 +53,17 @@ def get_current_volume(channel: int) -> float:
 
 
 def get_volume(channel: int) -> float:
+    """Return the current volume (0-100) for a channel, reflecting any in-progress ramp."""
     return _volumes[channel]
 
 
 def get_volumes() -> typing.List[float]:
+    """Return a copy of all channel volumes."""
     return _volumes.copy()
 
 
 def initialize() -> None:
+    """Initialize volume and thread-time arrays for the maximum channel count."""
     global _volumes, _volume_thread_times
 
     max_channels = 2
@@ -59,6 +73,7 @@ def initialize() -> None:
 
 
 def is_paused() -> bool:
+    """Return True if playback was started and then stopped (paused state)."""
     return not _is_playing and _clock_time > 0
 
 
@@ -72,6 +87,7 @@ def is_playing() -> bool:
 
 
 def load(es_audio: es.audio.Audio):
+    """Set the audio source for subsequent play() calls. Initializes on first call."""
     global _es_audio, _initialized
 
     if not _initialized:
@@ -82,6 +98,12 @@ def load(es_audio: es.audio.Audio):
 
 
 def play(audio_time: float = 0, target_volumes: typing.List[float] = None):
+    """Start playback from the given position with a smooth volume ramp-in.
+
+    :param audio_time: Position in seconds to start from.
+    :param target_volumes: Per-channel target volumes (0-100) for the ramp-in.
+        If None, uses the current ``_volumes`` values.
+    """
     global _is_playing, _audio_time, _clock_time, _channels, _volumes
 
     if _is_playing:
@@ -134,6 +156,13 @@ def play(audio_time: float = 0, target_volumes: typing.List[float] = None):
 
 
 def ramp_volume(volume_end: float, volume_start: float = None, channel: int = None, ramp_length: float = None):
+    """Smoothly ramp a channel's volume in a daemon thread.
+
+    :param volume_end: Target volume (0-100).
+    :param volume_start: Starting volume (defaults to current channel volume).
+    :param channel: Channel index, or None to ramp all channels.
+    :param ramp_length: Duration in seconds (auto-calculated from volume delta if None).
+    """
     global _channels, _volumes, _volume_thread_times
 
     if channel is None:
@@ -189,6 +218,7 @@ def ramp_volume(volume_end: float, volume_start: float = None, channel: int = No
 
 
 def set_volume(volume: float = None, channel: int = None):
+    """Set volume for a channel with an appropriate ramp (short for decrease, longer for increase)."""
     global _channels, _volumes, _volume_thread_times
 
     if channel is None:
@@ -207,6 +237,7 @@ def set_volume(volume: float = None, channel: int = None):
 
 
 def stop():
+    """Stop playback with a synchronous fade-to-zero to prevent audio pops."""
     global _is_playing, _audio_time, _clock_time
 
     if not _is_playing:
@@ -254,6 +285,7 @@ def stop():
 
 
 def toggle_playing():
+    """Toggle between playing and stopped states."""
     if _is_playing:
         stop()
     else:
@@ -271,6 +303,10 @@ def _get_repeat_mode() -> str:
 
 
 def _set_channel_volume_unsafe(volume: float = None, channel: int = None):
+    """Set a pygame channel's stereo volume directly, with no ramp or thread safety.
+
+    Called from ramp threads. No-op if playback has stopped or channel is invalid.
+    """
     global _channels
 
     if _is_playing and _channels and -len(_channels) <= channel < len(_channels):

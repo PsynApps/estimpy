@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from estimpy.audio import Audio, resample_audio_data
-from tests.conftest import TEST_MP3, SAMPLE_RATE, DURATION, N_SAMPLES
+from conftest import TEST_MP3, SAMPLE_RATE, DURATION, N_SAMPLES
 
 
 class TestAudioFromNumpy:

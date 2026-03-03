@@ -14,7 +14,7 @@ from estimpy.analysis import (
     peak_envelope,
     rms_envelope,
 )
-from tests.conftest import SAMPLE_RATE, N_SAMPLES
+from conftest import SAMPLE_RATE, N_SAMPLES
 
 
 class TestEnvelope:

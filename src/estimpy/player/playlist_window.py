@@ -22,7 +22,7 @@ def _get_display_name(file_path):
                 return f'{meta.artist} - {meta.title}'
             return meta.title
     except Exception:
-        pass
+        pass  # Fall through to filename-based display
 
     return os.path.splitext(os.path.basename(file_path))[0]
 

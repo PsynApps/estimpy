@@ -3,7 +3,7 @@ import pytest
 
 from estimpy.audio import Audio
 from estimpy.metadata import Metadata
-from tests.conftest import TEST_MP3, SAMPLE_RATE
+from conftest import TEST_MP3, SAMPLE_RATE
 
 
 class TestAudioFromFile:

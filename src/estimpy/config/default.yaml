@@ -61,9 +61,9 @@ metadata:
 player:
   # Start playback immediately
   autoplay: False
-  # Disable reassigned spectrogram for the player to speed up loading.
-  # Falls back to the standard spectrogram which is significantly faster to compute.
-  disable-spectrogram-reassign: True
+  # Use reassigned spectrogram in the player. Disabling falls back to the standard
+  # spectrogram which is significantly faster to compute.
+  spectrogram-reassign: False
   # Repeat mode: none (play through playlist and stop), one (loop current file), all (loop playlist)
   repeat: none
   # Amount of time to skip (in seconds)

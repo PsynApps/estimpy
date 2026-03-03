@@ -21,7 +21,7 @@
 - Triphase subplot height ratios (`visualization.style.subplot-height-ratios.amplitude.triphase`, `visualization.style.subplot-height-ratios.spectrogram.triphase`)
 - Pillow added as a package dependency
 - Configuration profiles for HEVC and ProRes VideoToolbox hardware encoding, and iPod Touch player
-- Configurable reassignment bypass for the player (`player.disable-spectrogram-reassign`, default True) to speed up loading by using the standard spectrogram
+- Configurable reassignment bypass for the player (`player.spectrogram-reassign`, default False) to speed up loading by using the standard spectrogram
 - Resolution-aware FFT sizing for all visualization modes (player, image, and video export), using coarse frequency pre-analysis (~20 FFTs) and output panel dimensions to determine the optimal FFT size
 - Oscilloscope waveform overlay for video display and export, showing trigger-stabilized raw audio waveform per channel with automatic pulse detection that switches window length between tonal and pulsed content using coefficient of variation analysis (`visualization.video.display.oscilloscope.enabled`, `visualization.video.export.oscilloscope.enabled`, `analysis.oscilloscope.pulse-detection.*`)
 - Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)

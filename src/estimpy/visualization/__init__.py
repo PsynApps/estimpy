@@ -192,6 +192,27 @@ def _parse_resolution(resolution) -> typing.Tuple[int, int]:
 
 
 def _on_config_updated():
+    """Recompute derived config values from primary config keys.
+
+    Derived keys injected into es.cfg (not present in default.yaml):
+        Resolution parsing (from *.size strings):
+            visualization.image.display.width / .height
+            visualization.image.export.width / .height
+            visualization.video.display.width / .height
+            visualization.video.export.width / .height
+        Font resolution:
+            visualization.style.font.text.properties      (FontProperties)
+            visualization.style.font.text.mpl-fontproperties (FontProperties, TTC-safe)
+            visualization.style.font.text.file             (resolved font file path)
+            visualization.style.font.text.face-index       (TTC face index)
+            visualization.style.font.symbols.properties    (FontProperties)
+            visualization.style.font.symbols.file          (resolved font file path)
+        Layout:
+            visualization.style.title.max-width            (pixels, from width-factor-max)
+        Channel styling (list of dicts, resolved from per-channel keys):
+            visualization.style.amplitude.channels         (base-color, rms-color, background-color)
+            visualization.style.spectrogram.channels       (color-map, possibly derived)
+    """
     # Display sizes
     es.cfg['visualization.image.display.width'], es.cfg['visualization.image.display.height'] = _parse_resolution(
         es.cfg['visualization.image.display.size'])
