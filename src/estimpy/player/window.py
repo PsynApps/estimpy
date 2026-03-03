@@ -159,21 +159,20 @@ class PlayerWindow(QMainWindow):
         self._full_screen = False
         self._playlist_window = None
 
+        # Initialize oscilloscope duration controls (before _init_visualization which reads them)
+        self._osc_auto = True
+        default_tone = es.cfg['analysis.oscilloscope.window-length']
+        self._osc_duration_index = 0
+        for i, d in enumerate(OSC_DURATIONS):
+            if d <= default_tone:
+                self._osc_duration_index = i
+
         # Initialize visualization and direct render pipeline
         self._visualization = None
         self._init_visualization(self._get_viz_audio())
 
         # Initialize zoom
         self._init_zoom_levels(es_audio.length)
-
-        # Initialize oscilloscope duration controls
-        self._osc_auto = True
-        # Default to oscilloscope window-length index
-        default_tone = es.cfg['analysis.oscilloscope.window-length']
-        self._osc_duration_index = 0
-        for i, d in enumerate(OSC_DURATIONS):
-            if d <= default_tone:
-                self._osc_duration_index = i
 
         # Set up the window
         self.setWindowTitle(es_audio.get_string())
