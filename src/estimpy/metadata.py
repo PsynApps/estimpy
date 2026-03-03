@@ -315,7 +315,7 @@ class MetadataFormatMP4(MetadataFormat, abc.ABC):
             'album': '\xa9alb',
             'artist': '\xa9ART',
             'genre': '\xa9gen',
-            'title': '\xa9nam2'
+            'title': '\xa9nam'
         }
 
     @classmethod
