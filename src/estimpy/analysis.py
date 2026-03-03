@@ -579,7 +579,7 @@ class Spectrogram:
             # Convert to decibels. Might have zero values which could lead to divide by zero errors when taking log
             spectrogram_data = np.multiply(es.utils.log10_quiet(spectrogram_data), 20)
             # Set the power threshold to 20% of the total dynamic range
-            power_threshold = 0.2 * -es.cfg['analysis.spectrogram.dynamic-range']
+            power_threshold = 0.2 * -es.cfg['visualization.style.spectrogram.dynamic-range']
             # Find the highest frequency whose 99.9 percentile power across all time bins is at least the power threshold
             frequency_max_index = len(frequencies) - np.argmax(
                np.flipud(np.percentile(spectrogram_data, 99.9, axis=1)) > power_threshold) - 1

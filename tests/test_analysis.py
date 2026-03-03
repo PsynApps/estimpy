@@ -8,6 +8,7 @@ from estimpy.analysis import (
     Envelope,
     EnvelopeModes,
     Spectrogram,
+    SpectrogramFrequencyMaxMethods,
     SpectrogramScaling,
     calculate_optimal_nfft,
     estimate_frequency_max_coarse,
@@ -163,6 +164,61 @@ class TestOptimalNfft:
 
     def test_zero_panel_height_returns_window_size(self):
         assert calculate_optimal_nfft(44100, 5000, 0, 2048) == 2048
+
+
+class TestGetFrequencyMax:
+    """Tests for Spectrogram._get_frequency_max with both detection methods."""
+
+    def test_spectral_edge_detects_signal_range(self, synthetic_stereo_audio):
+        """Spectral edge method should find a max frequency above the highest tone."""
+        freq_max = Spectrogram._get_frequency_max(
+            synthetic_stereo_audio.data, SAMPLE_RATE,
+            method=SpectrogramFrequencyMaxMethods.SPECTRAL_EDGE,
+            pretty_mode=False
+        )
+        # Must be above the 880Hz tone
+        assert freq_max >= 880
+        # But well below Nyquist for this narrow-band signal
+        assert freq_max < SAMPLE_RATE / 2
+
+    def test_spectral_edge_pretty_mode(self, synthetic_stereo_audio):
+        freq_max = Spectrogram._get_frequency_max(
+            synthetic_stereo_audio.data, SAMPLE_RATE,
+            method=SpectrogramFrequencyMaxMethods.SPECTRAL_EDGE,
+            pretty_mode=True
+        )
+        assert freq_max % 250 == 0 or freq_max % 500 == 0 or freq_max % 1000 == 0
+
+    def test_power_threshold_detects_signal_range(self, synthetic_stereo_audio):
+        """Power threshold method should find a max frequency above the highest tone."""
+        freq_max = Spectrogram._get_frequency_max(
+            synthetic_stereo_audio.data, SAMPLE_RATE,
+            method=SpectrogramFrequencyMaxMethods.POWER_THRESHOLD,
+            pretty_mode=False
+        )
+        assert freq_max >= 880
+        assert freq_max < SAMPLE_RATE / 2
+
+    def test_power_threshold_pretty_mode(self, synthetic_stereo_audio):
+        freq_max = Spectrogram._get_frequency_max(
+            synthetic_stereo_audio.data, SAMPLE_RATE,
+            method=SpectrogramFrequencyMaxMethods.POWER_THRESHOLD,
+            pretty_mode=True
+        )
+        assert freq_max % 250 == 0 or freq_max % 500 == 0 or freq_max % 1000 == 0
+
+    def test_padding_factor_increases_result(self, synthetic_stereo_audio):
+        narrow = Spectrogram._get_frequency_max(
+            synthetic_stereo_audio.data, SAMPLE_RATE,
+            method=SpectrogramFrequencyMaxMethods.SPECTRAL_EDGE,
+            padding_factor=1.0, pretty_mode=False
+        )
+        wide = Spectrogram._get_frequency_max(
+            synthetic_stereo_audio.data, SAMPLE_RATE,
+            method=SpectrogramFrequencyMaxMethods.SPECTRAL_EDGE,
+            padding_factor=1.5, pretty_mode=False
+        )
+        assert wide >= narrow
 
 
 class TestEstimateFrequencyMaxCoarse:

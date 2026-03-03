@@ -4,6 +4,7 @@
 ### Added
 - Unified `estimpy` CLI replacing `estimpy-visualizer` and `estimpy-player` with subcommands: `play` (default), `show-image`, `save-image`, `save-video`, `save-metadata`
 - Positional file arguments (e.g., `estimpy play song.mp3` instead of `estimpy-player -i song.mp3`)
+- Configurable time text position (`top`/`bottom`) for image and video visualizations (`*.time.position`)
 
 - Reassigned spectrogram algorithm for sharper time-frequency localization, with configurable smoothing (`analysis.spectrogram.reassign`, `analysis.spectrogram.reassign-smoothing`)
 - Triphase visualization mode (`-t`/`--triphase`) showing the derived common electrode signal -(A+B) alongside the A and B channels
@@ -60,6 +61,9 @@
 - Removed tkinter dependency (file dialogs replaced with Qt)
 
 ### Fixed
+- Fixed MP4/M4A title metadata tag (`\xa9nam2` → `\xa9nam`) that silently prevented reading/writing titles
+- Fixed orphaned spinner threads when audio file loading fails (e.g., non-audio files like Thumbs.db)
+- Fixed player crash on startup caused by oscilloscope state accessed before initialization
 - Pause/unpause no longer resets playback position (audio time is now captured before pausing)
 - Volume step of zero no longer causes infinite loop in volume ramping
 - Seeking to negative time values is now clamped to zero
