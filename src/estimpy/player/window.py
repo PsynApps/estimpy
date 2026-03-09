@@ -468,7 +468,7 @@ class PlayerWindow(QMainWindow):
             color = channel_cfg[channel_id]['color']
         else:
             color = channel_cfg[0]['color']
-        bg = _alpha_color(color, '#1a1a1a', 0.15)
+        bg = _alpha_color(color, '#1a1a1a', 0.25)
         widget.setStyleSheet(f'background-color: {bg}; border-radius: 4px;')
 
     def _add_channel_volume(self, container_layout, channel_id, label_text):
