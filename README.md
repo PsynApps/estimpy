@@ -277,7 +277,7 @@ These options are only available on `save-video`:
 
 - **Save image visualization to an image file with custom configuration options**
   ```
-  estimpy save-image input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.amplitude.channels.ch0.base-color #93c3ff visualization.style.amplitude.channels.ch1.base-color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
+  estimpy save-image input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.channels.ch0.color #93c3ff visualization.style.channels.ch1.color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
   ```
 <p align="center">
   <img src="https://github.com/user-attachments/assets/11858185-c7f8-4084-8eb3-450d4bcb6ae9" width="720">
@@ -380,19 +380,27 @@ For reference, the default configuration options and values are as follows:
 | visualization.image.export.time.position                     | bottom                                       |
 | visualization.image.export.title.enabled                     | True                                         |
 | visualization.style.amplitude.channels.ch0.background-color  | None                                         |
-| visualization.style.amplitude.channels.ch0.base-color        | #4799e8                                      |
+| visualization.style.amplitude.channels.ch0.peak-color        | None                                         |
 | visualization.style.amplitude.channels.ch0.rms-color         | None                                         |
 | visualization.style.amplitude.channels.ch1.background-color  | None                                         |
-| visualization.style.amplitude.channels.ch1.base-color        | #b775ff                                      |
+| visualization.style.amplitude.channels.ch1.peak-color        | None                                         |
 | visualization.style.amplitude.channels.ch1.rms-color         | None                                         |
 | visualization.style.amplitude.channels.ch2.background-color  | None                                         |
-| visualization.style.amplitude.channels.ch2.base-color        | #e06cb7                                      |
+| visualization.style.amplitude.channels.ch2.peak-color        | None                                         |
 | visualization.style.amplitude.channels.ch2.rms-color         | None                                         |
 | visualization.style.amplitude.axes.enabled                   | True                                         |
 | visualization.style.amplitude.background-alpha               | 0.15                                         |
 | visualization.style.amplitude.padding                        | 0.1                                          |
 | visualization.style.amplitude.rms-alpha                      | 0.5                                          |
 | visualization.style.amplitude.show-rms                       | True                                         |
+| visualization.style.channels.ch0.color                       | #4799e8                                      |
+| visualization.style.channels.ch0.label                       | A                                            |
+| visualization.style.channels.ch1.color                       | #b775ff                                      |
+| visualization.style.channels.ch1.label                       | B                                            |
+| visualization.style.channels.ch2.color                       | #e06cb7                                      |
+| visualization.style.channels.ch2.label                       | T                                            |
+| visualization.style.channels.labels.enabled                  | True                                         |
+| visualization.style.channels.labels.font-size                | 20                                           |
 | visualization.style.axes.color                               | #ffffff                                      |
 | visualization.style.axes.font-size                           | 16                                           |
 | visualization.style.axes.text-padding                        | 1                                            |
@@ -410,8 +418,8 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.oscilloscope.opacity                     | 0.95                                         |
 | visualization.style.oscilloscope.width-ratio                 | 0.25                                         |
 | visualization.style.spectrogram.color-map                    | jet                                          |
-| visualization.style.spectrogram.match-amplitude-color        | True                                         |
-| visualization.style.spectrogram.match-amplitude-color-radius | 5                                            |
+| visualization.style.spectrogram.match-channel-color          | True                                         |
+| visualization.style.spectrogram.match-channel-color-radius   | 5                                            |
 | visualization.style.spectrogram.channels.ch0.color-map       | None                                         |
 | visualization.style.spectrogram.channels.ch1.color-map       | None                                         |
 | visualization.style.spectrogram.channels.ch2.color-map       | None                                         |

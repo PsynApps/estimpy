@@ -194,6 +194,42 @@ class TestAxisHandleId:
         assert Visualization._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=2) == 'spectrogram_2'
 
 
+class TestGetChannelStyleCfg:
+    def test_returns_channel_config(self):
+        assert Visualization._get_channel_style_cfg(0)['color'] == '#4799e8'
+        assert Visualization._get_channel_style_cfg(1)['color'] == '#b775ff'
+        assert Visualization._get_channel_style_cfg(2)['color'] == '#e06cb7'
+
+    def test_labels(self):
+        assert Visualization._get_channel_style_cfg(0)['label'] == 'A'
+        assert Visualization._get_channel_style_cfg(1)['label'] == 'B'
+        assert Visualization._get_channel_style_cfg(2)['label'] == 'T'
+
+    def test_out_of_range_falls_back_to_ch0(self):
+        cfg = Visualization._get_channel_style_cfg(99)
+        assert cfg['color'] == '#4799e8'
+
+
+class TestGetAmplitudeStyleCfg:
+    def test_peak_color_inherits_channel_color(self):
+        """When peak-color is ~, it should inherit the channel identity color."""
+        cfg = Visualization._get_amplitude_style_cfg(0)
+        assert cfg['peak-color'] == '#4799e8'
+        assert cfg['color'] == '#4799e8'
+
+    def test_rms_color_derived(self):
+        """rms-color should be derived (not None) even when config is ~."""
+        cfg = Visualization._get_amplitude_style_cfg(0)
+        assert cfg['rms-color'] is not None
+        assert cfg['rms-color'].startswith('#')
+
+    def test_background_color_derived(self):
+        """background-color should be derived (not None) even when config is ~."""
+        cfg = Visualization._get_amplitude_style_cfg(0)
+        assert cfg['background-color'] is not None
+        assert cfg['background-color'].startswith('#')
+
+
 class TestEnums:
     def test_axis_types_values(self):
         assert AxisTypes.AMPLITUDE == 'amplitude'

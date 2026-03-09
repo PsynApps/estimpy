@@ -44,7 +44,7 @@ def _derive_channel_colormap(base_cmap_name: str, peak_color: str, background_co
     """Derive a channel-specific colormap by recoloring the base region to match a peak color.
 
     The "base region" is where the colormap's hue stays near its starting hue (e.g., the blue
-    region of jet). This region is recolored to match the channel's base-color hue and saturation,
+    region of jet). This region is recolored to match the channel's color hue and saturation,
     preserving the original luminance profile. The "signal region" (rapidly changing hues) is
     left untouched, so spectral features look identical across all channels.
 
@@ -74,7 +74,7 @@ def _derive_channel_colormap(base_cmap_name: str, peak_color: str, background_co
 
     base_hue = base_hls[np.argmax(saturated_mask), 0]
 
-    # Parse the channel base-color into HLS (only the hue is used for recoloring)
+    # Parse the channel color into HLS (only the hue is used for recoloring)
     peak_rgb = matplotlib.colors.to_rgb(peak_color)
     peak_h, _, _ = colorsys.rgb_to_hls(*peak_rgb)
 
@@ -210,7 +210,8 @@ def _on_config_updated():
         Layout:
             visualization.style.title.max-width            (pixels, from width-factor-max)
         Channel styling (list of dicts, resolved from per-channel keys):
-            visualization.style.amplitude.channels         (base-color, rms-color, background-color)
+            visualization.style.channels                   (color, label)
+            visualization.style.amplitude.channels         (color, peak-color, rms-color, background-color)
             visualization.style.spectrogram.channels       (color-map, possibly derived)
     """
     # Display sizes
@@ -295,93 +296,82 @@ def _on_config_updated():
     es.cfg['visualization.style.title.max-width'] = math.floor(
         es.cfg['visualization.style.title.width-factor-max'] * es.cfg['visualization.image.display.width'])
 
-    # Channel colors
-    cfg_prefixes = [
-        "visualization.style.amplitude.channels"
-    ]
-
-    # Initialize a dictionary to store the maximum channel number for each prefix
-    max_channels = {prefix: 0 for prefix in cfg_prefixes}
-
-    # Extract the maximum channel number for each prefix
+    # --- Resolve channel identity (color + label) ---
+    # Enumerate channels from visualization.style.channels.chN.color keys
+    channel_prefix = 'visualization.style.channels.'
+    max_channel = 0
     for key in es.cfg.keys():
-        for prefix in cfg_prefixes:
-            if key.startswith(prefix):
-                parts = key[len(prefix):].split('.')
-                if len(parts) > 1 and parts[1].startswith("ch"):
-                    channel_number = int(parts[1][2:])  # Extract and cast to int
-                    max_channels[prefix] = max(max_channels[prefix], channel_number)
+        if key.startswith(channel_prefix):
+            parts = key[len(channel_prefix):].split('.')
+            if parts[0].startswith('ch'):
+                channel_number = int(parts[0][2:])
+                max_channel = max(max_channel, channel_number)
 
-    # Generate full channel lists (continuous from 1 to max_channels)
-    channel_numbers = {prefix: list(range(0, max_channels[prefix] + 1)) for prefix in max_channels}
-
-    es.cfg['visualization.style.amplitude.channels'] = [None] * len(channel_numbers['visualization.style.amplitude.channels'])
-    for i_channel in channel_numbers['visualization.style.amplitude.channels']:
-        es.cfg['visualization.style.amplitude.channels'][i_channel] = {
-            'base-color': None,
-            'rms-color': None,
-            'background-color': None
+    n_channels = max_channel + 1
+    es.cfg['visualization.style.channels'] = [None] * n_channels
+    for i_channel in range(n_channels):
+        es.cfg['visualization.style.channels'][i_channel] = {
+            'color': es.cfg[f'visualization.style.channels.ch{i_channel}.color'],
+            'label': es.cfg.get(f'visualization.style.channels.ch{i_channel}.label', ''),
         }
 
-        # If the base color is not defined, use the color from the first channel
-        es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color'] = \
-            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.base-color'] if \
-                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.base-color'] is not None else \
-                es.cfg['visualization.style.amplitude.channels.ch0.base-color']
+    # --- Resolve amplitude channel styling ---
+    # Each amplitude property falls back to the channel identity color
+    es.cfg['visualization.style.amplitude.channels'] = [None] * n_channels
+    for i_channel in range(n_channels):
+        channel_color = es.cfg['visualization.style.channels'][i_channel]['color']
 
-        # If the color of the rms amplitude envelope is not defined,
-        # derive the color from blending the base color with white using the alpha level
-        es.cfg['visualization.style.amplitude.channels'][i_channel]['rms-color'] = \
-            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.rms-color'] if \
-                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.rms-color'] is not None else \
-                _alpha_color(
-                    es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color'], (1, 1, 1),
-                    es.cfg['visualization.style.amplitude.rms-alpha'])
+        peak_color = es.cfg.get(f'visualization.style.amplitude.channels.ch{i_channel}.peak-color')
+        if peak_color is None:
+            peak_color = channel_color
 
-        # If the background color of the amplitude panel is not defined,
-        # derive the color from blending the base color with black using the alpha level
-        es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color'] = \
-            es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.background-color'] if \
-                es.cfg[f'visualization.style.amplitude.channels.ch{i_channel}.background-color'] is not None else \
-                _alpha_color(
-                    es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color'], (0, 0, 0),
-                    es.cfg['visualization.style.amplitude.background-alpha'])
+        rms_color = es.cfg.get(f'visualization.style.amplitude.channels.ch{i_channel}.rms-color')
+        if rms_color is None:
+            rms_color = _alpha_color(channel_color, (1, 1, 1),
+                                     es.cfg['visualization.style.amplitude.rms-alpha'])
 
-    # Resolve per-channel spectrogram colormaps. For each channel:
+        background_color = es.cfg.get(f'visualization.style.amplitude.channels.ch{i_channel}.background-color')
+        if background_color is None:
+            background_color = _alpha_color(channel_color, (0, 0, 0),
+                                            es.cfg['visualization.style.amplitude.background-alpha'])
+
+        es.cfg['visualization.style.amplitude.channels'][i_channel] = {
+            'color': channel_color,
+            'peak-color': peak_color,
+            'rms-color': rms_color,
+            'background-color': background_color,
+        }
+
+    # --- Resolve per-channel spectrogram colormaps ---
     # 1. If an explicit per-channel override is set, use it directly
     # 2. Otherwise, derive from the base colormap (with color matching if enabled)
     base_cmap_name = es.cfg['visualization.style.spectrogram.color-map']
-    match_amplitude_color = es.cfg['visualization.style.spectrogram.match-amplitude-color']
-    n_amplitude_channels = len(es.cfg['visualization.style.amplitude.channels'])
+    match_channel_color = es.cfg['visualization.style.spectrogram.match-channel-color']
 
-    resolved_channels = [None] * n_amplitude_channels
-    for i_channel in range(n_amplitude_channels):
-        # Check for explicit per-channel colormap override from config
-        channel_override = es.cfg[f'visualization.style.spectrogram.channels.ch{i_channel}.color-map']
+    resolved_spec_channels = [None] * n_channels
+    for i_channel in range(n_channels):
+        channel_override = es.cfg.get(f'visualization.style.spectrogram.channels.ch{i_channel}.color-map')
 
         if channel_override is not None:
-            # Explicit override — use the specified colormap directly
-            resolved_channels[i_channel] = {'color-map': channel_override}
+            resolved_spec_channels[i_channel] = {'color-map': channel_override}
         else:
             cmap_registry_name = f'_estimpy_ch{i_channel}'
 
-            # Unregister any previously derived colormap for this channel
             if cmap_registry_name in matplotlib.colormaps:
                 matplotlib.colormaps.unregister(name=cmap_registry_name)
 
-            if match_amplitude_color:
-                peak_color = es.cfg['visualization.style.amplitude.channels'][i_channel]['base-color']
-                background_color = es.cfg['visualization.style.amplitude.channels'][i_channel]['background-color']
-                radius = es.cfg['visualization.style.spectrogram.match-amplitude-color-radius']
-                derived_cmap = _derive_channel_colormap(base_cmap_name, peak_color,
-                                                         background_color=background_color,
-                                                         radius_degrees=radius)
+            if match_channel_color:
+                amp_cfg = es.cfg['visualization.style.amplitude.channels'][i_channel]
+                derived_cmap = _derive_channel_colormap(
+                    base_cmap_name, amp_cfg['color'],
+                    background_color=amp_cfg['background-color'],
+                    radius_degrees=es.cfg['visualization.style.spectrogram.match-channel-color-radius'])
                 matplotlib.colormaps.register(derived_cmap, name=cmap_registry_name)
-                resolved_channels[i_channel] = {'color-map': cmap_registry_name}
+                resolved_spec_channels[i_channel] = {'color-map': cmap_registry_name}
             else:
-                resolved_channels[i_channel] = {'color-map': base_cmap_name}
+                resolved_spec_channels[i_channel] = {'color-map': base_cmap_name}
 
-    es.cfg['visualization.style.spectrogram.channels'] = resolved_channels
+    es.cfg['visualization.style.spectrogram.channels'] = resolved_spec_channels
 
 
 es.add_event_listener('config.updated', _on_config_updated)

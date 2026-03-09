@@ -217,7 +217,7 @@ class Visualization:
         ax.set_facecolor(axes_style_cfg['background-color'])
 
         ax.fill(self.peak_envelope.times, self.peak_envelope.envelope_data[channel_id, :],
-                color=axes_style_cfg['base-color'])
+                color=axes_style_cfg['peak-color'])
 
         if es.cfg['visualization.style.amplitude.show-rms']:
             ax.fill(self.rms_envelope.times, self.rms_envelope.envelope_data[channel_id, :],
@@ -281,6 +281,8 @@ class Visualization:
                   extent=[self.spectrogram.times.min(), self.spectrogram.times.max(),
                           self.spectrogram.frequency_min, self.spectrogram.frequency_max],
                   vmin=-es.cfg['visualization.style.spectrogram.dynamic-range'], vmax=0)
+
+        self._add_channel_label(ax=ax, channel_id=channel_id)
 
     def _add_title_subplot(self, gridspec: matplotlib.gridspec.GridSpec):
         if self._handles['figure'] is None:
@@ -464,6 +466,38 @@ class Visualization:
                     linewidth=self._text_border_width,
                     foreground=es.cfg['visualization.style.font.text.border-color'])
             ])
+
+    def _add_channel_label(self, ax, channel_id: int):
+        """Add a channel identity label (e.g., A, B, T) to the spectrogram panel."""
+        if not es.cfg['visualization.style.channels.labels.enabled']:
+            return
+        if self.es_audio.channels < 2:
+            return
+
+        channel_cfg = self._get_channel_style_cfg(channel_id)
+        label = channel_cfg['label']
+        if not label:
+            return
+
+        _mpl_fp = es.cfg['visualization.style.font.text.mpl-fontproperties']
+        text_padding = es.cfg['visualization.style.axes.text-padding']
+        label_handle = ax.annotate(
+            text=label,
+            xy=(0, 0.5), xycoords='axes fraction',
+            xytext=(text_padding, 0), textcoords='offset points',
+            va='center', ha='left',
+            fontsize=es.cfg['visualization.style.channels.labels.font-size'],
+            fontproperties=_mpl_fp,
+            color=channel_cfg['color'])
+
+        self._set_text_path_effects(label_handle)
+        self._handles['text'].append(label_handle)
+
+    @classmethod
+    def _get_channel_style_cfg(cls, channel_id: int) -> typing.Dict:
+        return es.cfg['visualization.style.channels'][channel_id] \
+            if channel_id < len(es.cfg['visualization.style.channels']) else \
+            es.cfg['visualization.style.channels'][0]
 
     @classmethod
     def _get_amplitude_style_cfg(cls, channel_id: int) -> typing.Dict:

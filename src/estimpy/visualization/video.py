@@ -140,7 +140,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                 self._handles['amplitude_peak_fills'][channel_id].set_xy(peak_xy)
             else:
                 self._handles['amplitude_peak_fills'][channel_id] = self._handles['axes'][axes_key].fill(
-                    peak_x, peak_y, color=axes_style_cfg['base-color'])[0]
+                    peak_x, peak_y, color=axes_style_cfg['peak-color'])[0]
 
             # RMS envelope
             if es.cfg['visualization.style.amplitude.show-rms']:
@@ -324,7 +324,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         for ch, _ in self._channel_layout:
             style_cfg = self._get_amplitude_style_cfg(ch)
             self._dr_amp_bg_rgb[ch] = (np.array(matplotlib.colors.to_rgb(style_cfg['background-color'])) * 255).astype(np.uint8)
-            self._dr_amp_peak_rgb[ch] = (np.array(matplotlib.colors.to_rgb(style_cfg['base-color'])) * 255).astype(np.uint8)
+            self._dr_amp_peak_rgb[ch] = (np.array(matplotlib.colors.to_rgb(style_cfg['peak-color'])) * 255).astype(np.uint8)
             if self._dr_show_rms:
                 self._dr_amp_rms_rgb[ch] = (np.array(matplotlib.colors.to_rgb(style_cfg['rms-color'])) * 255).astype(np.uint8)
 
@@ -870,7 +870,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         if scrub:
             ax.set_xlim(self.peak_envelope.times[0], self.peak_envelope.times[len(self.peak_envelope.times) - 1])
             ax.fill(self.peak_envelope.times, self.peak_envelope.envelope_data[channel_id, :],
-                    color=axes_style_cfg['base-color'])
+                    color=axes_style_cfg['peak-color'])
 
             if es.cfg['visualization.style.amplitude.show-rms']:
                 ax.fill(self.rms_envelope.times, self.rms_envelope.envelope_data[channel_id, :],

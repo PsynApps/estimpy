@@ -110,45 +110,58 @@ visualization:
   style:
     # Configuration for the amplitude panels
     amplitude:
-      # First channel is mono/left, second is right (if stereo)
+      # Per-channel amplitude color overrides. All default to ~ (inherit from channel color).
       channels:
         ch0:
-          # The color to use for the background of the amplitude panel. If not defined will be based on base-color.
+          # The color to use for the background of the amplitude panel. If not defined, derived from channel color.
           background-color: ~
-          # The base color for the channel, used directly for the peak amplitude envelope
-          base-color: '#4799e8'
-          # The color to use for the RMS amplitude envelope. If not defined will be based on base-color.
+          # The color to use for the peak amplitude envelope. If not defined, inherits channel color.
+          peak-color: ~
+          # The color to use for the RMS amplitude envelope. If not defined, derived from channel color.
           rms-color: ~
         ch1:
-          # The color to use for the background of the amplitude panel. If not defined will be based on base-color.
           background-color: ~
-          # The base color for the channel, used directly for the peak amplitude envelope
-          base-color: '#b775ff'
-          # The color to use for the RMS amplitude envelope. If not defined will be based on base-color.
+          peak-color: ~
           rms-color: ~
         ch2:
-          # The color to use for the background of the amplitude panel. If not defined will be based on base-color.
           background-color: ~
-          # The base color for the channel, used directly for the peak amplitude envelope
-          base-color: '#e06cb7'
-          # The color to use for the RMS amplitude envelope. If not defined will be based on base-color.
+          peak-color: ~
           rms-color: ~
       # Configuration for the axes of the amplitude panel
       axes:
         # Show the amplitude axis ticks and scale text
         enabled: True
       # The alpha level for the background of the amplitude envelopes.
-      # Based on the color defined for the peak envelope. Applies to both channels.
-      # Not used if background colors are explicitly defined in channel config.
+      # Based on the channel color. Applies to all channels.
+      # Not used if background colors are explicitly defined in amplitude channel config.
       background-alpha: 0.15
       # The amount of visual padding to add above and below the amplitude envelopes (0.2 = 20%)
       padding: 0.1
       # The alpha level for the RMS amplitude envelope.
-      # Based on the color defined for the peak envelope. Applies to both channels.
-      # Not used if RMS colors are explicitly defined in channel config.
+      # Based on the channel color. Applies to all channels.
+      # Not used if RMS colors are explicitly defined in amplitude channel config.
       rms-alpha: 0.5
       # Show the RMS amplitude envelope superimposed on the peak amplitude envelope
       show-rms: True
+    # Per-channel identity configuration (color and label)
+    channels:
+      ch0:
+        # The base color for this channel, used for amplitude, spectrogram color matching, and labels
+        color: '#4799e8'
+        # Label text displayed on the spectrogram panel
+        label: A
+      ch1:
+        color: '#b775ff'
+        label: B
+      ch2:
+        color: '#e06cb7'
+        label: T
+      # Configuration for channel labels displayed on spectrogram panels
+      labels:
+        # Show channel labels on spectrogram panels
+        enabled: True
+        # Font size of channel labels
+        font-size: 20
     # Configuration for axes
     axes:
       # Color of the axis ticks and scale text
@@ -197,16 +210,15 @@ visualization:
       # See matplotlib colormap documentation for a list of available options.
       color-map: jet
       # When True, the low-energy base region of the colormap is recolored to match
-      # each channel's amplitude base-color. When False, uses the base colormap
-      # directly for all channels.
-      match-amplitude-color: True
+      # each channel's color. When False, uses the base colormap directly for all channels.
+      match-channel-color: True
       # Controls how much of the colormap's base region is recolored to the channel's
-      # base-color hue when match-amplitude-color is True. Specified in degrees of hue
+      # color hue when match-channel-color is True. Specified in degrees of hue
       # distance (0-180) from the colormap's starting hue. Only affects the darkest,
       # low-energy portion of the colormap. Recolored samples are perceptually brightness-
       # matched and darkened toward the amplitude panel background. Small values (3-8)
       # produce a subtle tint; larger values extend recoloring into brighter regions.
-      match-amplitude-color-radius: 5
+      match-channel-color-radius: 5
       # Per-channel colormap overrides. When set, overrides the base colormap and
       # color matching for that channel. When not set (~), the channel uses the
       # base colormap with automatic color matching (if enabled).
@@ -283,6 +295,7 @@ visualization:
         '-colorspace': 'bt709'
         '-crf': 22
         '-preset': medium
+        '-movflags': '+faststart'
         '-tune': animation
       # Container format of the video
       format: mp4
