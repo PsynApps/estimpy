@@ -8,4 +8,5 @@ visualization:
         '-preset': ~
         '-tune': ~
         '-profile:v': 'hq'
+        '-movflags': ~
       format: mov

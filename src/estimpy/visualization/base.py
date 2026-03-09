@@ -282,8 +282,6 @@ class Visualization:
                           self.spectrogram.frequency_min, self.spectrogram.frequency_max],
                   vmin=-es.cfg['visualization.style.spectrogram.dynamic-range'], vmax=0)
 
-        self._add_channel_label(ax=ax, channel_id=channel_id)
-
     def _add_title_subplot(self, gridspec: matplotlib.gridspec.GridSpec):
         if self._handles['figure'] is None:
             return
@@ -459,6 +457,8 @@ class Visualization:
 
         matplotlib.pyplot.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
 
+        self._add_channel_labels()
+
     def _set_text_path_effects(self, text_handle):
         if hasattr(text_handle, 'set_path_effects') and callable(getattr(text_handle, 'set_path_effects')):
             text_handle.set_path_effects([
@@ -467,32 +467,47 @@ class Visualization:
                     foreground=es.cfg['visualization.style.font.text.border-color'])
             ])
 
-    def _add_channel_label(self, ax, channel_id: int):
-        """Add a channel identity label (e.g., A, B, T) to the spectrogram panel."""
+    def _add_channel_labels(self):
+        """Add channel identity labels (e.g., A, B, T) centered across each channel's panel pair."""
+        if self._handles['figure'] is None:
+            return
         if not es.cfg['visualization.style.channels.labels.enabled']:
             return
         if self.es_audio.channels < 2:
             return
 
-        channel_cfg = self._get_channel_style_cfg(channel_id)
-        label = channel_cfg['label']
-        if not label:
-            return
-
-        amp_cfg = self._get_amplitude_style_cfg(channel_id)
         _mpl_fp = es.cfg['visualization.style.font.text.mpl-fontproperties']
         font_size = es.cfg['visualization.style.channels.labels.font-size']
-        label_handle = ax.annotate(
-            text=label,
-            xy=(0, 0.5), xycoords='axes fraction',
-            xytext=(font_size * 0.4, 0), textcoords='offset points',
-            va='center', ha='left',
-            fontsize=font_size,
-            fontproperties=_mpl_fp,
-            color=amp_cfg['rms-color'])
 
-        self._set_text_path_effects(label_handle)
-        self._handles['text'].append(label_handle)
+        # Convert text padding from points to figure-coordinate fraction
+        fig = self._handles['figure']
+        text_padding = es.cfg['visualization.style.axes.text-padding']
+        x_offset = text_padding / (fig.get_size_inches()[0] * fig.dpi)
+
+        for channel_id, _ in self._channel_layout:
+            channel_cfg = self._get_channel_style_cfg(channel_id)
+            label = channel_cfg['label']
+            if not label:
+                continue
+
+            # Compute vertical center across the amplitude+spectrogram pair in figure coordinates
+            amp_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id)
+            spec_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id)
+            amp_pos = self._handles['axes'][amp_key].get_position()
+            spec_pos = self._handles['axes'][spec_key].get_position()
+            y_center = (min(amp_pos.y0, spec_pos.y0) + max(amp_pos.y1, spec_pos.y1)) / 2
+
+            amp_cfg = self._get_amplitude_style_cfg(channel_id)
+            label_handle = self._handles['figure'].text(
+                x=x_offset, y=y_center, s=label,
+                va='center', ha='left',
+                fontsize=font_size,
+                fontproperties=_mpl_fp,
+                color=amp_cfg['rms-color'],
+                transform=self._handles['figure'].transFigure)
+
+            self._set_text_path_effects(label_handle)
+            self._handles['text'].append(label_handle)
 
     @classmethod
     def _get_channel_style_cfg(cls, channel_id: int) -> typing.Dict:

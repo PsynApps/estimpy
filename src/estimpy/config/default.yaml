@@ -161,7 +161,7 @@ visualization:
         # Show channel labels on spectrogram panels
         enabled: True
         # Font size of channel labels
-        font-size: 28
+        font-size: 36
     # Configuration for axes
     axes:
       # Color of the axis ticks and scale text

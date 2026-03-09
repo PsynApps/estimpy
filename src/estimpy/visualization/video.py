@@ -902,8 +902,6 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._handles['position_lines'].append(
             ax.axvline(x=0, lw=1, color=es.cfg['visualization.style.video.position-line-color']))
 
-        self._add_channel_label(ax=ax, channel_id=channel_id)
-
     def _frame_to_time(self, frame):
         return frame / self.fps
 
