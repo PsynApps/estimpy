@@ -479,10 +479,10 @@ class Visualization:
         _mpl_fp = es.cfg['visualization.style.font.text.mpl-fontproperties']
         font_size = es.cfg['visualization.style.channels.labels.font-size']
 
-        # Convert text padding from points to figure-coordinate fraction
+        # Compute left margin as a fraction of font size (in figure coordinates)
         fig = self._handles['figure']
-        text_padding = es.cfg['visualization.style.axes.text-padding']
-        x_offset = text_padding / (fig.get_size_inches()[0] * fig.dpi)
+        fig_width_pts = fig.get_size_inches()[0] * 72  # 72 points per inch
+        x_offset = (font_size * 0.4) / fig_width_pts
 
         for channel_id, _ in self._channel_layout:
             channel_cfg = self._get_channel_style_cfg(channel_id)
