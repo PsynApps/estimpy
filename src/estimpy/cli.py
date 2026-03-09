@@ -10,11 +10,16 @@ Usage:
     estimpy save-image [files...]       Save image visualization to file(s)
     estimpy save-video [files...]       Save animated visualization to video file(s)
     estimpy save-metadata [files...]    Write album art to audio file metadata
+    estimpy benchmark [file]            Benchmark video encoding profiles
 """
 
 import argparse
+import copy
+import glob
 import logging
+import os
 import sys
+import time
 
 import estimpy as es
 
@@ -29,7 +34,7 @@ def main():
         sys.exit()
 
     # Check if any argument is a known subcommand. If not, default to 'play'.
-    subcommands = {'play', 'show-image', 'save-image', 'save-video', 'save-metadata'}
+    subcommands = {'play', 'show-image', 'save-image', 'save-video', 'save-metadata', 'benchmark'}
     args = sys.argv[1:]
     has_subcommand = any(a in subcommands for a in args)
     if not has_subcommand and '-h' not in args and '--help' not in args:
@@ -90,10 +95,18 @@ def main():
     _add_global_arguments(parser_save_metadata)
     _add_save_arguments(parser_save_metadata)
 
+    # benchmark
+    parser_benchmark = subparsers.add_parser('benchmark',
+        help='Benchmark video encoding profiles',
+        description='Encode a test file using each video profile and report encoding time, speed, and file size. '
+                    'If no input file is specified, uses the bundled benchmark audio file.')
+    parser_benchmark.add_argument('file', nargs='?', default=None, help='Input audio file. If not specified, uses the bundled benchmark file.')
+
     parsed = vars(parser.parse_args())
 
     # Handle global arguments (version, config, config options, etc.)
-    _handle_global_arguments(parsed)
+    if parsed['command'] != 'benchmark':
+        _handle_global_arguments(parsed)
 
     command = parsed['command']
 
@@ -107,6 +120,8 @@ def main():
         _run_save_video(parsed)
     elif command == 'save-metadata':
         _run_save_metadata(parsed)
+    elif command == 'benchmark':
+        _run_benchmark(parsed)
 
 
 def _add_global_arguments(parser):
@@ -288,6 +303,214 @@ def _run_save_metadata(args):
             es.metadata.write_metadata(es_audio=es_audio)
         except Exception as e:
             print(e)
+
+
+def _run_benchmark(args):
+    """Benchmark video encoding across all video profiles."""
+    # Determine input file
+    input_file = args.get('file')
+    if not input_file:
+        input_file = os.path.join(os.path.dirname(__file__), '..', '..', 'tests', 'input', 'benchmark.mp3')
+        input_file = os.path.normpath(input_file)
+
+    if not os.path.exists(input_file):
+        if args.get('file'):
+            print(f'Error: File not found: {input_file}')
+        else:
+            print('Error: Bundled benchmark file not found. Please specify an input file:')
+            print('  estimpy benchmark <audio-file>')
+        sys.exit(1)
+
+    print(f'Benchmark input: {input_file}')
+
+    # Load audio once
+    es_audio = _load_audio(input_file)
+
+    # Discover video profiles dynamically from the config directory
+    config_path = os.path.join(os.path.dirname(__file__), 'config')
+    profile_files = sorted(glob.glob(os.path.join(config_path, 'video-*.yaml')))
+    profile_names = [os.path.splitext(os.path.basename(f))[0] for f in profile_files]
+
+    # Build run list: default first, then each video profile
+    runs = [('default', None)] + [(name.removeprefix('video-'), name) for name in profile_names]
+
+    print(f'Found {len(runs)} profiles to benchmark: {", ".join(name for name, _ in runs)}')
+    print()
+
+    # Snapshot the default config state to restore between runs
+    default_cfg = copy.deepcopy(dict(es.cfg))
+    default_base_cfg = copy.deepcopy(dict(es.base_cfg))
+
+    results = []
+    output_dir = es.utils.get_temp_file_path()
+    os.makedirs(output_dir, exist_ok=True)
+
+    for i, (display_name, profile_name) in enumerate(runs):
+        # Restore config to default state
+        es.cfg.clear()
+        es.cfg.update(copy.deepcopy(default_cfg))
+        es.base_cfg.clear()
+        es.base_cfg.update(copy.deepcopy(default_base_cfg))
+
+        # Load the profile on top of defaults
+        if profile_name is not None:
+            try:
+                es.load_config(profile_name)
+            except Exception as e:
+                print(f'[{i + 1}/{len(runs)}] {display_name}: Failed to load profile — {e}')
+                results.append({'name': display_name, 'error': str(e)})
+                print()
+                continue
+
+        # Disable preview to focus on encode timing
+        es.cfg['visualization.video.export.preview.enabled'] = False
+        es.cfg['files.output.overwrite-default'] = True
+        es.trigger_event('config.updated')
+
+        # Read effective settings for this profile
+        codec = es.cfg['visualization.video.export.codec']
+        resolution = f'{es.cfg["visualization.video.export.width"]}x{es.cfg["visualization.video.export.height"]}'
+        fps = es.cfg['visualization.video.export.fps']
+
+        print(f'[{i + 1}/{len(runs)}] {display_name} ({codec}, {resolution}, {fps} fps)')
+        print('─' * 60)
+
+        try:
+            start_time = time.time()
+            video_file = es.export.write_video(
+                es_audio=es_audio,
+                output_path=output_dir,
+                overwrite=True)
+            elapsed = time.time() - start_time
+
+            if video_file and os.path.exists(video_file):
+                file_size = os.path.getsize(video_file)
+                total_frames = int(es_audio.length * fps)
+                encoding_fps = total_frames / elapsed if elapsed > 0 else 0
+
+                results.append({
+                    'name': display_name,
+                    'codec': codec,
+                    'resolution': resolution,
+                    'fps': fps,
+                    'time': elapsed,
+                    'encoding_fps': encoding_fps,
+                    'file_size': file_size,
+                })
+
+                # Clean up output file
+                os.remove(video_file)
+            else:
+                results.append({'name': display_name, 'error': 'No output file produced'})
+        except Exception as e:
+            results.append({
+                'name': display_name,
+                'codec': codec,
+                'resolution': resolution,
+                'fps': fps,
+                'error': str(e),
+            })
+            # Clean up any temp files left behind
+            es.utils.delete_temp_files()
+            print(f'FAILED: {e}')
+
+        print()
+
+    # Clean up temp directory
+    try:
+        os.rmdir(output_dir)
+    except OSError:
+        pass
+
+    # Print summary table
+    _print_benchmark_summary(results)
+
+
+def _format_file_size(size_bytes):
+    """Format a file size in bytes to a human-readable string."""
+    if size_bytes < 1024:
+        return f'{size_bytes} B'
+    elif size_bytes < 1024 * 1024:
+        return f'{size_bytes / 1024:.1f} KB'
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f'{size_bytes / (1024 * 1024):.1f} MB'
+    else:
+        return f'{size_bytes / (1024 * 1024 * 1024):.2f} GB'
+
+
+def _print_benchmark_summary(results):
+    """Print a formatted summary table of benchmark results."""
+    if not results:
+        print('No benchmark results to display.')
+        return
+
+    # Column definitions: (header, key, width, formatter)
+    columns = [
+        ('Profile', 'name', None, str),
+        ('Codec', 'codec', None, str),
+        ('Resolution', 'resolution', None, str),
+        ('FPS', 'fps', 5, lambda v: str(int(v))),
+        ('Time', 'time', 10, lambda v: es.utils.seconds_to_string(v)),
+        ('Enc. FPS', 'encoding_fps', 10, lambda v: f'{v:.1f}'),
+        ('File Size', 'file_size', 10, _format_file_size),
+    ]
+
+    # Compute column widths from data (use max of header and longest value)
+    col_widths = []
+    for header, key, min_width, formatter in columns:
+        width = len(header)
+        for r in results:
+            if 'error' not in r and key in r:
+                width = max(width, len(formatter(r[key])))
+            elif key == 'name':
+                width = max(width, len(r['name']))
+        if min_width:
+            width = max(width, min_width)
+        col_widths.append(width)
+
+    # Print header
+    header_parts = [columns[i][0].ljust(col_widths[i]) for i in range(len(columns))]
+    header_line = '  '.join(header_parts)
+    print('Benchmark Results')
+    print('=' * len(header_line))
+    print(header_line)
+    print('─' * len(header_line))
+
+    # Print rows
+    for r in results:
+        if 'error' in r:
+            name = r['name'].ljust(col_widths[0])
+            # Show codec/resolution/fps if available, then error
+            error_parts = [name]
+            for i, (_, key, _, formatter) in enumerate(columns[1:], 1):
+                if key in r:
+                    error_parts.append(formatter(r[key]).ljust(col_widths[i]))
+                else:
+                    break
+            error_msg = f'FAILED ({r["error"]})'
+            # Pad remaining columns and append error
+            filled = len(error_parts)
+            if filled < len(columns):
+                remaining_width = sum(col_widths[filled:]) + 2 * (len(columns) - filled)
+                error_parts.append(error_msg[:remaining_width].ljust(remaining_width))
+            print('  '.join(error_parts))
+        else:
+            parts = []
+            for i, (_, key, _, formatter) in enumerate(columns):
+                parts.append(formatter(r[key]).ljust(col_widths[i]))
+            print('  '.join(parts))
+
+    print('─' * len(header_line))
+
+    # Print fastest/smallest summary for successful runs
+    successful = [r for r in results if 'error' not in r]
+    if successful:
+        fastest = min(successful, key=lambda r: r['time'])
+        smallest = min(successful, key=lambda r: r['file_size'])
+        print(f'Fastest:  {fastest["name"]} ({es.utils.seconds_to_string(fastest["time"])}, {fastest["encoding_fps"]:.1f} enc. fps)')
+        print(f'Smallest: {smallest["name"]} ({_format_file_size(smallest["file_size"])})')
+
+    print()
 
 
 if __name__ == '__main__':

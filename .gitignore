@@ -21,6 +21,7 @@ Thumbs.db
 /export/
 /tests/input/*
 !/tests/input/test.mp3
+!/tests/input/benchmark.mp3
 /tests/output/
 todo.txt
 *.swp
