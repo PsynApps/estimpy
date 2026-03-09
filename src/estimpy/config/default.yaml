@@ -279,7 +279,7 @@ visualization:
         '-hide_banner': ''
         '-loglevel': 'error'
         '-y': ''
-        '-pix_fmt': 'yuv420p'
+        '-pix_fmt': 'yuv420p10le'
         '-colorspace': 'bt709'
         '-crf': 22
         '-preset': medium

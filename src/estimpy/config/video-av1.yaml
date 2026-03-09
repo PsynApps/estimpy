@@ -2,11 +2,9 @@
 visualization:
   video:
     export:
-      codec: libaom-av1
+      codec: libsvtav1
       ffmpeg-extra-args:
-        '-preset': ~                                                                                                                                                                                        
-        '-tune': ~                                                                                                                                                                                        
-        '-b:v': 0
+        '-tune': ~
+        '-pix_fmt': yuv420p10le
         '-crf': 28
-        '-cpu-used': 4
-        '-row-mt': 1
+        '-preset': 6

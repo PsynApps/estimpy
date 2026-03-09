@@ -6,7 +6,7 @@ visualization:
       ffmpeg-extra-args:
         '-preset': ~                                                                                                                                                                                        
         '-tune': ~
-        '-b:v': 0                                                                                                                                                                                           
-        '-crf': 26                                                                 
+        '-b:v': 0
+        '-crf': 30
         '-cpu-used': 3
         '-row-mt': 1

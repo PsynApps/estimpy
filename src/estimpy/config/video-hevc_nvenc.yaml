@@ -4,8 +4,8 @@ visualization:
     export:
       codec: hevc_nvenc
       ffmpeg-extra-args:
-        '-crf': ~                                                                                                                                                                                           
-        '-cq': 22                                                                  
+        '-crf': ~
+        '-cq': 22
         '-preset': slow
         '-tune': hq
         '-spatial-aq': 1

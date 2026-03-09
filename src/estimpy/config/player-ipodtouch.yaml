@@ -12,11 +12,12 @@ visualization:
     export:
       codec: libx264
       fmpeg-extra-args:
+        '-pix_fmt': 'yuv420p'
+        '-crf': 28
         '-profile:v': 'high'
-        '-level': 4.1
+        '-level': 3.1
         '-movflags': ''
         '+faststart': ''
-      fps: 60
       preview:
         enabled: False
       size: 1136x640

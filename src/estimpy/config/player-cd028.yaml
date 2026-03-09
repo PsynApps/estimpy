@@ -11,6 +11,11 @@ visualization:
   video:
     export:
       codec: libx264
+      fmpeg-extra-args:
+        '-pix_fmt': 'yuv420p'
+        '-crf': 30
+        '-movflags': ''
+        '+faststart': ''
       preview:
         enabled: False
       size: 320x240
