@@ -362,17 +362,6 @@ class PlayerWindow(QMainWindow):
 
         self._add_separator(button_row)
 
-        # --- Triphase toggle button ---
-        self._btn_triphase = self._make_text_button(
-            'Triphase', 28, 'Triphase (T)',
-            lambda: self._toggle_triphase(), width=70)
-        self._btn_triphase.setCheckable(True)
-        self._btn_triphase.setChecked(es.cfg['visualization.triphase'])
-        self._btn_triphase.setEnabled(self._es_audio.channels == 2)
-        button_row.addWidget(self._btn_triphase)
-
-        self._add_separator(button_row)
-
         # --- Volume controls ---
         self._volume_widgets = {}
 
@@ -386,6 +375,23 @@ class PlayerWindow(QMainWindow):
         self._channel_vol_layout.setSpacing(4)
         self._rebuild_channel_volumes()
         button_row.addWidget(self._channel_vol_container)
+
+        self._add_separator(button_row)
+
+        # --- Triphase toggle button (wrapped in channel-colored container) ---
+        self._triphase_container = QWidget()
+        triphase_layout = QHBoxLayout(self._triphase_container)
+        triphase_layout.setContentsMargins(4, 2, 4, 2)
+        triphase_layout.setSpacing(0)
+        self._btn_triphase = self._make_text_button(
+            'Triphase', 28, 'Triphase (T)',
+            lambda: self._toggle_triphase(), width=70)
+        self._btn_triphase.setCheckable(True)
+        self._btn_triphase.setChecked(es.cfg['visualization.triphase'])
+        self._btn_triphase.setEnabled(self._es_audio.channels == 2)
+        triphase_layout.addWidget(self._btn_triphase)
+        self._apply_channel_tint(self._triphase_container, channel_id=2)
+        button_row.addWidget(self._triphase_container)
 
         controls_layout.addLayout(button_row)
         layout.addWidget(self._controls)
@@ -454,8 +460,24 @@ class PlayerWindow(QMainWindow):
             'mute_btn': mute_btn,
         }
 
-    def _add_channel_volume(self, layout, channel_id, label_text):
-        """Add per-channel volume controls (label + mute + slider + value label)."""
+    def _apply_channel_tint(self, widget, channel_id):
+        """Apply a subtle channel-colored background tint to a container widget."""
+        from estimpy.visualization import _alpha_color
+        channel_cfg = es.cfg['visualization.style.channels']
+        if channel_id < len(channel_cfg):
+            color = channel_cfg[channel_id]['color']
+        else:
+            color = channel_cfg[0]['color']
+        bg = _alpha_color(color, '#1a1a1a', 0.15)
+        widget.setStyleSheet(f'background-color: {bg}; border-radius: 4px;')
+
+    def _add_channel_volume(self, container_layout, channel_id, label_text):
+        """Add per-channel volume controls (label + mute + slider + value label) in a tinted container."""
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setSpacing(4)
+
         label = QLabel(label_text)
         label.setFixedWidth(20)
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -487,6 +509,9 @@ class PlayerWindow(QMainWindow):
         vol_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(vol_label, alignment=Qt.AlignmentFlag.AlignVCenter)
 
+        self._apply_channel_tint(container, channel_id)
+        container_layout.addWidget(container)
+
         self._volume_widgets[channel_id] = {
             'mute_btn': mute_btn,
             'slider': slider,
@@ -506,10 +531,11 @@ class PlayerWindow(QMainWindow):
             if key != 'master':
                 del self._volume_widgets[key]
 
-        # Add controls for each channel
+        # Add controls for each channel using configured labels
+        channel_cfgs = es.cfg['visualization.style.channels']
         for ch in range(self._es_audio.channels):
-            self._add_separator(self._channel_vol_layout)
-            self._add_channel_volume(self._channel_vol_layout, channel_id=ch, label_text=chr(ch + 65))
+            label = channel_cfgs[ch]['label'] if ch < len(channel_cfgs) else chr(ch + 65)
+            self._add_channel_volume(self._channel_vol_layout, channel_id=ch, label_text=label)
 
     def _init_zoom_levels(self, audio_duration, target_length=None):
         """Build the list of available zoom levels for the current audio file.
