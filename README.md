@@ -181,16 +181,7 @@ If no command is given, the player is launched. If no files are given, a file di
 | `save-image`      | Save an image file with visualization of the input file(s). Output uses the same base name as the input file.      |
 | `save-video`      | Save a video file with an animated visualization. Output uses the input file as the audio track.                   |
 | `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, and m4a files.      |
-| `benchmark`       | Benchmark video encoding across all video profiles and display a comparison table of performance and file size.    |
-
-### Benchmark options
-
-These options are only available on `benchmark`:
-
-| Option                                 | Description                                                                                            |
-|----------------------------------------|--------------------------------------------------------------------------------------------------------|
-| `-o PATH`, `--output-path`             | Path to save encoded video files. If specified, files are kept after the benchmark.                   |
-| `-c PROFILE [...]`, `--config`         | Benchmark a specific combination of profiles instead of all video profiles.                           |
+| `benchmark`       | Benchmark video encoding across all video profiles and display a comparison table of performance and file size. Supports `-o` to keep encoded files and `-c` to benchmark a specific combination of profiles instead of all video profiles. |
 
 ### Global options
 
