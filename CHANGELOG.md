@@ -28,6 +28,7 @@
 - Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
 - Configurable channel identity labels (A, B, T) displayed on visualizations, centered across each channel's amplitude and spectrogram panels (`visualization.style.channels.labels.enabled`, `visualization.style.channels.labels.font-size`, `visualization.style.channels.chN.label`)
 - Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
+- `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles
 - Automated test suite (251 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed

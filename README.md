@@ -181,6 +181,7 @@ If no command is given, the player is launched. If no files are given, a file di
 | `save-image`      | Save an image file with visualization of the input file(s). Output uses the same base name as the input file.      |
 | `save-video`      | Save a video file with an animated visualization. Output uses the input file as the audio track.                   |
 | `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, and m4a files.      |
+| `benchmark`       | Benchmark video encoding across all video profiles and display a comparison table of performance and file size.    |
 
 ### Global options
 
@@ -282,7 +283,16 @@ These options are only available on `save-video`:
 <p align="center">
   <img src="https://github.com/user-attachments/assets/11858185-c7f8-4084-8eb3-450d4bcb6ae9" width="720">
 </p>
-  
+
+- **Benchmark all video encoding profiles**
+  ```
+  estimpy benchmark
+  ```
+  Or with a custom audio file:
+  ```
+  estimpy benchmark input.mp3
+  ```
+
 ## Configuration
 
 EstimPy uses a YAML-based configuration system to define its behavior. Configuration variables are initialized with the values specified in `config/default.yaml` from the python package directory.
