@@ -11,6 +11,7 @@ import mutagen.mp4
 
 class MetadataFileFormats(enum.StrEnum):
     M4A = 'm4a'
+    MOV = 'mov'
     MP3 = 'mp3'
     MP4 = 'mp4'
 
@@ -146,7 +147,7 @@ class Metadata:
         metadata = {}
         if self._format == MetadataFileFormats.MP3:
             metadata = MetadataFormatMP3.load(self.file)
-        elif self._format == MetadataFileFormats.M4A or self._format == MetadataFileFormats.MP4:
+        elif self._format in (MetadataFileFormats.M4A, MetadataFileFormats.MOV, MetadataFileFormats.MP4):
             metadata = MetadataFormatMP4.load(self.file)
 
         self.set_metadata(metadata)
@@ -165,7 +166,7 @@ class Metadata:
             raise Exception('Unsupported file format')
         elif self._format == MetadataFileFormats.MP3:
             MetadataFormatMP3.save(self.file, self._data)
-        elif self._format == MetadataFileFormats.M4A or self._format == MetadataFileFormats.MP4:
+        elif self._format in (MetadataFileFormats.M4A, MetadataFileFormats.MOV, MetadataFileFormats.MP4):
             MetadataFormatMP4.save(self.file, self._data)
 
     def set_tag(self, tag: str, value=None, overwrite: bool = True):

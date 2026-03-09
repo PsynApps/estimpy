@@ -419,22 +419,25 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     subprocess.run(ffmpeg_command, check=True)
 
-    print(f'Preparing metadata for video file... ')
+    try:
+        print(f'Preparing metadata for video file... ')
 
-    video_metadata = es.metadata.Metadata(file=video_file)
-    video_metadata.set_metadata(es_audio.metadata.get_metadata())
+        video_metadata = es.metadata.Metadata(file=video_file)
+        video_metadata.set_metadata(es_audio.metadata.get_metadata())
 
-    # Render an image to use as album art in the video metadata
-    if image_file is None:
-        print(f'Creating album art image... ')
-        image_file = write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path())
-        es.utils.add_temp_file(image_file)
-    image_data = open(image_file, 'rb').read()
+        # Render an image to use as album art in the video metadata
+        if image_file is None:
+            print(f'Creating album art image... ')
+            image_file = write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path())
+            es.utils.add_temp_file(image_file)
+        image_data = open(image_file, 'rb').read()
 
-    video_metadata.set_tag('image', image_data)
+        video_metadata.set_tag('image', image_data)
 
-    print(f'Saving metadata to video file... ')
-    video_metadata.save()
+        print(f'Saving metadata to video file... ')
+        video_metadata.save()
+    except Exception as e:
+        print(f'Warning: Failed to write metadata to video file: {e}')
 
     print('Deleting temporary files.')
 
