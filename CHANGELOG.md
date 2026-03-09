@@ -28,7 +28,8 @@
 - Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
 - Configurable channel identity labels (A, B, T) displayed on visualizations, centered across each channel's amplitude and spectrogram panels (`visualization.style.channels.labels.enabled`, `visualization.style.channels.labels.font-size`, `visualization.style.channels.chN.label`)
 - Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
-- `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles
+- `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles (`-o` to keep output files, `-c` to benchmark a specific profile combination)
+- MOV container metadata support (read/write via mutagen's MP4/QuickTime handler)
 - Automated test suite (251 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed
@@ -80,6 +81,7 @@
 - Scrub bar position line no longer leaves a ghost artifact when zoom level is changed during playback
 - Zoom level is now preserved when switching between files in the playlist
 - `Audio.resample()` now passes audio data to the resample function (was missing first argument) and updates `sample_count` after resampling
+- Metadata failures during video export now produce a warning instead of discarding the encoded video
 - LICENSE file updated from GPL-3.0 to MIT to match pyproject.toml declaration
 
 ## [1.1.3] - 2026-02-10
