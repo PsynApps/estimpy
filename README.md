@@ -441,7 +441,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.export.ffmpeg-extra-args.-hide_banner    |                                              |
 | visualization.video.export.ffmpeg-extra-args.-loglevel       | error                                        |
 | visualization.video.export.ffmpeg-extra-args.-y              |                                              |
-| visualization.video.export.ffmpeg-extra-args.-pix_fmt        | yuv420p                                      |
+| visualization.video.export.ffmpeg-extra-args.-pix_fmt        | yuv420p10le                                  |
 | visualization.video.export.ffmpeg-extra-args.-colorspace     | bt709                                        |
 | visualization.video.export.ffmpeg-extra-args.-crf            | 22                                           |
 | visualization.video.export.ffmpeg-extra-args.-preset         | medium                                       |

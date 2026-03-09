@@ -1,7 +1,6 @@
 """A module for analysis of audio data"""
 import enum
 import math
-import typing
 
 import estimpy as es
 import numpy as np
@@ -157,9 +156,9 @@ class Spectrogram:
 
 
     @property
-    def frequencies(self) -> np.ndarray[typing.Type[float]]:
+    def frequencies(self) -> np.ndarray:
         """
-        :return np.ndarray[typing.Type[float]]:
+        :return np.ndarray:
         """
         return self._frequencies
 
@@ -178,16 +177,16 @@ class Spectrogram:
         return self._frequency_max
 
     @property
-    def spectrogram_data(self) -> np.ndarray[typing.Type[float]]:
+    def spectrogram_data(self) -> np.ndarray:
         """
-        :return np.ndarray[typing.Type[float]]:
+        :return np.ndarray:
         """
         return self._spectrogram_data
 
     @property
-    def times(self) -> np.ndarray[typing.Type[float]]:
+    def times(self) -> np.ndarray:
         """
-        :return np.ndarray[typing.Type[float]]:
+        :return np.ndarray:
         """
         return self._times
 

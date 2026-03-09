@@ -306,7 +306,7 @@ class MetadataFormatMP3(MetadataFormat, abc.ABC):
 
             if value is not None:
                 file_tag_field_class = getattr(mutagen.id3, file_tag_field)
-                file_tags[file_tag_field] = file_tag_field_class(encoding=3, text=U'' + str(value))
+                file_tags[file_tag_field] = file_tag_field_class(encoding=3, text=str(value))
 
 class MetadataFormatMP4(MetadataFormat, abc.ABC):
     @classmethod

@@ -37,15 +37,15 @@ class AxisScaleText(enum.Enum):
 
 
 class AxisTypes(enum.StrEnum):
-    AMPLITUDE = 'amplitude',
-    AMPLITUDE_SCRUB = 'amplitude_scrub',
-    CONTROLS = 'controls',
+    AMPLITUDE = 'amplitude'
+    AMPLITUDE_SCRUB = 'amplitude_scrub'
+    CONTROLS = 'controls'
     TITLE = 'title'
     SPECTROGRAM = 'spectrogram'
 
 
 class VisualizationMode(enum.IntEnum):
-    DISPLAY = 0,
+    DISPLAY = 0
     EXPORT = 1
 
 
