@@ -10,7 +10,7 @@
 - Triphase visualization mode (`-t`/`--triphase`) showing the derived common electrode signal -(A+B) alongside the A and B channels
 - Triphase toggle in the player UI for instant switching between stereo and triphase visualization during playback, with pre-computed 3-channel analysis data for stereo files
 - Per-channel colormap derivation from a single base colormap (`visualization.style.spectrogram.color-map`), with the low-energy region automatically recolored to match each channel's base color
-- Configurable colormap recoloring radius (`visualization.style.spectrogram.match-amplitude-color-radius`) with perceptual brightness matching using Rec. 709 relative luminance
+- Configurable colormap recoloring radius (`visualization.style.spectrogram.match-channel-color-radius`) with perceptual brightness matching using Rec. 709 relative luminance
 - Playlist management UI in the player with add, remove, reorder, and file selection
 - Repeat mode button in the player (none/one/all), toggled with the R key
 - Fullscreen mode in the player, toggled via button, F key, Alt+Enter, or double-clicking the visualization (Escape to exit)
@@ -26,6 +26,8 @@
 - Resolution-aware FFT sizing for all visualization modes (player, image, and video export), using coarse frequency pre-analysis (~20 FFTs) and output panel dimensions to determine the optimal FFT size
 - Oscilloscope waveform overlay for video display and export, showing trigger-stabilized raw audio waveform per channel with automatic pulse detection that switches window length between tonal and pulsed content using coefficient of variation analysis (`visualization.video.display.oscilloscope.enabled`, `visualization.video.export.oscilloscope.enabled`, `analysis.oscilloscope.pulse-detection.*`)
 - Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
+- Configurable channel identity labels (A, B, T) displayed on visualizations, centered across each channel's amplitude and spectrogram panels (`visualization.style.channels.labels.enabled`, `visualization.style.channels.labels.font-size`, `visualization.style.channels.chN.label`)
+- Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
 - Automated test suite (251 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed
@@ -38,7 +40,9 @@
 - Envelope computation vectorized using NumPy stride tricks, replacing per-window Python loop
 - Spectral edge frequency max computation vectorized and subsampled for faster loading of long files
 - Spectrogram colormap configuration simplified from per-channel colormaps to a single base colormap with automatic per-channel derivation
-- Renamed `peak-color` to `base-color` in channel style configuration
+- Channel identity (color and label) promoted to `visualization.style.channels.chN` with per-channel amplitude styling (`peak-color`, `rms-color`, `background-color`) falling back to the channel color when not explicitly set
+- Renamed `base-color` to `peak-color` in amplitude channel style configuration
+- Renamed `match-amplitude-color` to `match-channel-color` in spectrogram style configuration
 - Default channel colors updated (`#4799e8`, `#b775ff`)
 - Triphase amplitude panel scaled to +6 dB (linear 2.0) to reflect the analog summation range
 - Video export default CRF changed from 26 to 22, preset from `slow` to `medium`
@@ -47,7 +51,7 @@
 - Reworked most video configuration profiles to improve processing speed and consistency of quality
 - Switched audio playback dependency from `pygame` to `pygame-ce` (community edition)
 - File selection dialogs now use Qt (`QFileDialog`) instead of tkinter, removing the tkinter dependency
-- Player controls reordered: playback | repeat | fullscreen | playlist | stretch | oscilloscope | zoom | triphase | volume
+- Player controls reordered: playback | repeat | fullscreen | playlist | stretch | oscilloscope | zoom | volume | triphase
 - Repeat config changed from boolean to string enum (`none`/`one`/`all`) with backward compatibility for boolean values
 - End-of-track handling now respects repeat mode: `one` loops the current file, `all` wraps around the playlist, `none` advances or stops
 - Refactored `visualization.py` into a `visualization/` subpackage with separate modules: `base.py` (static images), `video.py` (direct render pipeline), `oscilloscope.py` (waveform overlay mixin)
