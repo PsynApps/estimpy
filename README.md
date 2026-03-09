@@ -400,7 +400,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.channels.ch2.color                       | #e06cb7                                      |
 | visualization.style.channels.ch2.label                       | T                                            |
 | visualization.style.channels.labels.enabled                  | True                                         |
-| visualization.style.channels.labels.font-size                | 20                                           |
+| visualization.style.channels.labels.font-size                | 28                                           |
 | visualization.style.axes.color                               | #ffffff                                      |
 | visualization.style.axes.font-size                           | 16                                           |
 | visualization.style.axes.text-padding                        | 1                                            |

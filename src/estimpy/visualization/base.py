@@ -479,16 +479,17 @@ class Visualization:
         if not label:
             return
 
+        amp_cfg = self._get_amplitude_style_cfg(channel_id)
         _mpl_fp = es.cfg['visualization.style.font.text.mpl-fontproperties']
-        text_padding = es.cfg['visualization.style.axes.text-padding']
+        font_size = es.cfg['visualization.style.channels.labels.font-size']
         label_handle = ax.annotate(
             text=label,
             xy=(0, 0.5), xycoords='axes fraction',
-            xytext=(text_padding, 0), textcoords='offset points',
+            xytext=(font_size * 0.4, 0), textcoords='offset points',
             va='center', ha='left',
-            fontsize=es.cfg['visualization.style.channels.labels.font-size'],
+            fontsize=font_size,
             fontproperties=_mpl_fp,
-            color=channel_cfg['color'])
+            color=amp_cfg['rms-color'])
 
         self._set_text_path_effects(label_handle)
         self._handles['text'].append(label_handle)
