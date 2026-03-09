@@ -183,6 +183,15 @@ If no command is given, the player is launched. If no files are given, a file di
 | `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, and m4a files.      |
 | `benchmark`       | Benchmark video encoding across all video profiles and display a comparison table of performance and file size.    |
 
+### Benchmark options
+
+These options are only available on `benchmark`:
+
+| Option                                 | Description                                                                                            |
+|----------------------------------------|--------------------------------------------------------------------------------------------------------|
+| `-o PATH`, `--output-path`             | Path to save encoded video files. If specified, files are kept after the benchmark.                   |
+| `-c PROFILE [...]`, `--config`         | Benchmark a specific combination of profiles instead of all video profiles.                           |
+
 ### Global options
 
 | Option                                             | Description                                                                                                            |
@@ -288,9 +297,15 @@ These options are only available on `save-video`:
   ```
   estimpy benchmark
   ```
-  Or with a custom audio file:
+
+- **Benchmark with a custom audio file and keep the encoded files**
   ```
-  estimpy benchmark input.mp3
+  estimpy benchmark input.mp3 -o ./benchmark-output
+  ```
+
+- **Benchmark a specific combination of profiles**
+  ```
+  estimpy benchmark -c video-hevc_videotoolbox video-8k video-60fps
   ```
 
 ## Configuration

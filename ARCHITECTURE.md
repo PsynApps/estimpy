@@ -35,7 +35,7 @@ tests/
 ├── test_config.py           # Config loading, updates, type casting, event system
 ├── test_metadata.py         # Tag read/write, image format detection
 ├── test_utils.py            # Formatting, file path helpers
-└── input/                   # Test audio fixtures (WAV, MP3)
+└── input/                   # Test audio fixtures (WAV, MP3), benchmark audio file
 ```
 
 **Why this layout:** The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `visualization/` and `player/` packages are separate subpackages because they have significant internal structure — visualization splits rendering concerns across static images, video pipeline, and oscilloscope overlay, while player manages GUI dependencies (PyQt6, pygame) with its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.
@@ -74,11 +74,11 @@ tests/
 ### `export.py` — File Output
 - **Responsibility:** Write images via matplotlib and encode videos by piping raw RGB frames to ffmpeg.
 - **Key functions:** `write_image()`, `write_video()`.
-- **Notable:** Video export uses segment-based encoding (configurable segment length, default 3600s) with resume support. Segments are concatenated with ffmpeg's concat demuxer. Supports preview frames with fade overlay.
+- **Notable:** Video export uses segment-based encoding (configurable segment length, default 3600s) with resume support. Segments are concatenated with ffmpeg's concat demuxer. Supports preview frames with fade overlay. Metadata embedding is non-fatal — failures produce a warning rather than discarding the encoded video.
 - **Dependencies:** visualization (creates figures), subprocess (ffmpeg), tqdm (progress bars).
 
 ### `metadata.py` — Audio Tags
-- **Responsibility:** Read/write ID3 (MP3) and MP4/M4A tags. Extracts artist/title from filenames via regex.
+- **Responsibility:** Read/write ID3 (MP3), MP4/M4A, and MOV tags. Extracts artist/title from filenames via regex.
 - **Key classes:** `Metadata`, `MetadataFormat` (abstract), `MetadataFormatMP3`, `MetadataFormatMP4`, `MetadataImage`.
 - **Dependencies:** mutagen.
 - **Dependents:** audio (auto-loads metadata), export (embeds album art in videos), cli (save-metadata command).
@@ -154,6 +154,33 @@ sequenceDiagram
     Export->>FFmpeg: Concatenate segments + audio
     Export->>Export: Embed metadata + album art
 ```
+
+### CLI Invocation: `estimpy benchmark`
+
+```mermaid
+sequenceDiagram
+    participant CLI as cli.py
+    participant Config as __init__.py (config)
+    participant Export as export.py
+
+    CLI->>CLI: Load audio (once)
+    CLI->>CLI: Discover video-*.yaml profiles
+    CLI->>Config: Snapshot default config (deep copy)
+
+    loop Each profile
+        CLI->>Config: Restore snapshot
+        CLI->>Config: load_config(profile)
+        CLI->>Export: write_video(es_audio)
+        Note over Export: Full encode pipeline<br/>(same as save-video)
+        Export-->>CLI: video_file path
+        CLI->>CLI: Record time, FPS, file size
+        CLI->>CLI: Delete output (or keep if -o)
+    end
+
+    CLI->>CLI: Print summary table
+```
+
+The benchmark command reuses the standard `write_video()` pipeline — it does not implement a separate encoding path. Config isolation between runs is achieved by deep-copying the config dict before the loop and restoring it before each profile is loaded. When `-c` is specified, only that combination of profiles is benchmarked as a single run instead of iterating all `video-*` profiles.
 
 ### Direct Render Pipeline (per frame)
 
