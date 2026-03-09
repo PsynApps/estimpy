@@ -99,8 +99,13 @@ def main():
     parser_benchmark = subparsers.add_parser('benchmark',
         help='Benchmark video encoding profiles',
         description='Encode a test file using each video profile and report encoding time, speed, and file size. '
-                    'If no input file is specified, uses the bundled benchmark audio file.')
+                    'If no input file is specified, uses the bundled benchmark audio file. '
+                    'If -c is specified, benchmarks only that combination of profiles instead of all video profiles.')
     parser_benchmark.add_argument('file', nargs='?', default=None, help='Input audio file. If not specified, uses the bundled benchmark file.')
+    parser_benchmark.add_argument('-o', '--output-path', default=None, metavar='PATH',
+        help='Path to save output video file(s). If specified, encoded files are kept after the benchmark.')
+    parser_benchmark.add_argument('-c', '--config', default=None, nargs='*', metavar='PROFILE',
+        help='Benchmark a specific combination of configuration profile(s) instead of all video profiles.')
 
     parsed = vars(parser.parse_args())
 
@@ -321,20 +326,29 @@ def _run_benchmark(args):
             print('  estimpy benchmark <audio-file>')
         sys.exit(1)
 
+    # Determine output mode: keep files if -o is specified, otherwise use temp dir
+    user_output_path = args.get('output_path')
+    keep_files = user_output_path is not None
+
     print(f'Benchmark input: {input_file}')
 
     # Load audio once
     es_audio = _load_audio(input_file)
 
-    # Discover video profiles dynamically from the config directory
-    config_path = os.path.join(os.path.dirname(__file__), 'config')
-    profile_files = sorted(glob.glob(os.path.join(config_path, 'video-*.yaml')))
-    profile_names = [os.path.splitext(os.path.basename(f))[0] for f in profile_files]
+    # Build run list based on whether -c was specified
+    config_profiles = args.get('config')
+    if config_profiles:
+        # Single run with the specified combination of profiles
+        display_name = '+'.join(p.removeprefix('video-') for p in config_profiles)
+        runs = [(display_name, config_profiles)]
+    else:
+        # Discover all video profiles dynamically from the config directory
+        config_path = os.path.join(os.path.dirname(__file__), 'config')
+        profile_files = sorted(glob.glob(os.path.join(config_path, 'video-*.yaml')))
+        profile_names = [os.path.splitext(os.path.basename(f))[0] for f in profile_files]
+        runs = [('default', [])] + [(name.removeprefix('video-'), [name]) for name in profile_names]
 
-    # Build run list: default first, then each video profile
-    runs = [('default', None)] + [(name.removeprefix('video-'), name) for name in profile_names]
-
-    print(f'Found {len(runs)} profiles to benchmark: {", ".join(name for name, _ in runs)}')
+    print(f'Profiles to benchmark ({len(runs)}): {", ".join(name for name, _ in runs)}')
     print()
 
     # Snapshot the default config state to restore between runs
@@ -342,20 +356,25 @@ def _run_benchmark(args):
     default_base_cfg = copy.deepcopy(dict(es.base_cfg))
 
     results = []
-    output_dir = es.utils.get_temp_file_path()
-    os.makedirs(output_dir, exist_ok=True)
 
-    for i, (display_name, profile_name) in enumerate(runs):
+    if keep_files:
+        output_dir = user_output_path
+        os.makedirs(output_dir, exist_ok=True)
+    else:
+        output_dir = es.utils.get_temp_file_path()
+        os.makedirs(output_dir, exist_ok=True)
+
+    for i, (display_name, profiles) in enumerate(runs):
         # Restore config to default state
         es.cfg.clear()
         es.cfg.update(copy.deepcopy(default_cfg))
         es.base_cfg.clear()
         es.base_cfg.update(copy.deepcopy(default_base_cfg))
 
-        # Load the profile on top of defaults
-        if profile_name is not None:
+        # Load profiles on top of defaults
+        if profiles:
             try:
-                es.load_config(profile_name)
+                es.load_configs(profiles)
             except Exception as e:
                 print(f'[{i + 1}/{len(runs)}] {display_name}: Failed to load profile — {e}')
                 results.append({'name': display_name, 'error': str(e)})
@@ -388,6 +407,13 @@ def _run_benchmark(args):
                 total_frames = int(es_audio.length * fps)
                 encoding_fps = total_frames / elapsed if elapsed > 0 else 0
 
+                # Rename output file to include profile name when keeping files
+                if keep_files and len(runs) > 1:
+                    base, ext = os.path.splitext(video_file)
+                    profile_file = f'{base} [{display_name}]{ext}'
+                    os.replace(video_file, profile_file)
+                    video_file = profile_file
+
                 results.append({
                     'name': display_name,
                     'codec': codec,
@@ -396,10 +422,11 @@ def _run_benchmark(args):
                     'time': elapsed,
                     'encoding_fps': encoding_fps,
                     'file_size': file_size,
+                    'file': video_file if keep_files else None,
                 })
 
-                # Clean up output file
-                os.remove(video_file)
+                if not keep_files:
+                    os.remove(video_file)
             else:
                 results.append({'name': display_name, 'error': 'No output file produced'})
         except Exception as e:
@@ -416,11 +443,12 @@ def _run_benchmark(args):
 
         print()
 
-    # Clean up temp directory
-    try:
-        os.rmdir(output_dir)
-    except OSError:
-        pass
+    # Clean up temp directory if not keeping files
+    if not keep_files:
+        try:
+            os.rmdir(output_dir)
+        except OSError:
+            pass
 
     # Print summary table
     _print_benchmark_summary(results)
