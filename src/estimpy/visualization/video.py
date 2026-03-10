@@ -22,8 +22,9 @@ from estimpy.visualization.oscilloscope import OscilloscopeMixin
 
 
 class VideoVisualization(Visualization, OscilloscopeMixin):
-    def __init__(self, es_audio: es.audio.Audio = None, fps: float = None, frames: range = None):
-        super().__init__(es_audio=es_audio)
+    def __init__(self, es_audio: es.audio.Audio = None, fps: float = None, frames: range = None,
+                 mode: VisualizationMode = VisualizationMode.EXPORT):
+        super().__init__(es_audio=es_audio, mode=mode)
 
         self._fps = es.cfg['visualization.video.export.fps'] if fps is None else fps
         self._frames = range(math.floor(es_audio.length * self.fps)) if frames is None else frames
@@ -257,8 +258,8 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._position_line_color = (np.array(line_color) * 255).astype(np.uint8)
 
         # --- Time text rendering setup ---
-        self._dr_time_enabled = self._time_enabled()
-        self._dr_time_position_top = (self._time_position() == 'top')
+        self._dr_time_enabled = self._time_enabled(self._mode)
+        self._dr_time_position_top = (self._time_position(self._mode) == 'top')
 
         if self._dr_time_enabled and self._handles['time'] is not None:
             time_fontsize_pt = self._handles['time'].get_fontsize()
@@ -943,28 +944,29 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         if self._handles['time'] is None:
             return
 
-        if self._time_enabled():
+        if self._time_enabled(self._mode):
             self._handles['time'].set_text(self._get_time_text())
         else:
             self._handles['time'].set_text('')
 
     # --- Display/export mode classmethods ---
-    # These return export-path config by default. The player overrides them
-    # on the instance with lambdas that read display-path config instead
-    # (see player/window.py _init_visualization).
 
     @classmethod
-    def _time_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:
-        return es.cfg['visualization.video.export.time.enabled']
+    def _time_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:
+        return es.cfg['visualization.video.export.time.enabled'] if mode is VisualizationMode.EXPORT else \
+            es.cfg['visualization.video.display.time.enabled']
 
     @classmethod
-    def _time_position(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> str:
-        return es.cfg['visualization.video.export.time.position']
+    def _time_position(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> str:
+        return es.cfg['visualization.video.export.time.position'] if mode is VisualizationMode.EXPORT else \
+            es.cfg['visualization.video.display.time.position']
 
     @classmethod
-    def _title_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:
-        return es.cfg['visualization.video.export.title.enabled']
+    def _title_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:
+        return es.cfg['visualization.video.export.title.enabled'] if mode is VisualizationMode.EXPORT else \
+            es.cfg['visualization.video.display.title.enabled']
 
     @classmethod
-    def _triphase_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:
-        return es.cfg['visualization.video.export.triphase']
+    def _triphase_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:
+        return es.cfg['visualization.video.export.triphase'] if mode is VisualizationMode.EXPORT else \
+            es.cfg['visualization.video.display.triphase']

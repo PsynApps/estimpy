@@ -207,13 +207,8 @@ class PlayerWindow(QMainWindow):
             include_scrub=True)
 
         with es.utils.Spinner('Preparing player visualization... '):
-            self._visualization = es.visualization.VideoVisualization(es_audio=es_audio)
-
-            # Override to use display settings (not export)
-            self._visualization._time_enabled = lambda mode=None: es.cfg['visualization.video.display.time.enabled']
-            self._visualization._time_position = lambda mode=None: es.cfg['visualization.video.display.time.position']
-            self._visualization._title_enabled = lambda mode=None: es.cfg['visualization.video.display.title.enabled']
-            self._visualization._triphase_enabled = lambda mode=None: es.cfg['visualization.video.display.triphase']
+            self._visualization = es.visualization.VideoVisualization(
+                es_audio=es_audio, mode=es.visualization.VisualizationMode.DISPLAY)
             self._visualization._window_length = es.cfg['visualization.video.display.window-length']
             self._visualization._fps = self._fps
             self._visualization._frames = range(self._total_frames)

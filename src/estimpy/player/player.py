@@ -57,13 +57,8 @@ class Player:
         return self._es_audio
 
     def get_repeat_mode(self) -> str:
-        """Get the current repeat mode, with backward compatibility for boolean values."""
-        mode = es.cfg['player.repeat']
-        if mode is True:
-            return 'one'
-        elif mode is False or mode is None:
-            return 'none'
-        return str(mode)
+        """Get the current repeat mode ('none', 'one', or 'all')."""
+        return str(es.cfg['player.repeat'])
 
     def get_time(self) -> float:
         """Return current playback position in seconds."""

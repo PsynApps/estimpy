@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.0.0] - 2026-02-11
+## [2.0.0] - 2026-03-10
 ### Added
 - Unified `estimpy` CLI replacing `estimpy-visualizer` and `estimpy-player` with subcommands: `play` (default), `show-image`, `save-image`, `save-video`, `save-metadata`
 - Positional file arguments (e.g., `estimpy play song.mp3` instead of `estimpy-player -i song.mp3`)

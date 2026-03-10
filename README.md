@@ -320,6 +320,7 @@ The following additional configuration profiles are included with **EstimPy**:
 | `image-videopreview`        | Generate image visualization in 1440p with a 16:9 aspect ratio       |
 | `notitle`                   | Remove the title panel from all visualizations                       |
 | `player-cd028`              | Optimized settings for the CD-028 player                             |
+| `player-galaxytabs10ultra`  | Optimized settings for the Galaxy Tab S10 Ultra player               |
 | `player-ipodtouch`          | Optimized settings for the iPod Touch player                         |
 | `video-4k`                  | Generate animated visualizations in 4K                               |
 | `video-8k`                  | Generate animated visualizations in 8K                               |
@@ -496,6 +497,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.export.ffmpeg-extra-args.-colorspace     | bt709                                        |
 | visualization.video.export.ffmpeg-extra-args.-crf            | 22                                           |
 | visualization.video.export.ffmpeg-extra-args.-preset         | medium                                       |
+| visualization.video.export.ffmpeg-extra-args.-movflags       | +faststart                                   |
 | visualization.video.export.ffmpeg-extra-args.-tune           | animation                                    |
 | visualization.video.export.format                            | mp4                                          |
 | visualization.video.export.fps                               | 30                                           |

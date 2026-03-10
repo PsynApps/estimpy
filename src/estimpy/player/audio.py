@@ -271,13 +271,8 @@ def stop():
 
 
 def _get_repeat_mode() -> str:
-    """Get the current repeat mode, with backward compatibility for boolean values."""
-    mode = es.cfg['player.repeat']
-    if mode is True:
-        return 'one'
-    elif mode is False or mode is None:
-        return 'none'
-    return str(mode)
+    """Get the current repeat mode ('none', 'one', or 'all')."""
+    return str(es.cfg['player.repeat'])
 
 
 def _set_channel_volume_unsafe(volume: float = None, channel: int = None):
