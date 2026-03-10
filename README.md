@@ -491,7 +491,7 @@ For reference, the default configuration options and values are as follows:
 
 ### Regenerating the benchmark file
 
-The `benchmark` command uses `tests/input/benchmark.mp3` as its default input file. This file is generated from source audio files using a script that analyzes the audio content and selects 12 diverse 5-second segments spanning a range of amplitude, frequency, and modulation characteristics.
+The `benchmark` command uses `tests/input/benchmark.mp3` as its default input file. This file is generated from source audio files using a script that analyzes the audio content and selects diverse segments spanning a range of amplitude, frequency, and modulation characteristics. Mono sources are automatically duplicated to stereo when mixed with stereo sources.
 
 To regenerate the benchmark file:
 
@@ -501,7 +501,13 @@ To regenerate the benchmark file:
    python tests/generate_benchmark.py
    ```
 
-The script analyzes each source file, extracts candidate 5-second windows, filters out section transitions, then uses farthest-first traversal in feature space to select segments that maximize diversity across RMS amplitude, spectral centroid, spectral bandwidth, and amplitude modulation depth.
+The script prompts before overwriting an existing output file. Output length, segment length, and output path are configurable:
+
+```
+python tests/generate_benchmark.py --output-length 120 --segment-length 10 --output custom.mp3
+```
+
+Each source file is guaranteed at least one segment in the output (when slots permit). The script analyzes candidate segments, filters out silence and section transitions, then uses farthest-first traversal in feature space to select segments that maximize diversity across RMS amplitude, spectral centroid, spectral bandwidth, and amplitude modulation depth.
 
 ### Running tests
 

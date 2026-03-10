@@ -30,7 +30,7 @@ src/estimpy/
 
 tests/
 ├── conftest.py              # Pytest fixtures: synthetic audio, config isolation
-├── generate_benchmark.py    # Generates benchmark.mp3 from source files in input/benchmark/
+├── generate_benchmark.py    # Generates benchmark.mp3 from source files in input/benchmark/ (--output-length, --segment-length, --output)
 ├── test_audio.py            # Audio loading, normalization, triphase, resampling
 ├── test_analysis.py         # Envelope computation, spectrogram generation, FFT sizing
 ├── test_config.py           # Config loading, updates, type casting, event system

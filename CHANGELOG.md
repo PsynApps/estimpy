@@ -30,6 +30,7 @@
 - Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
 - `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles (`-o` to keep output files, `-c` to benchmark a specific profile combination)
 - MOV container metadata support (read/write via mutagen's MP4/QuickTime handler)
+- Benchmark audio generator script (`tests/generate_benchmark.py`) with configurable output/segment length, custom output path, per-file representation guarantees, diversity-maximizing segment selection, and automatic mono-to-stereo duplication
 - Automated test suite (251 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed
