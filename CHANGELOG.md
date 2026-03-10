@@ -28,7 +28,7 @@
 - Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
 - Configurable channel identity labels (A, B, T) displayed on visualizations, centered across each channel's amplitude and spectrogram panels (`visualization.style.channels.labels.enabled`, `visualization.style.channels.labels.font-size`, `visualization.style.channels.chN.label`)
 - Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
-- `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles (`-o` to keep output files, `-c` to benchmark a specific profile combination)
+- `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles (`-o` to keep output files with timestamped filenames, `-c` to benchmark a specific profile combination with automatic `video-` prefix resolution)
 - MOV container metadata support (read/write via mutagen's MP4/QuickTime handler)
 - User configuration directory (`~/.estimpy/`) for personal profile overrides and custom profiles, loaded after builtin profiles of the same name
 - `additional-config-profiles` key in config profiles to automatically load other profiles after the current one, enabling composable configuration chains
@@ -61,6 +61,7 @@
 - Repeat config changed from boolean to string enum (`none`/`one`/`all`) with backward compatibility for boolean values
 - End-of-track handling now respects repeat mode: `one` loops the current file, `all` wraps around the playlist, `none` advances or stops
 - Refactored `visualization.py` into a `visualization/` subpackage with separate modules: `base.py` (static images), `video.py` (direct render pipeline), `oscilloscope.py` (waveform overlay mixin)
+- `write_video()` returns a result dict (`file`, `encoding_fps`, `total_frames`, `encoding_time`, `file_size`) instead of a plain file path, providing encoding statistics to callers
 - Font face index for TTC files now stored as derived config key (`visualization.style.font.text.face-index`) instead of a module-level variable
 
 ### Removed

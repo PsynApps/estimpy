@@ -78,7 +78,7 @@ tests/
 
 ### `export.py` — File Output
 - **Responsibility:** Write images via matplotlib and encode videos by piping raw RGB frames to ffmpeg.
-- **Key functions:** `write_image()`, `write_video()`.
+- **Key functions:** `write_image()`, `write_video()`. `write_video()` returns a result dict (`file`, `encoding_fps`, `total_frames`, `encoding_time`, `file_size`) on success, `None` on failure.
 - **Notable:** Video export uses segment-based encoding (configurable segment length, default 3600s) with resume support. Segments are concatenated with ffmpeg's concat demuxer. Supports preview frames with fade overlay. Metadata embedding is non-fatal — failures produce a warning rather than discarding the encoded video.
 - **Dependencies:** visualization (creates figures), subprocess (ffmpeg), tqdm (progress bars).
 
@@ -185,7 +185,7 @@ sequenceDiagram
     CLI->>CLI: Print summary table
 ```
 
-The benchmark command reuses the standard `write_video()` pipeline — it does not implement a separate encoding path. Config isolation between runs is achieved by deep-copying the config dict before the loop and restoring it before each profile is loaded. When `-c` is specified, only that combination of profiles is benchmarked as a single run instead of iterating all `video-*` profiles.
+The benchmark command reuses the standard `write_video()` pipeline — it does not implement a separate encoding path. Config isolation between runs is achieved by deep-copying the config dict before the loop and restoring it before each profile is loaded. The encoding FPS reported in the summary table comes from `write_video()`'s result dict, reflecting the actual frame rendering speed rather than total wall-clock time (which includes file loading, analysis, and metadata overhead). When `-c` is specified, only that combination of profiles is benchmarked as a single run instead of iterating all `video-*` profiles; profile names auto-resolve the `video-` prefix so users can pass either `hevc_videotoolbox` or `video-hevc_videotoolbox`. Output files saved with `-o` use timestamped names: `benchmark-YYYYMMDDHHMMSS-profile.ext`.
 
 ### Direct Render Pipeline (per frame)
 
