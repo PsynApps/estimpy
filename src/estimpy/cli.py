@@ -398,16 +398,15 @@ def _run_benchmark(args):
 
         try:
             start_time = time.time()
-            video_file = es.export.write_video(
+            result = es.export.write_video(
                 es_audio=es_audio,
                 output_path=output_dir,
                 overwrite=True)
             elapsed = time.time() - start_time
 
-            if video_file and os.path.exists(video_file):
+            if result and os.path.exists(result['file']):
+                video_file = result['file']
                 file_size = os.path.getsize(video_file)
-                total_frames = int(es_audio.length * fps)
-                encoding_fps = total_frames / elapsed if elapsed > 0 else 0
 
                 # Rename output file to include profile name when keeping files
                 if keep_files and len(runs) > 1:
@@ -422,7 +421,7 @@ def _run_benchmark(args):
                     'resolution': resolution,
                     'fps': fps,
                     'time': elapsed,
-                    'encoding_fps': encoding_fps,
+                    'encoding_fps': result['encoding_fps'],
                     'file_size': file_size,
                     'file': video_file if keep_files else None,
                 })

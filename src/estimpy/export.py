@@ -57,7 +57,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 fps: float = None, width: int = None, height: int = None,
                 frame_start: int = None, segment_start: int = None,
                 image_file: str = None, overwrite: bool = None,
-                profiling: bool = False) -> str | None:
+                profiling: bool = False) -> dict | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     video_format = video_format if video_format is not None else es.cfg['visualization.video.export.format']
     segment_start = segment_start if segment_start is not None else 1
@@ -443,8 +443,16 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     es.utils.delete_temp_files()
 
+    encoding_time = time.time() - encoding_time_start
+    encoding_fps = frames_total / encoding_time if encoding_time > 0 else 0
+
     print(f'Saved file "{video_file}" ({os.path.getsize(video_file)}).')
 
     print()
 
-    return video_file
+    return {
+        'file': video_file,
+        'encoding_fps': encoding_fps,
+        'total_frames': frames_total,
+        'encoding_time': encoding_time,
+    }
