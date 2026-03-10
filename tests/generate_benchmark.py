@@ -278,7 +278,7 @@ def select_segments(candidates, segment_count):
     return selected
 
 
-def encode_single_file(source_file, output_length):
+def encode_single_file(source_file, output_length, output_file):
     """Encode a single source file directly when it's the only source and short enough."""
     samples, sample_rate, channels = load_audio(source_file)
     duration = samples.shape[-1] / sample_rate
@@ -287,12 +287,12 @@ def encode_single_file(source_file, output_length):
         return False  # File is too long, use segment approach
 
     print(f'Single file ({duration:.1f}s) fits within output length ({output_length:.0f}s), encoding directly.')
-    encode_to_mp3(samples, sample_rate)
+    encode_to_mp3(samples, sample_rate, output_file)
     return True
 
 
-def encode_to_mp3(samples, sample_rate):
-    """Encode a float32 samples array to the output MP3 file."""
+def encode_to_mp3(samples, sample_rate, output_file):
+    """Encode a float32 samples array to an MP3 file."""
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
         tmp_wav = tmp.name
 
@@ -309,14 +309,14 @@ def encode_to_mp3(samples, sample_rate):
             '-i', tmp_wav,
             '-codec:a', 'libmp3lame',
             '-q:a', '0',
-            OUTPUT_FILE
+            output_file
         ]
         subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     finally:
         os.unlink(tmp_wav)
 
-    file_size = os.path.getsize(OUTPUT_FILE)
-    print(f'Wrote {OUTPUT_FILE} ({file_size / 1024:.0f} KB)')
+    file_size = os.path.getsize(output_file)
+    print(f'Wrote {output_file} ({file_size / 1024:.0f} KB)')
 
 
 def format_time(seconds):
@@ -333,10 +333,20 @@ def main():
         help='Total output length in seconds (default: 60).')
     parser.add_argument('--segment-length', type=float, default=5.0,
         help='Length of each segment in seconds (default: 5).')
+    parser.add_argument('--output', type=str, default=OUTPUT_FILE,
+        help=f'Output MP3 file path (default: {OUTPUT_FILE}).')
     args = parser.parse_args()
 
     output_length = args.output_length
     segment_length = args.segment_length
+    output_file = args.output
+
+    # Check for existing output file
+    if os.path.exists(output_file):
+        response = input(f'{output_file} already exists. Overwrite? [y/N] ')
+        if response.lower() != 'y':
+            print('Aborted.')
+            sys.exit(0)
 
     if segment_length > output_length:
         print(f'Error: Segment length ({segment_length}s) exceeds output length ({output_length}s).')
@@ -367,7 +377,7 @@ def main():
 
     # Single file special case
     if len(source_files) == 1:
-        if encode_single_file(source_files[0], output_length):
+        if encode_single_file(source_files[0], output_length, output_file):
             return
         # File is longer than output length — fall through to segment approach
         print('File exceeds output length, using segment selection.')
@@ -505,7 +515,7 @@ def main():
     print(f'Assembling {len(selected)} segments ({assembled.shape[-1] / target_sr:.1f}s, '
           f'{target_channels}ch, {target_sr}Hz)...')
 
-    encode_to_mp3(assembled, target_sr)
+    encode_to_mp3(assembled, target_sr, output_file)
 
 
 if __name__ == '__main__':
