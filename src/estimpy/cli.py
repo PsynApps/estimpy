@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import copy
+import datetime
 import glob
 import logging
 import os
@@ -359,6 +360,8 @@ def _run_benchmark(args):
 
     results = []
 
+    benchmark_timestamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+
     if keep_files:
         output_dir = user_output_path
         os.makedirs(output_dir, exist_ok=True)
@@ -408,10 +411,11 @@ def _run_benchmark(args):
                 video_file = result['file']
                 file_size = result['file_size']
 
-                # Rename output file to include profile name when keeping files
-                if keep_files and len(runs) > 1:
-                    base, ext = os.path.splitext(video_file)
-                    profile_file = f'{base} [{display_name}]{ext}'
+                # Rename output file with timestamp and profile name when keeping files
+                if keep_files:
+                    directory = os.path.dirname(video_file)
+                    ext = os.path.splitext(video_file)[1]
+                    profile_file = os.path.join(directory, f'benchmark-{benchmark_timestamp}-{display_name}{ext}')
                     os.replace(video_file, profile_file)
                     video_file = profile_file
 
