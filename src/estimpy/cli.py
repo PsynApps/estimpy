@@ -339,6 +339,18 @@ def _run_benchmark(args):
     # Build run list based on whether -c was specified
     config_profiles = args.get('config')
     if config_profiles:
+        # Normalize profile names: allow users to omit the 'video-' prefix
+        normalized = []
+        for p in config_profiles:
+            if not p.startswith('video-'):
+                try:
+                    es._resolve_profile_paths(f'video-{p}')
+                    p = f'video-{p}'
+                except Exception:
+                    pass  # Not a video profile, use as-is
+            normalized.append(p)
+        config_profiles = normalized
+
         # Single run with the specified combination of profiles
         display_name = '+'.join(p.removeprefix('video-') for p in config_profiles)
         runs = [(display_name, config_profiles)]
