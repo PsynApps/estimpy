@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """Generate the benchmark.mp3 fixture from source audio files.
 
-Analyzes all audio files in tests/input/benchmark/, identifies 12 diverse
-5-second segments based on amplitude and frequency characteristics, and
-concatenates them into a 1-minute benchmark file.
+Analyzes all audio files in tests/input/benchmark/, identifies diverse segments
+based on amplitude and frequency characteristics, and concatenates them into a
+benchmark file.
 
 Usage:
     python tests/generate_benchmark.py
+    python tests/generate_benchmark.py --output-length 120 --segment-length 10
 
 Requires source audio files in tests/input/benchmark/ (not included in the
 repository — add your own estim audio files to this directory).
 """
 
+import argparse
 import glob
 import os
 import subprocess
@@ -22,19 +24,19 @@ import numpy as np
 import pydub
 
 
-# --- Configuration ---
+# --- Constants ---
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 SOURCE_DIR = os.path.join(SCRIPT_DIR, 'input', 'benchmark')
 OUTPUT_FILE = os.path.join(SCRIPT_DIR, 'input', 'benchmark.mp3')
 
-SEGMENT_DURATION = 5.0       # seconds per segment
-SEGMENT_COUNT = 12           # number of segments to select
 SUB_WINDOW_COUNT = 10        # sub-windows per segment for feature analysis
 FADE_DURATION = 0.02         # seconds of fade-in/fade-out per segment
 SILENCE_THRESHOLD = 0.01     # minimum mean RMS to consider a segment
 TRANSITION_RATIO = 2.0       # max ratio between half-means before rejecting as transition
 TRANSITION_CENTROID_HZ = 500 # max spectral centroid shift between halves
+
+FEATURE_KEYS = ['mean_rms', 'mean_centroid', 'mean_bandwidth', 'amp_cv']
 
 
 def load_audio(file):
@@ -60,7 +62,7 @@ def compute_rms(samples):
 
 
 def compute_spectral_features(samples, sample_rate):
-    """Compute spectral centroid and bandwidth from a mono signal.
+    """Compute spectral centroid and bandwidth from a signal.
 
     Returns (centroid_hz, bandwidth_hz).
     """
@@ -80,17 +82,14 @@ def compute_spectral_features(samples, sample_rate):
     if total_energy < 1e-10:
         return 0.0, 0.0
 
-    # Spectral centroid: weighted mean of frequencies
     centroid = np.sum(freqs * spectrum) / total_energy
-
-    # Spectral bandwidth: weighted std of frequencies
     bandwidth = np.sqrt(np.sum(((freqs - centroid) ** 2) * spectrum) / total_energy)
 
     return float(centroid), float(bandwidth)
 
 
 def analyze_segment(samples, sample_rate):
-    """Analyze a 5-second segment and return its feature dict, or None if rejected.
+    """Analyze a segment and return its feature dict, or None if rejected.
 
     Computes features on sub-windows, filters transitions, and returns
     aggregate features for diversity selection.
@@ -116,7 +115,6 @@ def analyze_segment(samples, sample_rate):
 
     sub_rms = np.array(sub_rms)
     sub_centroids = np.array(sub_centroids)
-    sub_bandwidths = np.array(sub_bandwidths)
 
     mean_rms = float(np.mean(sub_rms))
     mean_centroid = float(np.mean(sub_centroids))
@@ -154,45 +152,171 @@ def analyze_segment(samples, sample_rate):
     }, None
 
 
-def select_diverse_segments(candidates, count):
-    """Select `count` segments that maximize diversity in feature space.
+def build_feature_matrix(candidates):
+    """Build a normalized feature matrix from a list of candidates.
 
-    Uses greedy farthest-first traversal in normalized feature space.
+    Returns (normalized_matrix, mins, ranges) where normalized_matrix has
+    values in [0, 1] for each feature dimension.
     """
-    if len(candidates) <= count:
-        return list(range(len(candidates)))
-
-    # Build feature matrix and normalize to [0, 1]
-    feature_keys = ['mean_rms', 'mean_centroid', 'mean_bandwidth', 'amp_cv']
-    features = np.array([[c['features'][k] for k in feature_keys] for c in candidates])
-
+    features = np.array([[c['features'][k] for k in FEATURE_KEYS] for c in candidates])
     mins = features.min(axis=0)
-    maxs = features.max(axis=0)
-    ranges = maxs - mins
-    # Avoid division by zero for constant features
+    ranges = features.max(axis=0) - mins
     ranges[ranges == 0] = 1.0
     normalized = (features - mins) / ranges
+    return normalized, mins, ranges
 
-    # Start with the candidate closest to the centroid
-    centroid = normalized.mean(axis=0)
-    distances_to_centroid = np.linalg.norm(normalized - centroid, axis=1)
-    selected = [int(np.argmin(distances_to_centroid))]
 
-    # Greedy farthest-first
+def farthest_first_select(normalized, count, excluded=None):
+    """Select indices using greedy farthest-first traversal.
+
+    Args:
+        normalized: (N, D) normalized feature matrix.
+        count: Number of indices to select.
+        excluded: Set of indices to exclude from selection (already selected).
+
+    Returns list of selected indices.
+    """
+    if excluded is None:
+        excluded = set()
+
+    available = set(range(len(normalized))) - excluded
+    if not available or count <= 0:
+        return []
+
+    # Start with the candidate closest to the centroid of available candidates
+    available_features = np.array([normalized[i] for i in sorted(available)])
+    available_indices = sorted(available)
+    centroid = available_features.mean(axis=0)
+    distances_to_centroid = np.linalg.norm(available_features - centroid, axis=1)
+    selected = [available_indices[int(np.argmin(distances_to_centroid))]]
+
     for _ in range(count - 1):
         # For each candidate, compute min distance to any selected candidate
-        min_distances = np.full(len(candidates), np.inf)
-        for s in selected:
-            dists = np.linalg.norm(normalized - normalized[s], axis=1)
-            min_distances = np.minimum(min_distances, dists)
+        min_distances = np.full(len(normalized), -1.0)
+        for i in available - set(selected):
+            min_dist = min(np.linalg.norm(normalized[i] - normalized[s]) for s in selected)
+            min_distances[i] = min_dist
 
-        # Zero out already-selected
-        for s in selected:
-            min_distances[s] = -1.0
-
-        selected.append(int(np.argmax(min_distances)))
+        next_idx = int(np.argmax(min_distances))
+        if min_distances[next_idx] <= 0:
+            break  # No more available candidates
+        selected.append(next_idx)
 
     return selected
+
+
+def select_segments(candidates, segment_count):
+    """Select segments ensuring file representation and maximizing diversity.
+
+    Strategy:
+    1. Select one segment per file (most diverse representative from each).
+       If more files than slots, use one-per-file constrained diversity selection.
+    2. Fill remaining slots with farthest-first traversal across all candidates.
+    3. If total unique segments < segment_count, repeat selected segments cyclically.
+    """
+    # Group candidates by file
+    file_candidates = {}
+    for i, c in enumerate(candidates):
+        file_candidates.setdefault(c['file'], []).append(i)
+
+    num_files = len(file_candidates)
+    normalized, _, _ = build_feature_matrix(candidates)
+
+    if num_files >= segment_count:
+        # More files than slots: pick one per file, maximize diversity across files
+        # First, find the best representative from each file (farthest from global centroid)
+        centroid = normalized.mean(axis=0)
+        file_reps = {}
+        for file, indices in file_candidates.items():
+            distances = [np.linalg.norm(normalized[i] - centroid) for i in indices]
+            file_reps[file] = indices[int(np.argmax(distances))]
+
+        # Now select `segment_count` from these representatives using farthest-first
+        rep_indices = list(file_reps.values())
+        rep_normalized = normalized[rep_indices]
+
+        # Farthest-first on the representatives
+        rep_centroid = rep_normalized.mean(axis=0)
+        distances_to_centroid = np.linalg.norm(rep_normalized - rep_centroid, axis=1)
+        selected_rep = [int(np.argmin(distances_to_centroid))]
+
+        for _ in range(segment_count - 1):
+            min_distances = np.full(len(rep_indices), -1.0)
+            for j in range(len(rep_indices)):
+                if j not in selected_rep:
+                    min_dist = min(np.linalg.norm(rep_normalized[j] - rep_normalized[s])
+                                   for s in selected_rep)
+                    min_distances[j] = min_dist
+            next_idx = int(np.argmax(min_distances))
+            if min_distances[next_idx] <= 0:
+                break
+            selected_rep.append(next_idx)
+
+        return [rep_indices[j] for j in selected_rep]
+
+    # Fewer files than slots: guarantee one per file, then fill with diversity
+    # Round 1: Pick one representative per file (farthest from global centroid)
+    selected = []
+    centroid = normalized.mean(axis=0)
+    for file, indices in file_candidates.items():
+        distances = [np.linalg.norm(normalized[i] - centroid) for i in indices]
+        selected.append(indices[int(np.argmax(distances))])
+
+    remaining_slots = segment_count - len(selected)
+
+    if remaining_slots > 0:
+        # Round 2: Fill remaining slots with farthest-first from all candidates
+        additional = farthest_first_select(normalized, remaining_slots, excluded=set(selected))
+        selected.extend(additional)
+
+    # Round 3: If still not enough unique segments, repeat cyclically
+    if len(selected) < segment_count:
+        base = list(selected)
+        while len(selected) < segment_count:
+            selected.append(base[len(selected) % len(base)])
+
+    return selected
+
+
+def encode_single_file(source_file, output_length):
+    """Encode a single source file directly when it's the only source and short enough."""
+    samples, sample_rate, channels = load_audio(source_file)
+    duration = samples.shape[-1] / sample_rate
+
+    if duration > output_length:
+        return False  # File is too long, use segment approach
+
+    print(f'Single file ({duration:.1f}s) fits within output length ({output_length:.0f}s), encoding directly.')
+    encode_to_mp3(samples, sample_rate)
+    return True
+
+
+def encode_to_mp3(samples, sample_rate):
+    """Encode a float32 samples array to the output MP3 file."""
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
+        tmp_wav = tmp.name
+
+    try:
+        import scipy.io.wavfile
+
+        int16_data = np.clip(samples * 32767, -32768, 32767).astype(np.int16)
+        interleaved = int16_data.T  # (samples, channels)
+        scipy.io.wavfile.write(tmp_wav, sample_rate, interleaved)
+
+        print('Encoding to MP3...')
+        ffmpeg_cmd = [
+            'ffmpeg', '-y',
+            '-i', tmp_wav,
+            '-codec:a', 'libmp3lame',
+            '-q:a', '0',
+            OUTPUT_FILE
+        ]
+        subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    finally:
+        os.unlink(tmp_wav)
+
+    file_size = os.path.getsize(OUTPUT_FILE)
+    print(f'Wrote {OUTPUT_FILE} ({file_size / 1024:.0f} KB)')
 
 
 def format_time(seconds):
@@ -203,13 +327,33 @@ def format_time(seconds):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description='Generate benchmark.mp3 from source audio files in tests/input/benchmark/.')
+    parser.add_argument('--output-length', type=float, default=60.0,
+        help='Total output length in seconds (default: 60).')
+    parser.add_argument('--segment-length', type=float, default=5.0,
+        help='Length of each segment in seconds (default: 5).')
+    args = parser.parse_args()
+
+    output_length = args.output_length
+    segment_length = args.segment_length
+
+    if segment_length > output_length:
+        print(f'Error: Segment length ({segment_length}s) exceeds output length ({output_length}s).')
+        sys.exit(1)
+
+    segment_count = int(output_length / segment_length)
+    # Last segment may be truncated if output_length isn't evenly divisible
+    last_segment_length = output_length - (segment_count - 1) * segment_length
+    if last_segment_length > segment_length:
+        segment_count += 1
+        last_segment_length = output_length - (segment_count - 1) * segment_length
+
     # Discover source files
     source_files = sorted(
-        glob.glob(os.path.join(SOURCE_DIR, '*'))
+        f for f in glob.glob(os.path.join(SOURCE_DIR, '*'))
+        if os.path.isfile(f)
     )
-    # Filter to files only (not directories or .gitkeep)
-    source_files = [f for f in source_files
-                    if os.path.isfile(f) and not f.endswith('.gitkeep')]
 
     if not source_files:
         print(f'Error: No audio files found in {SOURCE_DIR}')
@@ -217,12 +361,22 @@ def main():
         sys.exit(1)
 
     print(f'Source directory: {SOURCE_DIR}')
-    print(f'Found {len(source_files)} source files')
+    print(f'Found {len(source_files)} source file(s)')
+    print(f'Output: {output_length:.0f}s total, {segment_length:.0f}s segments, {segment_count} segments')
     print()
+
+    # Single file special case
+    if len(source_files) == 1:
+        if encode_single_file(source_files[0], output_length):
+            return
+        # File is longer than output length — fall through to segment approach
+        print('File exceeds output length, using segment selection.')
+        print()
 
     # Phase 1 & 2: Extract and analyze candidate segments
     candidates = []
     reject_counts = {'silence': 0, 'transition_rms': 0, 'transition_centroid': 0}
+    files_with_candidates = set()
 
     for file in source_files:
         filename = os.path.basename(file)
@@ -235,8 +389,8 @@ def main():
             continue
 
         duration = samples.shape[-1] / sample_rate
-        segment_samples = int(SEGMENT_DURATION * sample_rate)
-        num_candidates = int(duration // SEGMENT_DURATION)
+        segment_samples = int(segment_length * sample_rate)
+        num_candidates = int(duration // segment_length)
 
         file_accepted = 0
         for i in range(num_candidates):
@@ -254,14 +408,26 @@ def main():
                 'file': file,
                 'filename': filename,
                 'start_sample': start_sample,
-                'start_time': i * SEGMENT_DURATION,
+                'start_time': i * segment_length,
                 'sample_rate': sample_rate,
                 'channels': channels,
                 'features': features,
             })
             file_accepted += 1
 
-        print(f'{file_accepted}/{num_candidates} candidates')
+        if file_accepted > 0:
+            files_with_candidates.add(file)
+        else:
+            print(f'WARNING — no valid segments', end='')
+
+        print(f' ({file_accepted}/{num_candidates} candidates)')
+
+    # Report files with no valid candidates
+    files_without = set(source_files) - files_with_candidates
+    for file in files_without:
+        if file not in [f for f in source_files if os.path.basename(file) in
+                        [c['filename'] for c in candidates]]:
+            pass  # Already warned during analysis
 
     total_rejected = sum(reject_counts.values())
     print()
@@ -270,25 +436,26 @@ def main():
           f'transition_rms: {reject_counts["transition_rms"]}, '
           f'transition_centroid: {reject_counts["transition_centroid"]})')
 
-    if len(candidates) < SEGMENT_COUNT:
-        print(f'Error: Not enough candidates ({len(candidates)}) to select {SEGMENT_COUNT} segments.')
+    if len(candidates) == 0:
+        print('Error: No valid candidates found across all files.')
         sys.exit(1)
 
-    # Phase 4: Select diverse segments
-    selected_indices = select_diverse_segments(candidates, SEGMENT_COUNT)
+    # Phase 3: Select diverse segments
+    selected_indices = select_segments(candidates, segment_count)
     selected = [candidates[i] for i in selected_indices]
 
+    # Report selection
+    unique_files = len(set(s['file'] for s in selected))
     print()
-    print(f'Selected {SEGMENT_COUNT} segments:')
+    print(f'Selected {len(selected)} segments from {unique_files} file(s):')
     for i, seg in enumerate(selected):
         f = seg['features']
+        truncated = ' (truncated)' if i == len(selected) - 1 and last_segment_length < segment_length else ''
         print(f'  {i + 1:2d}. {seg["filename"]:<45s} @ {format_time(seg["start_time"]):>5s}  '
               f'(rms={f["mean_rms"]:.3f}, centroid={f["mean_centroid"]:.0f}Hz, '
-              f'bw={f["mean_bandwidth"]:.0f}Hz, cv={f["amp_cv"]:.2f})')
+              f'bw={f["mean_bandwidth"]:.0f}Hz, cv={f["amp_cv"]:.2f}){truncated}')
 
-    # Phase 5: Assembly
-    # Determine output sample rate and channels (use first selected segment's properties)
-    # Resample all segments to match if needed
+    # Phase 4: Assembly
     target_sr = selected[0]['sample_rate']
     target_channels = max(seg['channels'] for seg in selected)
 
@@ -296,10 +463,15 @@ def main():
     fade_in = np.linspace(0, 1, fade_samples, dtype=np.float32)
     fade_out = np.linspace(1, 0, fade_samples, dtype=np.float32)
 
-    segment_samples = int(SEGMENT_DURATION * target_sr)
+    full_segment_samples = int(segment_length * target_sr)
+    last_segment_samples = int(last_segment_length * target_sr)
     assembled_parts = []
 
-    for seg in selected:
+    for i, seg in enumerate(selected):
+        # Determine sample count for this segment (last may be truncated)
+        is_last = (i == len(selected) - 1)
+        seg_samples = last_segment_samples if is_last and last_segment_length < segment_length else full_segment_samples
+
         # Reload the segment from the source file
         samples, sr, ch = load_audio(seg['file'])
 
@@ -311,7 +483,9 @@ def main():
             total_resampled = int(samples.shape[-1] * target_sr / sr)
             samples = resample(samples, total_resampled, axis=-1).astype(np.float32)
 
-        end = start + segment_samples
+        end = start + seg_samples
+        # Clamp to actual length
+        end = min(end, samples.shape[-1])
         segment_audio = samples[:, start:end]
 
         # Handle channel mismatch: duplicate mono to stereo if needed
@@ -319,45 +493,19 @@ def main():
             segment_audio = np.repeat(segment_audio, target_channels, axis=0)
 
         # Apply fade-in and fade-out
-        segment_audio[:, :fade_samples] *= fade_in
-        segment_audio[:, -fade_samples:] *= fade_out
+        actual_fade = min(fade_samples, segment_audio.shape[-1])
+        segment_audio[:, :actual_fade] *= fade_in[:actual_fade]
+        segment_audio[:, -actual_fade:] *= fade_out[-actual_fade:]
 
         assembled_parts.append(segment_audio)
 
     assembled = np.concatenate(assembled_parts, axis=-1)
 
-    # Write to temporary WAV, encode to MP3
     print()
     print(f'Assembling {len(selected)} segments ({assembled.shape[-1] / target_sr:.1f}s, '
           f'{target_channels}ch, {target_sr}Hz)...')
 
-    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as tmp:
-        tmp_wav = tmp.name
-
-    try:
-        # Convert float32 [-1, 1] to int16 for WAV
-        int16_data = np.clip(assembled * 32767, -32768, 32767).astype(np.int16)
-
-        # Interleave channels for WAV: shape (samples, channels)
-        interleaved = int16_data.T  # (samples, channels)
-
-        import scipy.io.wavfile
-        scipy.io.wavfile.write(tmp_wav, target_sr, interleaved)
-
-        print(f'Encoding to MP3...')
-        ffmpeg_cmd = [
-            'ffmpeg', '-y',
-            '-i', tmp_wav,
-            '-codec:a', 'libmp3lame',
-            '-q:a', '0',
-            OUTPUT_FILE
-        ]
-        subprocess.run(ffmpeg_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    finally:
-        os.unlink(tmp_wav)
-
-    file_size = os.path.getsize(OUTPUT_FILE)
-    print(f'Wrote {OUTPUT_FILE} ({file_size / 1024:.0f} KB)')
+    encode_to_mp3(assembled, target_sr)
 
 
 if __name__ == '__main__':
