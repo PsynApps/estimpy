@@ -445,8 +445,9 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     encoding_time = time.time() - encoding_time_start
     encoding_fps = frames_total / encoding_time if encoding_time > 0 else 0
+    file_size = os.path.getsize(video_file)
 
-    print(f'Saved file "{video_file}" ({os.path.getsize(video_file)}).')
+    print(f'Saved file "{video_file}" ({file_size}).')
 
     print()
 
@@ -455,4 +456,5 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         'encoding_fps': encoding_fps,
         'total_frames': frames_total,
         'encoding_time': encoding_time,
+        'file_size': file_size,
     }

@@ -406,7 +406,7 @@ def _run_benchmark(args):
 
             if result and os.path.exists(result['file']):
                 video_file = result['file']
-                file_size = os.path.getsize(video_file)
+                file_size = result['file_size']
 
                 # Rename output file to include profile name when keeping files
                 if keep_files and len(runs) > 1:
