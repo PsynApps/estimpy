@@ -1,4 +1,5 @@
 ---
+estimpy-version: 2.0.0
 visualization:
   video:
     export:
@@ -6,5 +7,5 @@ visualization:
       ffmpeg-extra-args:
         '-tune': ~
         '-pix_fmt': yuv420p10le
-        '-crf': 28
-        '-preset': 6
+        '-crf': 30
+        '-preset': 5

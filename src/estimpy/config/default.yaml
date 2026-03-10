@@ -1,4 +1,6 @@
 ---
+estimpy-version: 2.0.0
+additional-config-profiles: ~
 analysis:
   oscilloscope:
     # Display window duration for tonal content (milliseconds)

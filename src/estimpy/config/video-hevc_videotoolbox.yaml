@@ -1,4 +1,5 @@
 ---
+estimpy-version: 2.0.0
 visualization:
   video:
     export:
@@ -7,6 +8,6 @@ visualization:
         '-crf': ~
         '-preset': ~
         '-tune': ~
-        '-q:v': 60
+        '-q:v': 50
         '-tag:v': 'hvc1'
         '-profile:v': 'main10'

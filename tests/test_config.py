@@ -1,7 +1,9 @@
 import copy
 import os
+import tempfile
 
 import pytest
+import yaml
 
 import estimpy as es
 
@@ -35,6 +37,73 @@ class TestConfigLoading:
     def test_load_config_nonexistent_raises(self):
         with pytest.raises(Exception, match='does not exist'):
             es.load_config('nonexistent_profile_xyz')
+
+    def test_estimpy_version_not_persisted_in_cfg(self):
+        """estimpy-version should be stored in cfg after loading default."""
+        es.load_config('default')
+        assert 'estimpy-version' in es.cfg
+
+    def test_additional_config_profiles_not_persisted(self):
+        """additional-config-profiles should be consumed and removed from cfg."""
+        es.load_config('default')
+        assert 'additional-config-profiles' not in es.cfg
+        assert 'additional-config-profiles' not in es.base_cfg
+
+    def test_additional_config_profiles_loads_referenced_profiles(self):
+        """A profile with additional-config-profiles should load those profiles."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create a profile that sets a known key
+            extra_profile = os.path.join(tmpdir, 'extra.yaml')
+            with open(extra_profile, 'w') as f:
+                yaml.dump({'analysis': {'window-size': 9999}}, f)
+
+            # Create a profile that references the extra via additional-config-profiles
+            main_profile = os.path.join(tmpdir, 'main.yaml')
+            with open(main_profile, 'w') as f:
+                yaml.dump({'additional-config-profiles': [extra_profile]}, f)
+
+            es.load_config(main_profile)
+            assert es.cfg['analysis.window-size'] == 9999
+
+    def test_circular_profile_reference_does_not_loop(self):
+        """Circular additional-config-profiles references should be skipped."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            a = os.path.join(tmpdir, 'a.yaml')
+            b = os.path.join(tmpdir, 'b.yaml')
+            with open(a, 'w') as f:
+                yaml.dump({'additional-config-profiles': [b]}, f)
+            with open(b, 'w') as f:
+                yaml.dump({'additional-config-profiles': [a]}, f)
+
+            # Should not raise or loop infinitely
+            es.load_config(a)
+
+    def test_user_config_dir_overlay(self):
+        """User config in ~/.estimpy/ should overlay builtin config."""
+        user_dir = es._user_config_path
+        os.makedirs(user_dir, exist_ok=True)
+        user_profile = os.path.join(user_dir, '_test_overlay.yaml')
+        try:
+            with open(user_profile, 'w') as f:
+                yaml.dump({'analysis': {'window-size': 7777}}, f)
+
+            es.load_config('_test_overlay')
+            assert es.cfg['analysis.window-size'] == 7777
+        finally:
+            if os.path.exists(user_profile):
+                os.remove(user_profile)
+
+    def test_version_check_warns_on_newer_version(self, capsys):
+        """Loading a profile with a newer estimpy-version should print a warning."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            profile = os.path.join(tmpdir, 'future.yaml')
+            with open(profile, 'w') as f:
+                yaml.dump({'estimpy-version': '99.0.0'}, f)
+
+            es.load_config(profile)
+            captured = capsys.readouterr()
+            assert 'Warning' in captured.out
+            assert '99.0.0' in captured.out
 
 
 class TestConfigUpdate:

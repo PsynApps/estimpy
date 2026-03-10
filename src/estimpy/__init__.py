@@ -1,6 +1,7 @@
 """A python package for Estim (estimpy)."""
 
 import ast
+import importlib.metadata
 import os
 import subprocess
 import typing
@@ -25,6 +26,7 @@ matplotlib.use('QtAgg')
 
 _config_path = os.path.dirname(__file__) + '/config'
 _config_file_default = f'{_config_path}/default.yaml'
+_user_config_path = os.path.expanduser('~/.estimpy')
 
 # base_cfg stores the keys and values loaded from .yaml profiles, but does not store
 # derived keys or updated values from the command line
@@ -147,23 +149,97 @@ def _flat_dict(d: dict, parent_key: str = '', delimiter: str = '.') -> dict:
     return dict(items)
 
 
-def _load_config(file: str) -> None:
+def _resolve_profile_paths(name: str) -> list:
+    """Resolve a profile name to an ordered list of file paths to load.
+
+    For bare profile names (no directory component), searches both the builtin
+    config directory and the user config directory (~/.estimpy/). If a profile
+    exists in both locations, both are returned (builtin first, then user).
+
+    For explicit file paths (with directory component or existing as-is),
+    returns the single path directly.
+    """
+    # Explicit path — load as-is
+    if os.path.dirname(name) or os.path.exists(name):
+        if os.path.exists(name):
+            return [name]
+        raise Exception(f'Error: Configuration file "{name}" does not exist.')
+
+    # Bare profile name — search builtin and user directories
+    paths = []
+    for search_dir in (_config_path, _user_config_path):
+        for candidate in (f'{search_dir}/{name}', f'{search_dir}/{name}.yaml'):
+            if os.path.exists(candidate):
+                paths.append(candidate)
+                break
+
+    if not paths:
+        raise Exception(f'Error: Configuration profile "{name}" does not exist.')
+
+    return paths
+
+
+def _check_config_version(profile_version: str, source: str) -> None:
+    """Warn if a profile targets a newer version of estimpy than is running."""
+    try:
+        current = importlib.metadata.version('estimpy')
+        current_parts = tuple(int(x) for x in current.split('.'))
+        profile_parts = tuple(int(x) for x in str(profile_version).split('.'))
+        if profile_parts > current_parts:
+            print(f'Warning: Profile "{source}" targets estimpy {profile_version}, '
+                  f'but running {current}.')
+    except Exception:
+        pass  # Version check is best-effort
+
+
+def _load_config(name: str, _loading: set = None) -> None:
+    """Load a configuration profile by name.
+
+    For bare profile names, loads the builtin version first, then the user
+    version (~/.estimpy/) as an overlay. After loading, processes the
+    ``estimpy-version`` key (version compatibility check) and
+    ``additional-config-profiles`` key (recursive profile loading).
+
+    :param name: Profile name (bare) or file path (explicit).
+    :param _loading: Set of profile names currently being loaded (cycle detection).
+    """
+    if _loading is None:
+        _loading = set()
+
+    # Normalize name for cycle detection (strip .yaml suffix)
+    canonical = name.removesuffix('.yaml')
+    if canonical in _loading:
+        print(f'Warning: Skipping circular profile reference: {name}')
+        return
+    _loading.add(canonical)
+
+    try:
+        paths = _resolve_profile_paths(name)
+        for path in paths:
+            _load_config_file(path)
+
+        # Check profile version compatibility
+        version_key = 'estimpy-version'
+        if version_key in cfg:
+            _check_config_version(cfg[version_key], name)
+
+        # Process additional config profiles (consumed, not persisted)
+        additional_key = 'additional-config-profiles'
+        additional = cfg.pop(additional_key, None)
+        base_cfg.pop(additional_key, None)
+
+        if additional:
+            for profile in additional:
+                _load_config(profile, _loading)
+    finally:
+        _loading.discard(canonical)
+
+
+def _load_config_file(path: str) -> None:
+    """Load a single YAML configuration file into cfg and base_cfg."""
     global cfg
 
-    if not os.path.exists(file):
-        if not os.path.dirname(file):
-            # If the file does not specify a directory, look in the estimpy package config directory
-            file = f'{_config_path}/{file}'
-
-            if not os.path.exists(file) and file.find('.yaml') == -1:
-                # Try adding .yaml to the file
-                file = f'{file}.yaml'
-
-            if not os.path.exists(file):
-                # We've tried everything, give up
-                raise Exception(f'Error: Configuration file "{file}" does not exist.')
-
-    with open(file, 'r') as file_handle:
+    with open(path, 'r') as file_handle:
         try:
             file_cfg = _flat_dict(yaml.safe_load(file_handle), delimiter='.')
 
@@ -174,7 +250,7 @@ def _load_config(file: str) -> None:
             # Update the main configuration
             cfg.update(file_cfg)
         except yaml.YAMLError as exc:
-            raise Exception(f'Error loading default configuration file "{file}": {exc}')
+            raise Exception(f'Error loading configuration file "{path}": {exc}')
 
 
 _check_dependencies()

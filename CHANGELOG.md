@@ -30,8 +30,11 @@
 - Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
 - `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles (`-o` to keep output files, `-c` to benchmark a specific profile combination)
 - MOV container metadata support (read/write via mutagen's MP4/QuickTime handler)
-- Benchmark audio generator script (`tests/generate_benchmark.py`) with configurable output/segment length, custom output path, per-file representation guarantees, diversity-maximizing segment selection, and automatic mono-to-stereo duplication
-- Automated test suite (251 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
+- User configuration directory (`~/.estimpy/`) for personal profile overrides and custom profiles, loaded after builtin profiles of the same name
+- `additional-config-profiles` key in config profiles to automatically load other profiles after the current one, enabling composable configuration chains
+- `estimpy-version` key in all config profiles for forward-compatible version identification, with a warning when a profile targets a newer version than the running installation
+- Benchmark audio generator script (`tests/generate_benchmark.py`)
+- Automated test suite (257 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed
 - Audio data stored as float32 instead of float64, halving memory usage for all audio operations

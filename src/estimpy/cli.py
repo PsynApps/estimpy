@@ -342,10 +342,12 @@ def _run_benchmark(args):
         display_name = '+'.join(p.removeprefix('video-') for p in config_profiles)
         runs = [(display_name, config_profiles)]
     else:
-        # Discover all video profiles dynamically from the config directory
-        config_path = os.path.join(os.path.dirname(__file__), 'config')
-        profile_files = sorted(glob.glob(os.path.join(config_path, 'video-*.yaml')))
-        profile_names = [os.path.splitext(os.path.basename(f))[0] for f in profile_files]
+        # Discover all video profiles from builtin and user config directories
+        profile_names = set()
+        for search_dir in (os.path.join(os.path.dirname(__file__), 'config'), es._user_config_path):
+            for f in glob.glob(os.path.join(search_dir, 'video-*.yaml')):
+                profile_names.add(os.path.splitext(os.path.basename(f))[0])
+        profile_names = sorted(profile_names)
         runs = [('default', [])] + [(name.removeprefix('video-'), [name]) for name in profile_names]
 
     print(f'Profiles to benchmark ({len(runs)}): {", ".join(name for name, _ in runs)}')

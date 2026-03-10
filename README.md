@@ -332,6 +332,28 @@ The following additional configuration profiles are included with **EstimPy**:
 | `video-prores_videotoolbox` | Encode video with ProRes codec using VideoToolbox hardware (macOS)   |
 | `video-vp9`                 | Encode video with VP9 codec using CPU                                |
 
+### User configuration directory
+
+EstimPy also searches `~/.estimpy/` for configuration profiles. When a profile name is loaded (via `--config` or `additional-config-profiles`), the builtin version is loaded first, then any user version of the same name is loaded as an overlay. This allows you to customize builtin profiles without modifying the package files.
+
+User-only profiles (with no builtin counterpart) are also supported and can be loaded with `--config`.
+
+For example, creating `~/.estimpy/default.yaml` with the following content would automatically apply the HEVC VideoToolbox codec profile on every run:
+
+```yaml
+additional-config-profiles:
+  - hevc_videotoolbox
+```
+
+### Profile keys
+
+All configuration profiles support these top-level keys:
+
+| Key                            | Description                                                                                     |
+|--------------------------------|-------------------------------------------------------------------------------------------------|
+| `estimpy-version`              | The estimpy version the profile is designed for. A warning is shown if the profile targets a newer version than the running installation. |
+| `additional-config-profiles`   | A list of profile names to load after the current profile. Enables composable configuration chains. |
+
 ### Creating custom configuration files
 
 The best way to create a custom configuration profile to ensure it follows the correct schema is to:
@@ -343,6 +365,8 @@ You can then apply your configuration using the `--config` command-line option:
 ```
 estimpy <command> [files...] --config path_to/config_file.yaml
 ```
+
+Custom profiles can also be placed in `~/.estimpy/` to be loadable by name without specifying a path.
 
 ### Overwriting configuration option values
 
@@ -371,6 +395,7 @@ For reference, the default configuration options and values are as follows:
 | analysis.spectrogram.window-function                         | hann                                         |
 | analysis.window-size                                         | 2048                                         |
 | analysis.window-overlap                                      | None                                         |
+| estimpy-version                                              | 2.0.0                                        |
 | files.input.recursive                                        | False                                        |
 | files.output.path                                            | ./                                           |
 | files.output.overwrite-default                               | False                                        |

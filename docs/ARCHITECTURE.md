@@ -49,6 +49,7 @@ tests/
 ### `__init__.py` — Configuration Hub
 - **Responsibility:** Load YAML configs into a flat `cfg` dict, provide an event system (`config.updated`), check system dependencies (ffmpeg/ffprobe), import all submodules.
 - **Key exports:** `cfg` (current config), `base_cfg` (file-loaded config), `load_config()`, `update_config_values()`, `add_event_listener()`, `trigger_event()`.
+- **Profile resolution:** Bare profile names are resolved against both the builtin config directory (`src/estimpy/config/`) and the user config directory (`~/.estimpy/`). When a profile exists in both locations, the builtin is loaded first and the user version overlays on top. Each profile may declare `additional-config-profiles` to chain further profiles after itself, with cycle detection to prevent infinite loops. The `estimpy-version` key is checked against the running version and produces a warning if the profile targets a newer release.
 - **Dependents:** Every other module accesses `es.cfg['key']` for configuration.
 
 ### `audio.py` — Audio Data
