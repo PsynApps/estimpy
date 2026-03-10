@@ -18,6 +18,7 @@
   - [Global options](#global-options)
   - [Examples](#examples)
 - [Configuration](#configuration)
+- [Development](#development)
 
 ## Visualization library
 [**Click here**](https://www.youtube.com/@Psynapster/videos) to access a library of pre-rendered high-resolution (8k 60fps) visualizations of some popular Estim audio files.
@@ -485,3 +486,25 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.export.title.enabled                     | False                                        |
 | visualization.video.export.video-length-max                  | None                                         |
 | visualization.video.export.window-length                     | 20                                           |
+
+## Development
+
+### Regenerating the benchmark file
+
+The `benchmark` command uses `tests/input/benchmark.mp3` as its default input file. This file is generated from source audio files using a script that analyzes the audio content and selects 12 diverse 5-second segments spanning a range of amplitude, frequency, and modulation characteristics.
+
+To regenerate the benchmark file:
+
+1. Place estim audio files in `tests/input/benchmark/`
+2. Run the generator script:
+   ```
+   python tests/generate_benchmark.py
+   ```
+
+The script analyzes each source file, extracts candidate 5-second windows, filters out section transitions, then uses farthest-first traversal in feature space to select segments that maximize diversity across RMS amplitude, spectral centroid, spectral bandwidth, and amplitude modulation depth.
+
+### Running tests
+
+```
+pytest tests/
+```

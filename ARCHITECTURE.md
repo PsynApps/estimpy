@@ -30,12 +30,16 @@ src/estimpy/
 
 tests/
 ├── conftest.py              # Pytest fixtures: synthetic audio, config isolation
+├── generate_benchmark.py    # Generates benchmark.mp3 from source files in input/benchmark/
 ├── test_audio.py            # Audio loading, normalization, triphase, resampling
 ├── test_analysis.py         # Envelope computation, spectrogram generation, FFT sizing
 ├── test_config.py           # Config loading, updates, type casting, event system
 ├── test_metadata.py         # Tag read/write, image format detection
 ├── test_utils.py            # Formatting, file path helpers
-└── input/                   # Test audio fixtures (WAV, MP3), benchmark audio file
+└── input/
+    ├── test.mp3             # Synthetic 1s test tone
+    ├── benchmark.mp3        # 1-minute benchmark file (generated, committed)
+    └── benchmark/           # Source audio files for benchmark generation (gitignored)
 ```
 
 **Why this layout:** The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `visualization/` and `player/` packages are separate subpackages because they have significant internal structure — visualization splits rendering concerns across static images, video pipeline, and oscilloscope overlay, while player manages GUI dependencies (PyQt6, pygame) with its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.

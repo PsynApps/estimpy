@@ -22,6 +22,9 @@ Thumbs.db
 /tests/input/*
 !/tests/input/test.mp3
 !/tests/input/benchmark.mp3
+!/tests/input/benchmark/
+/tests/input/benchmark/*
+!/tests/input/benchmark/.gitkeep
 /tests/output/
 todo.txt
 *.swp
