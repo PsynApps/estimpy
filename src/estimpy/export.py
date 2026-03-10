@@ -15,7 +15,8 @@ _EXPORT_DPI = 8
 
 
 def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format: str = None,
-                width: int = None, height: int = None, overwrite: bool = None) -> str | None:
+                width: int = None, height: int = None, overwrite: bool = None,
+                triphase: bool = None) -> str | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     image_format = es.cfg['visualization.image.export.format'] if image_format is None else image_format
 
@@ -36,9 +37,10 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
 
     width = es.cfg['visualization.image.export.width'] if width is None else width
     height = es.cfg['visualization.image.export.height'] if height is None else height
+    triphase = es.cfg['visualization.image.export.triphase'] if triphase is None else triphase
 
     es.visualization.set_optimal_nfft(es_audio, figure_height=height,
-                                      triphase=es.cfg['visualization.image.export.triphase'],
+                                      triphase=triphase,
                                       title_enabled=es.cfg['visualization.image.export.title.enabled'])
 
     with es.utils.Spinner(f'Preparing image visualization... '):
@@ -193,7 +195,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         if video_segment_id == 'preview':
             print(f'Creating video preview image...')
 
-            # Generate preview image file
+            # Generate preview image file (use video triphase setting, not image)
             preview_image_file = write_image(
                 es_audio=es_audio,
                 output_path=es.utils.get_temp_file_path(
@@ -201,7 +203,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 ),
                 width=width,
                 height=height,
-                overwrite=True
+                overwrite=True,
+                triphase=es.cfg['visualization.video.export.triphase']
             )
 
             if not preview_image_file:
