@@ -235,7 +235,6 @@ class TestEnums:
         assert AxisTypes.AMPLITUDE == 'amplitude'
         assert AxisTypes.SPECTROGRAM == 'spectrogram'
         assert AxisTypes.TITLE == 'title'
-        assert AxisTypes.CONTROLS == 'controls'
         assert AxisTypes.AMPLITUDE_SCRUB == 'amplitude_scrub'
 
     def test_visualization_mode_values(self):

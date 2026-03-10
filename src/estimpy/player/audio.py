@@ -62,11 +62,6 @@ def initialize() -> None:
     _volume_thread_times = [0] * max_channels
 
 
-def is_paused() -> bool:
-    """Return True if playback was started and then stopped (paused state)."""
-    return not _is_playing and _clock_time > 0
-
-
 def is_playing() -> bool:
     """Return True if audio is actively playing (started and channels still producing output)."""
     if not _is_playing:
@@ -273,13 +268,6 @@ def stop():
 
     pygame.mixer.quit()
 
-
-def toggle_playing():
-    """Toggle between playing and stopped states."""
-    if _is_playing:
-        stop()
-    else:
-        play()
 
 
 def _get_repeat_mode() -> str:

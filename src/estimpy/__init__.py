@@ -25,7 +25,6 @@ import matplotlib
 matplotlib.use('QtAgg')
 
 _config_path = os.path.dirname(__file__) + '/config'
-_config_file_default = f'{_config_path}/default.yaml'
 _user_config_path = os.path.expanduser('~/.estimpy')
 
 # base_cfg stores the keys and values loaded from .yaml profiles, but does not store

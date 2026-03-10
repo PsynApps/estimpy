@@ -475,7 +475,6 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.subplot-height-ratios.spectrogram.mono   | 6                                            |
 | visualization.style.subplot-height-ratios.spectrogram.stereo | 3.25                                         |
 | visualization.style.subplot-height-ratios.spectrogram.triphase | 3.25                                       |
-| visualization.style.subplot-height-ratios.controls           | 0.75                                         |
 | visualization.style.time.font-size                           | 24                                           |
 | visualization.style.title.background-color                   | #000000                                      |
 | visualization.style.title.color                              | #ffffff                                      |

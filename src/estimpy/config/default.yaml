@@ -250,7 +250,6 @@ visualization:
         mono: 6
         stereo: 3.25
         triphase: 3.25
-      controls: 0.75
     # Configuration for the title panel
     title:
       # Background color of the title text panel

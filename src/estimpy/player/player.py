@@ -12,11 +12,9 @@ class Player:
     """Coordinates audio playback, visualization, and UI for a playlist of audio files.
 
     :param audio_files: List of file paths to play.
-    :param width: Display width override (pixels).
-    :param height: Display height override (pixels).
     """
 
-    def __init__(self, audio_files: list, width: int = None, height: int = None):
+    def __init__(self, audio_files: list):
         self._current_file = 0
         self._audio_files = audio_files
         self._es_audio = None

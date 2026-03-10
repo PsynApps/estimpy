@@ -12,7 +12,6 @@ import typing
 
 import estimpy as es
 import matplotlib
-import matplotlib.animation
 import matplotlib.colors
 import matplotlib.gridspec
 import numpy as np
@@ -26,7 +25,6 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
     def __init__(self, es_audio: es.audio.Audio = None, fps: float = None, frames: range = None):
         super().__init__(es_audio=es_audio)
 
-        self._animation = None  # type: matplotlib.animation.FuncAnimation | None
         self._fps = es.cfg['visualization.video.export.fps'] if fps is None else fps
         self._frames = range(math.floor(es_audio.length * self.fps)) if frames is None else frames
         self._frame = 0
@@ -40,13 +38,6 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self.__spectrogram_window_length = None
         self.__precolored_spectrograms = None
 
-
-    @property
-    def animation(self) -> matplotlib.animation.FuncAnimation | None:
-        if self._animation is None:
-            self._set_animation()
-
-        return self._animation
 
     @property
     def fps(self) -> float:
@@ -944,13 +935,6 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._handles['amplitude_rms_fills'] = {}
         self._handles['spectrogram_images'] = {}
 
-    def _set_animation(self):
-        if self._handles['figure'] is None:
-            return
-
-        self._animation = matplotlib.animation.FuncAnimation(fig=self._handles['figure'], func=self.make_frame,
-                                                             frames=self.frames, repeat=False, cache_frame_data=False,
-                                                             interval=1)
 
     def _time_to_frame(self, time):
         return math.floor(time * self.fps)
