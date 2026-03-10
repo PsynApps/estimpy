@@ -196,7 +196,7 @@ class Spectrogram:
                                   frequency_min: float = None, frequency_max: float = None,
                                   scaling: SpectrogramScaling = SpectrogramScaling.DB,
                                   reassign: bool = None) -> \
-                                      typing.Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                                      tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute a spectrogram (standard or reassigned) from raw audio data.
 
         :param audio_data: Array of shape (channels, samples).

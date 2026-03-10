@@ -238,7 +238,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 fps=fps,
                 frames=range(segment_frame_start, segment_frame_start + frame_count))
 
-            visualization.make_figure()
+            visualization.make_figure(skip_initial_frame=True)
             visualization.resize_figure(width=width, height=height, dpi=_EXPORT_DPI)
             visualization.prepare_direct_render(profiling=profiling)
 

@@ -334,7 +334,7 @@ class MetadataFormatMP4(MetadataFormat, abc.ABC):
         try:
             return mutagen.mp4.MP4(file)
         except Exception as e:
-            print(e)
+            print(f'Warning: Could not read MP4 tags from "{file}": {e}')
             return None
 
     @classmethod
