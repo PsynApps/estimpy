@@ -69,7 +69,7 @@ class Visualization:
     @property
     def _channel_layout(self):
         """Display order and inversion for each channel: list of (channel_id, invert)."""
-        if es.cfg['visualization.triphase'] and self.es_audio.channels == 3:
+        if self._triphase_enabled(self._mode) and self.es_audio.channels == 3:
             return [(0, False), (1, True), (2, False)]
         elif self.es_audio.channels >= 2:
             return [(0, False), (1, True)]
@@ -87,7 +87,7 @@ class Visualization:
     @property
     def _layout_ratio_key(self):
         """Config key suffix for height ratios."""
-        if es.cfg['visualization.triphase'] and self.es_audio.channels == 3:
+        if self._triphase_enabled(self._mode) and self.es_audio.channels == 3:
             return 'triphase'
         elif self.es_audio.channels >= 2:
             return 'stereo'
@@ -363,7 +363,7 @@ class Visualization:
         in the analog domain without clipping.
         """
         padding = es.cfg['visualization.style.amplitude.padding']
-        if es.cfg['visualization.triphase'] and self.es_audio.channels == 3 and channel_id == 2:
+        if self._triphase_enabled(self._mode) and self.es_audio.channels == 3 and channel_id == 2:
             return 2 * (1 + padding)
         return 1 + padding
 
@@ -568,9 +568,15 @@ class Visualization:
         return es.cfg['visualization.image.export.title.enabled'] if mode is VisualizationMode.EXPORT else \
             es.cfg['visualization.image.display.title.enabled']
 
+    @classmethod
+    def _triphase_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:
+        return es.cfg['visualization.image.export.triphase'] if mode is VisualizationMode.EXPORT else \
+            es.cfg['visualization.image.display.triphase']
+
 
 def show_image(es_audio: es.audio.Audio):
     set_optimal_nfft(es_audio, figure_height=es.cfg['visualization.image.display.height'],
+                     triphase=es.cfg['visualization.image.display.triphase'],
                      title_enabled=es.cfg['visualization.image.display.title.enabled'])
     with es.utils.Spinner(f'Preparing image visualization... '):
         visualization = Visualization(es_audio=es_audio)
@@ -600,7 +606,7 @@ def set_optimal_nfft(es_audio: es.audio.Audio, figure_height: float,
         return
 
     if triphase is None:
-        triphase = es.cfg['visualization.triphase']
+        triphase = False
 
     freq_max = es.cfg['analysis.spectrogram.frequency-max']
     if freq_max is None:

@@ -38,6 +38,7 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
     height = es.cfg['visualization.image.export.height'] if height is None else height
 
     es.visualization.set_optimal_nfft(es_audio, figure_height=height,
+                                      triphase=es.cfg['visualization.image.export.triphase'],
                                       title_enabled=es.cfg['visualization.image.export.title.enabled'])
 
     with es.utils.Spinner(f'Preparing image visualization... '):
@@ -87,6 +88,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     image_format = es.cfg['visualization.image.export.format']
 
     es.visualization.set_optimal_nfft(es_audio, figure_height=height,
+                                      triphase=es.cfg['visualization.video.export.triphase'],
                                       title_enabled=es.cfg['visualization.video.export.title.enabled'],
                                       include_scrub=True)
 

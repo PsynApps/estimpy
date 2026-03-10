@@ -6,6 +6,5 @@ visualization:
       codec: libsvtav1
       ffmpeg-extra-args:
         '-tune': ~
-        '-pix_fmt': yuv420p10le
         '-crf': 30
         '-preset': 5

@@ -980,3 +980,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
     @classmethod
     def _title_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:
         return es.cfg['visualization.video.export.title.enabled']
+
+    @classmethod
+    def _triphase_enabled(cls, mode: VisualizationMode = VisualizationMode.EXPORT) -> bool:
+        return es.cfg['visualization.video.export.triphase']

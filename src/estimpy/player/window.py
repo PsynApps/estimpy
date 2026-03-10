@@ -202,6 +202,7 @@ class PlayerWindow(QMainWindow):
 
         es.visualization.set_optimal_nfft(
             es_audio, figure_height=es.cfg['visualization.video.display.height'] * self._device_pixel_ratio,
+            triphase=es.cfg['visualization.video.display.triphase'],
             title_enabled=es.cfg['visualization.video.display.title.enabled'],
             include_scrub=True)
 
@@ -212,6 +213,7 @@ class PlayerWindow(QMainWindow):
             self._visualization._time_enabled = lambda mode=None: es.cfg['visualization.video.display.time.enabled']
             self._visualization._time_position = lambda mode=None: es.cfg['visualization.video.display.time.position']
             self._visualization._title_enabled = lambda mode=None: es.cfg['visualization.video.display.title.enabled']
+            self._visualization._triphase_enabled = lambda mode=None: es.cfg['visualization.video.display.triphase']
             self._visualization._window_length = es.cfg['visualization.video.display.window-length']
             self._visualization._fps = self._fps
             self._visualization._frames = range(self._total_frames)
@@ -387,7 +389,7 @@ class PlayerWindow(QMainWindow):
             'Triphase', 28, 'Triphase (T)',
             lambda: self._toggle_triphase(), width=70)
         self._btn_triphase.setCheckable(True)
-        self._btn_triphase.setChecked(es.cfg['visualization.triphase'])
+        self._btn_triphase.setChecked(es.cfg['visualization.video.display.triphase'])
         self._btn_triphase.setEnabled(self._es_audio.channels == 2)
         triphase_layout.addWidget(self._btn_triphase)
         self._apply_channel_tint(self._triphase_container, channel_id=2)
@@ -788,8 +790,8 @@ class PlayerWindow(QMainWindow):
 
     def _toggle_triphase(self):
         """Toggle triphase visualization mode."""
-        new_state = not es.cfg['visualization.triphase']
-        es.cfg['visualization.triphase'] = new_state
+        new_state = not es.cfg['visualization.video.display.triphase']
+        es.cfg['visualization.video.display.triphase'] = new_state
         self._btn_triphase.setChecked(new_state)
 
         # Rebuild figure layout (reuses cached analysis data for instant toggle)
@@ -989,7 +991,7 @@ class PlayerWindow(QMainWindow):
         if es_audio.channels != 2:
             self._btn_triphase.setChecked(False)
         else:
-            self._btn_triphase.setChecked(es.cfg['visualization.triphase'])
+            self._btn_triphase.setChecked(es.cfg['visualization.video.display.triphase'])
 
         # Rebuild per-channel volume controls if channel count changed
         self._rebuild_channel_volumes()

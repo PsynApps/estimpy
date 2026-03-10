@@ -411,16 +411,17 @@ For reference, the default configuration options and values are as follows:
 | player.volume-step                                           | 1                                            |
 | player.volume-ramp-min-length                                | 1                                            |
 | player.volume-ramp-max-length                                | 5                                            |
-| visualization.triphase                                       | False                                        |
 | visualization.image.display.size                             | 1080x1080                                    |
 | visualization.image.display.time.enabled                     | True                                         |
 | visualization.image.display.time.position                    | bottom                                       |
 | visualization.image.display.title.enabled                    | False                                        |
+| visualization.image.display.triphase                         | False                                        |
 | visualization.image.export.format                            | png                                          |
 | visualization.image.export.size                              | 1080x1080                                    |
 | visualization.image.export.time.enabled                      | True                                         |
 | visualization.image.export.time.position                     | bottom                                       |
 | visualization.image.export.title.enabled                     | True                                         |
+| visualization.image.export.triphase                          | False                                        |
 | visualization.style.amplitude.channels.ch0.background-color  | None                                         |
 | visualization.style.amplitude.channels.ch0.peak-color        | None                                         |
 | visualization.style.amplitude.channels.ch0.rms-color         | None                                         |
@@ -486,6 +487,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.display.time.enabled                     | False                                        |
 | visualization.video.display.time.position                    | top                                          |
 | visualization.video.display.title.enabled                    | False                                        |
+| visualization.video.display.triphase                         | True                                         |
 | visualization.video.display.window-length                    | 20                                           |
 | visualization.video.export.codec                             | libx265                                      |
 | visualization.video.export.ffmpeg-extra-args.-hide_banner    |                                              |
@@ -509,6 +511,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.export.time.enabled                      | True                                         |
 | visualization.video.export.time.position                     | top                                          |
 | visualization.video.export.title.enabled                     | False                                        |
+| visualization.video.export.triphase                          | True                                         |
 | visualization.video.export.video-length-max                  | None                                         |
 | visualization.video.export.window-length                     | 20                                           |
 

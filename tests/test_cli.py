@@ -141,7 +141,10 @@ class TestConfigHandling:
     def test_triphase_sets_config(self):
         args = _parse_args(['play', '-t'])
         _handle_global_arguments(args)
-        assert es.cfg['visualization.triphase'] is True
+        assert es.cfg['visualization.image.display.triphase'] is True
+        assert es.cfg['visualization.image.export.triphase'] is True
+        assert es.cfg['visualization.video.display.triphase'] is True
+        assert es.cfg['visualization.video.export.triphase'] is True
 
     def test_recursive_sets_config(self):
         args = _parse_args(['play', '-r'])

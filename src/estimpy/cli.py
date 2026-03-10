@@ -201,9 +201,12 @@ def _handle_global_arguments(args):
     if args.get('frequency_max') is not None:
         es.cfg['analysis.spectrogram.frequency-max'] = args['frequency_max']
 
-    # Apply triphase
+    # Apply triphase to all visualization modes
     if args.get('triphase'):
-        es.cfg['visualization.triphase'] = True
+        es.cfg['visualization.image.display.triphase'] = True
+        es.cfg['visualization.image.export.triphase'] = True
+        es.cfg['visualization.video.display.triphase'] = True
+        es.cfg['visualization.video.export.triphase'] = True
 
 
 def _get_files(args):
@@ -248,11 +251,10 @@ def _run_play(args):
 def _run_show_image(args):
     """Show static image visualization for each input file."""
     files = _get_files(args)
-    triphase = args.get('triphase', False)
 
     for file in files:
         try:
-            es_audio = _load_audio(file, triphase=triphase)
+            es_audio = _load_audio(file, triphase=es.cfg['visualization.image.display.triphase'])
             es.visualization.show_image(es_audio=es_audio)
         except Exception as e:
             print(e)
@@ -261,14 +263,13 @@ def _run_show_image(args):
 def _run_save_image(args):
     """Save image visualization for each input file."""
     files = _get_files(args)
-    triphase = args.get('triphase', False)
 
     if args.get('yes'):
         es.cfg['files.output.overwrite-default'] = True
 
     for file in files:
         try:
-            es_audio = _load_audio(file, triphase=triphase)
+            es_audio = _load_audio(file, triphase=es.cfg['visualization.image.export.triphase'])
             es.export.write_image(es_audio=es_audio)
         except Exception as e:
             print(e)
@@ -277,7 +278,6 @@ def _run_save_image(args):
 def _run_save_video(args):
     """Save video visualization for each input file."""
     files = _get_files(args)
-    triphase = args.get('triphase', False)
     resume_frame = args.get('resume_frame')
     resume_segment = args.get('resume_segment')
     profiling = args.get('profiling', False)
@@ -287,7 +287,7 @@ def _run_save_video(args):
 
     for file in files:
         try:
-            es_audio = _load_audio(file, triphase=triphase)
+            es_audio = _load_audio(file, triphase=es.cfg['visualization.video.export.triphase'])
             es.export.write_video(es_audio=es_audio,
                 frame_start=resume_frame, segment_start=resume_segment,
                 profiling=profiling)
@@ -298,14 +298,13 @@ def _run_save_video(args):
 def _run_save_metadata(args):
     """Write album art metadata for each input file."""
     files = _get_files(args)
-    triphase = args.get('triphase', False)
 
     if args.get('yes'):
         es.cfg['files.output.overwrite-default'] = True
 
     for file in files:
         try:
-            es_audio = _load_audio(file, triphase=triphase)
+            es_audio = _load_audio(file, triphase=es.cfg['visualization.image.export.triphase'])
             es.metadata.write_metadata(es_audio=es_audio)
         except Exception as e:
             print(e)
@@ -334,7 +333,7 @@ def _run_benchmark(args):
     print(f'Benchmark input: {input_file}')
 
     # Load audio once
-    es_audio = _load_audio(input_file)
+    es_audio = _load_audio(input_file, triphase=True)
 
     # Build run list based on whether -c was specified
     config_profiles = args.get('config')

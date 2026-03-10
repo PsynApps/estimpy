@@ -7,7 +7,7 @@
 - Configurable time text position (`top`/`bottom`) for image and video visualizations (`*.time.position`)
 
 - Reassigned spectrogram algorithm for sharper time-frequency localization, with configurable smoothing (`analysis.spectrogram.reassign`, `analysis.spectrogram.reassign-smoothing`)
-- Triphase visualization mode (`-t`/`--triphase`) showing the derived common electrode signal -(A+B) alongside the A and B channels
+- Triphase visualization mode (`-t`/`--triphase`) showing the derived common electrode signal -(A+B) alongside the A and B channels, with per-mode config keys (`visualization.image.display.triphase`, `visualization.image.export.triphase`, `visualization.video.display.triphase`, `visualization.video.export.triphase`) defaulting to off for images and on for video
 - Triphase toggle in the player UI for instant switching between stereo and triphase visualization during playback, with pre-computed 3-channel analysis data for stereo files
 - Per-channel colormap derivation from a single base colormap (`visualization.style.spectrogram.color-map`), with the low-energy region automatically recolored to match each channel's base color
 - Configurable colormap recoloring radius (`visualization.style.spectrogram.match-channel-color-radius`) with perceptual brightness matching using Rec. 709 relative luminance

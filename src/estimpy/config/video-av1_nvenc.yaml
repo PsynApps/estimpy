@@ -6,8 +6,7 @@ visualization:
       codec: av1_nvenc
       ffmpeg-extra-args:
         '-crf': ~
-        '-pix_fmt': 'yuv420p10le'
-        '-cq': 28
+        '-cq': 30
         '-preset': p6
         '-tune': hq
         '-spatial-aq': 1

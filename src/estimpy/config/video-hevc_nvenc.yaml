@@ -7,6 +7,6 @@ visualization:
       ffmpeg-extra-args:
         '-crf': ~
         '-cq': 22
-        '-preset': slow
+        '-preset': p6
         '-tune': hq
         '-spatial-aq': 1

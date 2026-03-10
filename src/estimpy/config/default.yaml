@@ -81,8 +81,6 @@ player:
   # Maximum amount of time to smoothly transition to a new volume (i.e. with a volume change of 100)
   volume-ramp-max-length: 5
 visualization:
-  # Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode
-  triphase: False
   # Configuration for image visualizations
   image:
     # Configuration for displaying image interactively
@@ -96,6 +94,8 @@ visualization:
       # Configuration for the title panel
       title:
         enabled: False
+      # Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode
+      triphase: False
     # Configuration for exporting image
     export:
       # File format of image
@@ -109,6 +109,8 @@ visualization:
       # Configuration for the title panel
       title:
         enabled: True
+      # Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode
+      triphase: False
   style:
     # Configuration for the amplitude panels
     amplitude:
@@ -279,6 +281,8 @@ visualization:
       # Configuration for the title panel
       title:
         enabled: False
+      # Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode
+      triphase: True
       # Configuration for the oscilloscope waveform overlay
       oscilloscope:
         enabled: True
@@ -329,6 +333,8 @@ visualization:
       # Configuration for the oscilloscope waveform overlay
       oscilloscope:
         enabled: True
+      # Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode
+      triphase: True
       # Maximum length of video to encode
       video-length-max: ~
       # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
