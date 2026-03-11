@@ -37,23 +37,34 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
 
     width = es.cfg['visualization.image.export.width'] if width is None else width
     height = es.cfg['visualization.image.export.height'] if height is None else height
-    triphase = es.cfg['visualization.image.export.triphase'] if triphase is None else triphase
 
-    es.visualization.set_optimal_nfft(es_audio, figure_height=height,
-                                      triphase=triphase,
-                                      title_enabled=es.cfg['visualization.image.export.title.enabled'])
+    # When triphase is explicitly overridden (e.g. video preview/album art), temporarily
+    # set the image export config so the Visualization classmethods read the correct value
+    triphase_key = 'visualization.image.export.triphase'
+    original_triphase = es.cfg[triphase_key]
+    if triphase is not None:
+        es.cfg[triphase_key] = triphase
+    else:
+        triphase = original_triphase
 
-    with es.utils.Spinner(f'Preparing image visualization... '):
-        visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
-        visualization.make_figure()
-        visualization.resize_figure(width=width, height=height, dpi=_EXPORT_DPI)
+    try:
+        es.visualization.set_optimal_nfft(es_audio, figure_height=height,
+                                          triphase=triphase,
+                                          title_enabled=es.cfg['visualization.image.export.title.enabled'])
 
-    with es.utils.Spinner(f'Saving image file... '):
-        matplotlib.pyplot.savefig(image_file, dpi=_EXPORT_DPI, pil_kwargs={'optimize': True})
+        with es.utils.Spinner(f'Preparing image visualization... '):
+            visualization = es.visualization.Visualization(es_audio=es_audio, mode=es.visualization.VisualizationMode.EXPORT)
+            visualization.make_figure()
+            visualization.resize_figure(width=width, height=height, dpi=_EXPORT_DPI)
 
-    print('Done!')
+        with es.utils.Spinner(f'Saving image file... '):
+            matplotlib.pyplot.savefig(image_file, dpi=_EXPORT_DPI, pil_kwargs={'optimize': True})
 
-    return image_file
+        print('Done!')
+
+        return image_file
+    finally:
+        es.cfg[triphase_key] = original_triphase
 
 
 def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format: str = None,
@@ -430,10 +441,11 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         video_metadata = es.metadata.Metadata(file=video_file)
         video_metadata.set_metadata(es_audio.metadata.get_metadata())
 
-        # Render an image to use as album art in the video metadata
+        # Render an image to use as album art in the video metadata (use video triphase setting)
         if image_file is None:
             print(f'Creating album art image... ')
-            image_file = write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path())
+            image_file = write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path(),
+                                     triphase=es.cfg['visualization.video.export.triphase'])
             es.utils.add_temp_file(image_file)
         image_data = open(image_file, 'rb').read()
 
