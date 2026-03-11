@@ -46,7 +46,8 @@
 - Envelope computation vectorized using NumPy stride tricks, replacing per-window Python loop
 - Spectral edge frequency max computation vectorized and subsampled for faster loading of long files
 - Spectrogram colormap configuration simplified from per-channel colormaps to a single base colormap with automatic per-channel derivation
-- Channel identity (color and label) promoted to `visualization.style.channels.chN` with per-channel amplitude styling (`peak-color`, `rms-color`, `background-color`) falling back to the channel color when not explicitly set
+- Channel identity (color, label, and inverted) promoted to `visualization.style.channels.chN` with per-channel amplitude styling (`peak-color`, `rms-color`, `background-color`) falling back to the channel color when not explicitly set
+- Per-channel vertical inversion is now configurable (`visualization.style.channels.chN.inverted`, default `False`). Previously, ch1 was always inverted in stereo and triphase modes to mirror amplitude envelopes; this is now opt-in
 - Renamed `base-color` to `peak-color` in amplitude channel style configuration
 - Renamed `match-amplitude-color` to `match-channel-color` in spectrogram style configuration
 - Default channel colors updated (`#4799e8`, `#b775ff`)

@@ -147,25 +147,6 @@ visualization:
       rms-alpha: 0.5
       # Show the RMS amplitude envelope superimposed on the peak amplitude envelope
       show-rms: True
-    # Per-channel identity configuration (color and label)
-    channels:
-      ch0:
-        # The base color for this channel, used for amplitude, spectrogram color matching, and labels
-        color: '#4799e8'
-        # Label text displayed on the spectrogram panel
-        label: A
-      ch1:
-        color: '#b775ff'
-        label: B
-      ch2:
-        color: '#e06cb7'
-        label: T
-      # Configuration for channel labels displayed on spectrogram panels
-      labels:
-        # Show channel labels on spectrogram panels
-        enabled: True
-        # Font size of channel labels
-        font-size: 64
     # Configuration for axes
     axes:
       # Color of the axis ticks and scale text
@@ -194,6 +175,29 @@ visualization:
         family: Helvetica Neue, Helvetica, Arial, sans-serif
         # The font weight to use for text
         weight: bold
+    # Per-channel identity configuration (color and label)
+    channels:
+      ch0:
+        # The base color for this channel, used for amplitude, spectrogram color matching, and labels
+        color: '#4799e8'
+        # Whether to vertically invert the amplitude and spectrogram panels for this channel
+        inverted: False
+        # Label text displayed on the spectrogram panel
+        label: A
+      ch1:
+        color: '#b775ff'
+        inverted: False
+        label: B
+      ch2:
+        color: '#e06cb7'
+        inverted: False
+        label: T
+      # Configuration for channel labels displayed on spectrogram panels
+      labels:
+        # Show channel labels on spectrogram panels
+        enabled: True
+        # Font size of channel labels
+        font-size: 64
     # Configuration for the oscilloscope waveform overlay
     oscilloscope:
       # Border width in pixels

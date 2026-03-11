@@ -67,21 +67,23 @@ class Visualization:
 
     @property
     def _channel_layout(self):
-        """Display order and inversion for each channel: list of (channel_id, invert)."""
+        """Display order and inversion for each channel: list of (channel_id, inverted)."""
+        channels = es.cfg['visualization.style.channels']
         if self._triphase_enabled(self._mode) and self.es_audio.channels == 3:
-            return [(0, False), (1, True), (2, False)]
+            return [(i, channels[i]['inverted']) for i in range(3)]
         elif self.es_audio.channels >= 2:
-            return [(0, False), (1, True)]
+            return [(i, channels[i]['inverted']) for i in range(2)]
         else:
-            return [(0, False)]
+            return [(0, channels[0]['inverted'])]
 
     @property
     def _scrub_channel_layout(self):
         """Channel layout for scrub panels: always shows original stereo channels (no triphase)."""
+        channels = es.cfg['visualization.style.channels']
         if self.es_audio.channels >= 2:
-            return [(0, False), (1, True)]
+            return [(i, channels[i]['inverted']) for i in range(2)]
         else:
-            return [(0, False)]
+            return [(0, channels[0]['inverted'])]
 
     @property
     def _layout_ratio_key(self):

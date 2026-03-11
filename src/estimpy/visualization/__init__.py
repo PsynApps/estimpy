@@ -312,6 +312,7 @@ def _on_config_updated():
     for i_channel in range(n_channels):
         es.cfg['visualization.style.channels'][i_channel] = {
             'color': es.cfg[f'visualization.style.channels.ch{i_channel}.color'],
+            'inverted': es.cfg.get(f'visualization.style.channels.ch{i_channel}.inverted', False),
             'label': es.cfg.get(f'visualization.style.channels.ch{i_channel}.label', ''),
         }
 

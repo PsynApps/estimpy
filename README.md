@@ -438,10 +438,13 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.amplitude.rms-alpha                      | 0.5                                          |
 | visualization.style.amplitude.show-rms                       | True                                         |
 | visualization.style.channels.ch0.color                       | #4799e8                                      |
+| visualization.style.channels.ch0.inverted                    | False                                        |
 | visualization.style.channels.ch0.label                       | A                                            |
 | visualization.style.channels.ch1.color                       | #b775ff                                      |
+| visualization.style.channels.ch1.inverted                    | False                                        |
 | visualization.style.channels.ch1.label                       | B                                            |
 | visualization.style.channels.ch2.color                       | #e06cb7                                      |
+| visualization.style.channels.ch2.inverted                    | False                                        |
 | visualization.style.channels.ch2.label                       | T                                            |
 | visualization.style.channels.labels.enabled                  | True                                         |
 | visualization.style.channels.labels.font-size                | 64                                           |
