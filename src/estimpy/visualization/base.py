@@ -78,12 +78,15 @@ class Visualization:
 
     @property
     def _scrub_channel_layout(self):
-        """Channel layout for scrub panels: always shows original stereo channels (no triphase)."""
-        channels = es.cfg['visualization.style.channels']
+        """Channel layout for scrub panels: always shows original stereo channels (no triphase).
+
+        Channel B (ch1) is always inverted so the amplitude envelopes mirror each other
+        for easy visual comparison, regardless of the per-channel inversion config.
+        """
         if self.es_audio.channels >= 2:
-            return [(i, channels[i]['inverted']) for i in range(2)]
+            return [(0, False), (1, True)]
         else:
-            return [(0, channels[0]['inverted'])]
+            return [(0, False)]
 
     @property
     def _layout_ratio_key(self):
