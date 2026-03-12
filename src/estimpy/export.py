@@ -20,10 +20,29 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
     if not es.cfg['audio.stereo-stim.enabled']:
         return
 
+    import matplotlib.colors
+
     font_file = es.cfg['visualization.style.font.text.file']
     face_index = es.cfg['visualization.style.font.text.face-index']
-    badge_font_size = max(8, int(fig_height * 0.018))
+
+    # Match axes label font size — the export figure was resized from base DPI to target
+    # pixel dimensions, so the effective pt-to-px factor matches the video pipeline
+    axes_font_pt = es.cfg['visualization.style.axes.font-size']
+    # Use the same proportional relationship as the video renderer:
+    # at 1080p with standard layout, fig.dpi/72 ≈ 2.5, axes font ~6pt → ~15px.
+    # The resize_figure scales fonts by height_scale_factor, and savefig at _EXPORT_DPI
+    # renders at that DPI. The net pixel size is axes_font_pt * height_scale * DPI/72.
+    # Since height_scale * DPI = target_height / original_height * original_DPI,
+    # the pixel size equals axes_font_pt * target_height / (original_height_inches * 72).
+    # For standard matplotlib figures at 100 DPI, original_height ≈ 4.8in → 4.8*72=345.6.
+    # This gives us: badge_font_size ≈ axes_font_pt * fig_height / 345.
+    # Use a tuned constant that matches the video pipeline output.
+    badge_font_size = max(8, int(axes_font_pt * fig_height / 350))
     badge_font = ImageFont.truetype(font_file, badge_font_size, index=face_index)
+
+    # Use axes color for text and outline
+    axes_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.axes.color'])
+    axes_color = tuple(int(c * 255) for c in axes_color_rgb) + (255,)
 
     # Measure text
     dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
@@ -43,24 +62,26 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
     radius = max(3, badge_h // 3)
     draw.rounded_rectangle(
         [(0, 0), (badge_w - 1, badge_h - 1)],
-        radius=radius, fill=(0, 0, 0, 0), outline=(255, 255, 255, 140), width=1)
+        radius=radius, fill=(0, 0, 0, 0), outline=axes_color, width=1)
     draw.text(
         (pad_x - bbox[0], pad_y - bbox[1]),
-        'SS', font=badge_font, fill=(255, 255, 255, 200))
+        'SS', font=badge_font, fill=axes_color)
 
     # Position: to the left of where the time text would be
     margin = max(2, badge_font_size // 4)
     position_top = (time_position == 'top')
     if time_enabled:
-        # Estimate time text width (time text is right-aligned with a margin)
-        time_font_size = max(8, int(fig_height * 0.025))
+        # Estimate time text size using the same proportional scaling
+        time_font_pt = es.cfg['visualization.style.time.font-size']
+        time_font_size = max(8, int(time_font_pt * fig_height / 350))
         time_font = ImageFont.truetype(font_file, time_font_size, index=face_index)
         time_bbox = draw.textbbox((0, 0), '00:00.0', font=time_font)
         time_w = time_bbox[2] - time_bbox[0]
         time_h = time_bbox[3] - time_bbox[1]
-        time_x = fig_width - time_w - margin
-        time_y = margin if position_top else fig_height - time_h - margin
-        gap = max(4, time_font_size // 4)
+        time_margin = max(2, time_font_size // 8)
+        time_x = fig_width - time_w - time_margin
+        time_y = time_margin if position_top else fig_height - time_h - time_margin
+        gap = max(6, time_font_size // 2)
         bx = time_x - badge_w - gap
         by = time_y + (time_h - badge_h) // 2
     else:

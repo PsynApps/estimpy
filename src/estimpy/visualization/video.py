@@ -282,15 +282,16 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._dr_ss_badge = None
 
         if self._dr_ss_enabled:
-            # Scale badge font relative to time text (or figure height if time is disabled)
-            if self._dr_time_enabled and hasattr(self, '_dr_time_font_size_px'):
-                badge_font_size = max(8, int(self._dr_time_font_size_px * 0.6))
-            else:
-                badge_font_size = max(8, int(fig_height * 0.018))
+            # Match axes label font size
+            badge_font_size = max(8, int(es.cfg['visualization.style.axes.font-size'] * self._pt_to_px))
 
             font_file = es.cfg['visualization.style.font.text.file']
             face_index = es.cfg['visualization.style.font.text.face-index']
             badge_font = ImageFont.truetype(font_file, badge_font_size, index=face_index)
+
+            # Use axes color for text and outline
+            axes_color_rgb = matplotlib.colors.to_rgb(es.cfg['visualization.style.axes.color'])
+            axes_color = tuple(int(c * 255) for c in axes_color_rgb) + (255,)
 
             # Measure text
             dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
@@ -309,10 +310,10 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             radius = max(3, badge_h // 3)
             draw.rounded_rectangle(
                 [(0, 0), (badge_w - 1, badge_h - 1)],
-                radius=radius, fill=(0, 0, 0, 0), outline=(255, 255, 255, 140), width=1)
+                radius=radius, fill=(0, 0, 0, 0), outline=axes_color, width=1)
             draw.text(
                 (pad_x - bbox[0], pad_y - bbox[1]),
-                'SS', font=badge_font, fill=(255, 255, 255, 200))
+                'SS', font=badge_font, fill=axes_color)
             self._dr_ss_badge = np.array(badge_img)
 
         # --- Pre-compute axis overlay masks for data regions (for efficient compositing) ---
@@ -878,7 +879,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             margin = max(2, self._dr_time_font_size_px // 8)
             time_x = self._dr_fig_width - tw - margin
             time_y = margin if self._dr_time_position_top else self._dr_fig_height - th - margin
-            gap = max(4, self._dr_time_font_size_px // 4)
+            gap = max(6, self._dr_time_font_size_px // 2)
             bx = time_x - bw - gap
             by = time_y + (th - bh) // 2  # vertically center with time text
         else:
