@@ -6,12 +6,71 @@ import os
 import subprocess
 import time
 import tqdm
+from PIL import Image, ImageDraw, ImageFont
 
 import estimpy as es
 
 # Low DPI for export — figures are created at this DPI then resized to exact pixel dimensions,
 # keeping matplotlib element proportions (fonts, lines, ticks) correct via the scale factor
 _EXPORT_DPI = 8
+
+
+def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, time_position):
+    """Draw the SS badge onto a saved image file if stereo stim mode is enabled."""
+    if not es.cfg['audio.stereo-stim.enabled']:
+        return
+
+    font_file = es.cfg['visualization.style.font.text.file']
+    face_index = es.cfg['visualization.style.font.text.face-index']
+    badge_font_size = max(8, int(fig_height * 0.018))
+    badge_font = ImageFont.truetype(font_file, badge_font_size, index=face_index)
+
+    # Measure text
+    dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(dummy)
+    bbox = draw.textbbox((0, 0), 'SS', font=badge_font)
+    tw = bbox[2] - bbox[0]
+    th = bbox[3] - bbox[1]
+
+    pad_x = max(4, badge_font_size // 3)
+    pad_y = max(2, badge_font_size // 5)
+    badge_w = tw + 2 * pad_x
+    badge_h = th + 2 * pad_y
+
+    # Create badge
+    badge_img = Image.new('RGBA', (badge_w, badge_h), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(badge_img)
+    radius = max(3, badge_h // 3)
+    draw.rounded_rectangle(
+        [(0, 0), (badge_w - 1, badge_h - 1)],
+        radius=radius, fill=(0, 0, 0, 0), outline=(255, 255, 255, 140), width=1)
+    draw.text(
+        (pad_x - bbox[0], pad_y - bbox[1]),
+        'SS', font=badge_font, fill=(255, 255, 255, 200))
+
+    # Position: to the left of where the time text would be
+    margin = max(2, badge_font_size // 4)
+    position_top = (time_position == 'top')
+    if time_enabled:
+        # Estimate time text width (time text is right-aligned with a margin)
+        time_font_size = max(8, int(fig_height * 0.025))
+        time_font = ImageFont.truetype(font_file, time_font_size, index=face_index)
+        time_bbox = draw.textbbox((0, 0), '00:00.0', font=time_font)
+        time_w = time_bbox[2] - time_bbox[0]
+        time_h = time_bbox[3] - time_bbox[1]
+        time_x = fig_width - time_w - margin
+        time_y = margin if position_top else fig_height - time_h - margin
+        gap = max(4, time_font_size // 4)
+        bx = time_x - badge_w - gap
+        by = time_y + (time_h - badge_h) // 2
+    else:
+        bx = fig_width - badge_w - margin
+        by = margin if position_top else fig_height - badge_h - margin
+
+    # Composite onto image
+    img = Image.open(image_path).convert('RGBA')
+    img.paste(badge_img, (max(0, bx), max(0, by)), badge_img)
+    img.convert('RGB').save(image_path)
 
 
 def _detect_audio_codec(es_audio: es.audio.Audio) -> str:
@@ -88,6 +147,10 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
 
         with es.utils.Spinner(f'Saving image file... '):
             matplotlib.pyplot.savefig(image_file, dpi=_EXPORT_DPI, pil_kwargs={'optimize': True})
+            _draw_ss_badge_on_image(
+                image_file, width, height,
+                time_enabled=es.cfg['visualization.image.export.time.enabled'],
+                time_position=es.cfg['visualization.image.export.time.position'])
 
         print('Done!')
 

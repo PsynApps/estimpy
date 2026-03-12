@@ -282,11 +282,11 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._dr_ss_badge = None
 
         if self._dr_ss_enabled:
-            # Scale badge font to match time text size (or a fraction of figure height if time is disabled)
+            # Scale badge font relative to time text (or figure height if time is disabled)
             if self._dr_time_enabled and hasattr(self, '_dr_time_font_size_px'):
-                badge_font_size = max(8, int(self._dr_time_font_size_px * 0.75))
+                badge_font_size = max(8, int(self._dr_time_font_size_px * 0.6))
             else:
-                badge_font_size = max(8, int(fig_height * 0.02))
+                badge_font_size = max(8, int(fig_height * 0.018))
 
             font_file = es.cfg['visualization.style.font.text.file']
             face_index = es.cfg['visualization.style.font.text.face-index']
@@ -781,6 +781,13 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                     saved = self._dr_frame_buffer[y0:y1, x_start:x_end].copy()
                     self._dr_saved_regions.append((y0, y1, x_start, x_end, saved))
 
+        # SS badge region (save before time text so badge region is restored cleanly)
+        if self._dr_ss_enabled and self._dr_ss_badge is not None:
+            bx, by, bx_end, by_end = self._dr_ss_badge_position()
+            if bx < bx_end and by < by_end:
+                saved = self._dr_frame_buffer[by:by_end, bx:bx_end].copy()
+                self._dr_saved_regions.append((by, by_end, bx, bx_end, saved))
+
         # Time text region
         if self._dr_time_enabled and self._handles['time'] is not None:
             time_string = self._get_time_text()
@@ -858,8 +865,8 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         blended = fg * alpha + bg * (1.0 - alpha)
         self._dr_frame_buffer[ty:ty_end, tx:tx_end] = blended.astype(np.uint8)
 
-    def _dr_draw_ss_badge(self, t):
-        """Draw the SS badge to the left of the time text on the frame buffer."""
+    def _dr_ss_badge_position(self):
+        """Compute the (x, y, x_end, y_end) position for the SS badge on the frame buffer."""
         badge = self._dr_ss_badge
         bh, bw = badge.shape[:2]
 
@@ -884,6 +891,12 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         by = max(0, by)
         bx_end = min(self._dr_fig_width, bx + bw)
         by_end = min(self._dr_fig_height, by + bh)
+        return bx, by, bx_end, by_end
+
+    def _dr_draw_ss_badge(self, t):
+        """Draw the SS badge to the left of the time text on the frame buffer."""
+        badge = self._dr_ss_badge
+        bx, by, bx_end, by_end = self._dr_ss_badge_position()
 
         if bx >= bx_end or by >= by_end:
             return
