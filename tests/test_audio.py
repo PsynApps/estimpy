@@ -88,48 +88,48 @@ class TestTriphase:
 
 
 class TestStereoStimProtection:
-    def test_ssp_preserves_channels(self, synthetic_stereo_audio):
-        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
-        assert ssp.channels == synthetic_stereo_audio.channels
+    def test_ss_preserves_channels(self, synthetic_stereo_audio):
+        ss =synthetic_stereo_audio.with_stereo_stim()
+        assert ss.channels == synthetic_stereo_audio.channels
 
-    def test_ssp_preserves_sample_count(self, synthetic_stereo_audio):
-        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
-        assert ssp.sample_count == synthetic_stereo_audio.sample_count
+    def test_ss_preserves_sample_count(self, synthetic_stereo_audio):
+        ss =synthetic_stereo_audio.with_stereo_stim()
+        assert ss.sample_count == synthetic_stereo_audio.sample_count
 
-    def test_ssp_preserves_sample_rate(self, synthetic_stereo_audio):
-        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
-        assert ssp.sample_rate == synthetic_stereo_audio.sample_rate
+    def test_ss_preserves_sample_rate(self, synthetic_stereo_audio):
+        ss =synthetic_stereo_audio.with_stereo_stim()
+        assert ss.sample_rate == synthetic_stereo_audio.sample_rate
 
-    def test_ssp_output_dtype_float32(self, synthetic_stereo_audio):
-        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
-        assert ssp.data.dtype == np.float32
+    def test_ss_output_dtype_float32(self, synthetic_stereo_audio):
+        ss =synthetic_stereo_audio.with_stereo_stim()
+        assert ss.data.dtype == np.float32
 
-    def test_ssp_attenuates_dc(self, synthetic_stereo_audio):
-        """SSP high-pass filter should remove DC offset."""
+    def test_ss_attenuates_dc(self, synthetic_stereo_audio):
+        """Stereo stim high-pass filter should remove DC offset."""
         # Add DC offset to audio
         dc_audio = Audio(
             audio_data=np.full((2, N_SAMPLES), 16000, dtype=np.int16),
             sample_rate=SAMPLE_RATE, bit_depth=16)
-        ssp = dc_audio.with_stereo_stim_protection()
+        ss =dc_audio.with_stereo_stim()
         # DC should be nearly eliminated
-        assert abs(np.mean(ssp.data[0])) < 0.01
+        assert abs(np.mean(ss.data[0])) < 0.01
 
-    def test_ssp_passes_midrange(self, synthetic_stereo_audio):
-        """SSP should pass 440 Hz signal with minimal attenuation."""
-        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
+    def test_ss_passes_midrange(self, synthetic_stereo_audio):
+        """Stereo stim should pass 440 Hz signal with minimal attenuation."""
+        ss =synthetic_stereo_audio.with_stereo_stim()
         original_rms = np.sqrt(np.mean(synthetic_stereo_audio.data[0] ** 2))
-        filtered_rms = np.sqrt(np.mean(ssp.data[0] ** 2))
+        filtered_rms = np.sqrt(np.mean(ss.data[0] ** 2))
         # 440 Hz is well within passband — should retain >90% of energy
         assert filtered_rms / original_rms > 0.9
 
-    def test_ssp_creates_temp_wav(self, synthetic_stereo_audio):
-        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
-        assert ssp.file is not None
-        assert ssp.file.endswith('.wav')
+    def test_ss_creates_temp_wav(self, synthetic_stereo_audio):
+        ss =synthetic_stereo_audio.with_stereo_stim()
+        assert ss.file is not None
+        assert ss.file.endswith('.wav')
 
-    def test_ssp_mono_works(self, synthetic_mono_audio):
-        ssp = synthetic_mono_audio.with_stereo_stim_protection()
-        assert ssp.channels == 1
+    def test_ss_mono_works(self, synthetic_mono_audio):
+        ss =synthetic_mono_audio.with_stereo_stim()
+        assert ss.channels == 1
 
 
 class TestTimeToDataIndex:

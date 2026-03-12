@@ -276,12 +276,12 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             self._dr_time_border_color = tuple(int(c * 255) for c in border_color_rgb)
             self._dr_time_border_width = max(1, int(round(self._text_border_width * self._pt_to_px)))
 
-        # --- SSP badge rendering setup ---
-        self._dr_ssp_enabled = (
-            es.cfg['audio.stereo-stim-protection.enabled'] and self._mode is VisualizationMode.EXPORT)
-        self._dr_ssp_badge = None
+        # --- Stereo stim badge rendering setup ---
+        self._dr_ss_enabled = (
+            es.cfg['audio.stereo-stim.enabled'] and self._mode is VisualizationMode.EXPORT)
+        self._dr_ss_badge = None
 
-        if self._dr_ssp_enabled:
+        if self._dr_ss_enabled:
             # Scale badge font to match time text size (or a fraction of figure height if time is disabled)
             if self._dr_time_enabled and hasattr(self, '_dr_time_font_size_px'):
                 badge_font_size = max(8, int(self._dr_time_font_size_px * 0.75))
@@ -295,7 +295,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             # Measure text
             dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
             draw = ImageDraw.Draw(dummy)
-            bbox = draw.textbbox((0, 0), 'SSP', font=badge_font)
+            bbox = draw.textbbox((0, 0), 'SS', font=badge_font)
             tw = bbox[2] - bbox[0]
             th = bbox[3] - bbox[1]
 
@@ -312,8 +312,8 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                 radius=radius, fill=(255, 255, 255, 50), outline=(255, 255, 255, 140), width=1)
             draw.text(
                 (pad_x - bbox[0], pad_y - bbox[1]),
-                'SSP', font=badge_font, fill=(255, 255, 255, 200))
-            self._dr_ssp_badge = np.array(badge_img)
+                'SS', font=badge_font, fill=(255, 255, 255, 200))
+            self._dr_ss_badge = np.array(badge_img)
 
         # --- Pre-compute axis overlay masks for data regions (for efficient compositing) ---
         self._axis_overlay_masks = {}
@@ -543,8 +543,8 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             if _profiling:
                 self._dr_profile_times['draw_time'] += time.perf_counter() - t0
 
-        if self._dr_ssp_enabled and self._dr_ssp_badge is not None:
-            self._dr_draw_ssp_badge()
+        if self._dr_ss_enabled and self._dr_ss_badge is not None:
+            self._dr_draw_ss_badge()
 
         # Update state
         self._dr_prev_window_min = window_min
@@ -858,9 +858,9 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         blended = fg * alpha + bg * (1.0 - alpha)
         self._dr_frame_buffer[ty:ty_end, tx:tx_end] = blended.astype(np.uint8)
 
-    def _dr_draw_ssp_badge(self):
-        """Draw the SSP badge in the bottom-left corner of the frame buffer."""
-        badge = self._dr_ssp_badge
+    def _dr_draw_ss_badge(self):
+        """Draw the SS badge in the bottom-left corner of the frame buffer."""
+        badge = self._dr_ss_badge
         bh, bw = badge.shape[:2]
         margin = max(2, bh // 4)
         bx = margin

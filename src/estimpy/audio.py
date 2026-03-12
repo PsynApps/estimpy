@@ -178,28 +178,28 @@ class Audio:
 
         self.metadata.save()
 
-    def with_stereo_stim_protection(self) -> 'Audio':
-        """Create a new Audio with stereo stim protection filters applied.
+    def with_stereo_stim(self) -> 'Audio':
+        """Create a new Audio with stereo stim filters applied.
 
         Applies a bandpass Butterworth filter to remove DC offset, subsonic content,
         and high-frequency content that could be harmful with direct-output stereostim
         devices. Uses zero-phase filtering to preserve timing relationships.
 
         Filter cutoffs are read from config:
-        - audio.stereo-stim-protection.high-pass (default 20 Hz)
-        - audio.stereo-stim-protection.low-pass (default 12000 Hz)
+        - audio.stereo-stim.high-pass (default 20 Hz)
+        - audio.stereo-stim.low-pass (default 12000 Hz)
 
         :return Audio: A new Audio instance with filtered data and a temp WAV file
         """
-        hp = es.cfg['audio.stereo-stim-protection.high-pass']
-        lp = es.cfg['audio.stereo-stim-protection.low-pass']
+        hp = es.cfg['audio.stereo-stim.high-pass']
+        lp = es.cfg['audio.stereo-stim.low-pass']
 
         # Design bandpass Butterworth filter (4th order, zero-phase doubles effective order to 8th)
         sos = scipy.signal.butter(4, [hp, lp], btype='bandpass', fs=self.sample_rate, output='sos')
         filtered = scipy.signal.sosfiltfilt(sos, self._data, axis=1).astype(np.float32)
 
         # Write filtered audio to a temp WAV file for use by FFmpeg during export
-        temp_path = es.utils.get_temp_file_path(temp_file_name='ssp_audio.wav')
+        temp_path = es.utils.get_temp_file_path(temp_file_name='ss_audio.wav')
         dtype = np.int16 if self._bit_depth <= 16 else np.int32
         raw = (filtered * (2 ** (self._bit_depth - 1))).clip(
             -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1

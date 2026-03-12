@@ -56,7 +56,7 @@ Many commercial Estim units support custom stimulation signals using audio input
   - **Triphase toggle**: Instantly switch between stereo and triphase visualization during playback
   - **Stereo stim protection toggle**: Apply or remove safety filtering during playback
   - **Zoom controls**: Adjust the sliding window length during playback
-- **Stereo stim protection**: Optional safety filter chain for direct-output stereostim devices, applying a bandpass filter (default 20 Hz–12 kHz) to remove DC offset, subsonic content, and high-frequency content. Visualizations and exported media reflect the filtered audio. Indicated by an "SSP" badge on exported videos.
+- **Stereo stim**: Optional safety filter chain for direct-output stereostim devices, applying a bandpass filter (default 20 Hz–12 kHz) to remove DC offset, subsonic content, and high-frequency content. Visualizations and exported media reflect the filtered audio. Indicated by an "SS" badge on exported videos.
 - **Highly configurable**: Nearly all parameters related to the rendering and export of visualizations are determined from an easily customizable configuration file
 
 ## Disclaimer
@@ -200,7 +200,7 @@ If no command is given, the player is launched. If no files are given, a file di
 | `--dynamic-range DB`                               | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
 | `--frequency-min HZ`                               | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
 | `--frequency-max HZ`                               | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
-| `-ssp`, `--stereo-stim-protection`                 | Apply stereo stim protection filters (bandpass 20 Hz–12 kHz) for safer use with direct-output stereostim devices.      |
+| `-ss`, `--stereo-stim`                 | Apply stereo stim filters (bandpass 20 Hz–12 kHz) for safer use with direct-output stereostim devices.      |
 
 ### Save options
 
@@ -382,9 +382,9 @@ For reference, the default configuration options and values are as follows:
 
 | Configuration Option                                         | Value                                        |
 |--------------------------------------------------------------|----------------------------------------------|
-| audio.stereo-stim-protection.enabled                         | False                                        |
-| audio.stereo-stim-protection.high-pass                       | 20                                           |
-| audio.stereo-stim-protection.low-pass                        | 12000                                        |
+| audio.stereo-stim.enabled                         | False                                        |
+| audio.stereo-stim.high-pass                       | 20                                           |
+| audio.stereo-stim.low-pass                        | 12000                                        |
 | analysis.oscilloscope.pulse-detection.count-threshold        | 5                                            |
 | analysis.oscilloscope.pulse-detection.cv-threshold           | 1.5                                          |
 | analysis.oscilloscope.pulse-detection.enabled                | True                                         |

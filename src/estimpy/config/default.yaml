@@ -46,8 +46,8 @@ analysis:
   # Window overlap to use when processing audio data (in number of samples). Must be less than analysis.window-size. Defaults to 3 * analysis.window-size // 4
   window-overlap: ~
 audio:
-  stereo-stim-protection:
-    # Enable stereo stim protection mode. Applies a safety filter chain (bandpass) to the audio
+  stereo-stim:
+    # Enable stereo stim mode. Applies a safety filter chain (bandpass) to the audio
     # data before visualization and export, removing DC offset, subsonic content, and high-frequency
     # content that could be harmful with direct-output stereostim devices.
     enabled: False

@@ -447,8 +447,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     else:
         concat_extra_args = ffmpeg_extra_args
 
-    # Determine audio codec — stream copy when possible, re-encode when SSP has modified the audio
-    if es.cfg['audio.stereo-stim-protection.enabled']:
+    # Determine audio codec — stream copy when possible, re-encode when stereo stim has modified the audio
+    if es.cfg['audio.stereo-stim.enabled']:
         audio_codec_args = ['-c:a', _detect_audio_codec(es_audio), '-strict', '-1']
     else:
         audio_codec_args = ['-c:a', 'copy', '-strict', '-1']
