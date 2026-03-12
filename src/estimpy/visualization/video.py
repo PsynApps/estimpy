@@ -309,7 +309,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             radius = max(3, badge_h // 3)
             draw.rounded_rectangle(
                 [(0, 0), (badge_w - 1, badge_h - 1)],
-                radius=radius, fill=(255, 255, 255, 50), outline=(255, 255, 255, 140), width=1)
+                radius=radius, fill=(0, 0, 0, 0), outline=(255, 255, 255, 140), width=1)
             draw.text(
                 (pad_x - bbox[0], pad_y - bbox[1]),
                 'SS', font=badge_font, fill=(255, 255, 255, 200))
@@ -544,7 +544,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                 self._dr_profile_times['draw_time'] += time.perf_counter() - t0
 
         if self._dr_ss_enabled and self._dr_ss_badge is not None:
-            self._dr_draw_ss_badge()
+            self._dr_draw_ss_badge(t)
 
         # Update state
         self._dr_prev_window_min = window_min
@@ -858,13 +858,27 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         blended = fg * alpha + bg * (1.0 - alpha)
         self._dr_frame_buffer[ty:ty_end, tx:tx_end] = blended.astype(np.uint8)
 
-    def _dr_draw_ss_badge(self):
-        """Draw the SS badge in the bottom-left corner of the frame buffer."""
+    def _dr_draw_ss_badge(self, t):
+        """Draw the SS badge to the left of the time text on the frame buffer."""
         badge = self._dr_ss_badge
         bh, bw = badge.shape[:2]
-        margin = max(2, bh // 4)
-        bx = margin
-        by = self._dr_fig_height - bh - margin
+
+        if self._dr_time_enabled and self._handles['time'] is not None:
+            # Position to the left of the time text
+            time_string = self._get_time_text()
+            text_img = self._dr_get_time_text_image(time_string)
+            th, tw = text_img.shape[:2]
+            margin = max(2, self._dr_time_font_size_px // 8)
+            time_x = self._dr_fig_width - tw - margin
+            time_y = margin if self._dr_time_position_top else self._dr_fig_height - th - margin
+            gap = max(4, self._dr_time_font_size_px // 4)
+            bx = time_x - bw - gap
+            by = time_y + (th - bh) // 2  # vertically center with time text
+        else:
+            # Fallback: top-right or bottom-right corner
+            margin = max(2, bh // 4)
+            bx = self._dr_fig_width - bw - margin
+            by = margin if self._dr_time_position_top else self._dr_fig_height - bh - margin
 
         bx = max(0, bx)
         by = max(0, by)

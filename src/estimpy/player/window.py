@@ -153,6 +153,7 @@ class PlayerWindow(QMainWindow):
         super().__init__()
         self._player = player
         self._es_audio = es_audio
+        self._ss_original_file = None
         self._fps = es.cfg['visualization.video.export.fps']
         self._total_frames = max(1, math.floor(es_audio.length * self._fps))
         self._seeking = False
@@ -817,10 +818,12 @@ class PlayerWindow(QMainWindow):
 
         # Reload audio with or without stereo stim filtering
         if new_state:
+            self._ss_original_file = self._es_audio.file
             with es.utils.Spinner('Applying stereo stim... '):
                 ss_audio = self._es_audio.with_stereo_stim()
         else:
-            ss_audio = es.audio.Audio(file=self._player.get_audio_files()[self._player.get_current_file_index()])
+            ss_audio = es.audio.Audio(file=self._ss_original_file)
+            self._ss_original_file = None
 
         # Reload into player and rebuild visualization
         self._player.set_audio(es_audio=ss_audio)
