@@ -25,19 +25,13 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
     font_file = es.cfg['visualization.style.font.text.file']
     face_index = es.cfg['visualization.style.font.text.face-index']
 
-    # Match axes label font size — the export figure was resized from base DPI to target
-    # pixel dimensions, so the effective pt-to-px factor matches the video pipeline
+    # Match axes label font size — the figure was created at display dimensions (100 DPI)
+    # then resized to export dimensions (8 DPI). The net pixel size of a config font is:
+    # font_pt * (export_height / display_height) * (100 / 8) * (8 / 72)
+    # = font_pt * export_height * 100 / (display_height * 72)
+    display_height = es.cfg['visualization.image.display.height']
     axes_font_pt = es.cfg['visualization.style.axes.font-size']
-    # Use the same proportional relationship as the video renderer:
-    # at 1080p with standard layout, fig.dpi/72 ≈ 2.5, axes font ~6pt → ~15px.
-    # The resize_figure scales fonts by height_scale_factor, and savefig at _EXPORT_DPI
-    # renders at that DPI. The net pixel size is axes_font_pt * height_scale * DPI/72.
-    # Since height_scale * DPI = target_height / original_height * original_DPI,
-    # the pixel size equals axes_font_pt * target_height / (original_height_inches * 72).
-    # For standard matplotlib figures at 100 DPI, original_height ≈ 4.8in → 4.8*72=345.6.
-    # This gives us: badge_font_size ≈ axes_font_pt * fig_height / 345.
-    # Use a tuned constant that matches the video pipeline output.
-    badge_font_size = max(8, int(axes_font_pt * fig_height / 350))
+    badge_font_size = max(8, int(axes_font_pt * fig_height * 100 / (display_height * 72)))
     badge_font = ImageFont.truetype(font_file, badge_font_size, index=face_index)
 
     # Use axes color for text and outline
@@ -71,9 +65,9 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
     margin = max(2, badge_font_size // 4)
     position_top = (time_position == 'top')
     if time_enabled:
-        # Estimate time text size using the same proportional scaling
+        # Estimate time text pixel size using the same resize scaling
         time_font_pt = es.cfg['visualization.style.time.font-size']
-        time_font_size = max(8, int(time_font_pt * fig_height / 350))
+        time_font_size = max(8, int(time_font_pt * fig_height * 100 / (display_height * 72)))
         time_font = ImageFont.truetype(font_file, time_font_size, index=face_index)
         time_bbox = draw.textbbox((0, 0), '00:00.0', font=time_font)
         time_w = time_bbox[2] - time_bbox[0]
@@ -81,9 +75,9 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
         time_margin = max(2, time_font_size // 8)
         time_x = fig_width - time_w - time_margin
         time_y = time_margin if position_top else fig_height - time_h - time_margin
-        gap = max(6, time_font_size // 2)
+        gap = max(4, time_font_size // 3)
         bx = time_x - badge_w - gap
-        by = time_y + (time_h - badge_h) // 2
+        by = time_y + time_h - badge_h  # bottom-align with time text
     else:
         bx = fig_width - badge_w - margin
         by = margin if position_top else fig_height - badge_h - margin

@@ -282,8 +282,13 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._dr_ss_badge = None
 
         if self._dr_ss_enabled:
-            # Match axes label font size
-            badge_font_size = max(8, int(es.cfg['visualization.style.axes.font-size'] * self._pt_to_px))
+            # Match axes label font size — use ratio of axes/time config sizes applied to
+            # the already-scaled time font pixel size (both are scaled by the same factor)
+            if self._dr_time_enabled and hasattr(self, '_dr_time_font_size_px'):
+                axes_time_ratio = es.cfg['visualization.style.axes.font-size'] / es.cfg['visualization.style.time.font-size']
+                badge_font_size = max(8, int(self._dr_time_font_size_px * axes_time_ratio))
+            else:
+                badge_font_size = max(8, int(fig_height * 0.015))
 
             font_file = es.cfg['visualization.style.font.text.file']
             face_index = es.cfg['visualization.style.font.text.face-index']
@@ -879,9 +884,9 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             margin = max(2, self._dr_time_font_size_px // 8)
             time_x = self._dr_fig_width - tw - margin
             time_y = margin if self._dr_time_position_top else self._dr_fig_height - th - margin
-            gap = max(6, self._dr_time_font_size_px // 2)
+            gap = max(4, self._dr_time_font_size_px // 3)
             bx = time_x - bw - gap
-            by = time_y + (th - bh) // 2  # vertically center with time text
+            by = time_y + th - bh  # bottom-align with time text
         else:
             # Fallback: top-right or bottom-right corner
             margin = max(2, bh // 4)
