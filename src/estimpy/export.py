@@ -25,13 +25,13 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
     font_file = es.cfg['visualization.style.font.text.file']
     face_index = es.cfg['visualization.style.font.text.face-index']
 
-    # Match axes label font size — the figure was created at display dimensions (100 DPI)
+    # Match time text font size — the figure was created at display dimensions (100 DPI)
     # then resized to export dimensions (8 DPI). The net pixel size of a config font is:
     # font_pt * (export_height / display_height) * (100 / 8) * (8 / 72)
     # = font_pt * export_height * 100 / (display_height * 72)
     display_height = es.cfg['visualization.image.display.height']
-    axes_font_pt = es.cfg['visualization.style.axes.font-size']
-    badge_font_size = max(8, int(axes_font_pt * fig_height * 100 / (display_height * 72)))
+    time_font_pt = es.cfg['visualization.style.time.font-size']
+    badge_font_size = max(8, int(time_font_pt * fig_height * 100 / (display_height * 72)))
     badge_font = ImageFont.truetype(font_file, badge_font_size, index=face_index)
 
     # Use axes color for text and outline
@@ -65,19 +65,18 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
     margin = max(2, badge_font_size // 4)
     position_top = (time_position == 'top')
     if time_enabled:
-        # Estimate time text pixel size using the same resize scaling
-        time_font_pt = es.cfg['visualization.style.time.font-size']
-        time_font_size = max(8, int(time_font_pt * fig_height * 100 / (display_height * 72)))
-        time_font = ImageFont.truetype(font_file, time_font_size, index=face_index)
+        # Estimate time text pixel size using the same resize scaling (badge_font_size
+        # already matches time font since we used time_font_pt above)
+        time_font = ImageFont.truetype(font_file, badge_font_size, index=face_index)
         time_bbox = draw.textbbox((0, 0), '00:00.0', font=time_font)
         time_w = time_bbox[2] - time_bbox[0]
         time_h = time_bbox[3] - time_bbox[1]
-        time_margin = max(2, time_font_size // 8)
+        time_margin = max(2, badge_font_size // 8)
         time_x = fig_width - time_w - time_margin
         time_y = time_margin if position_top else fig_height - time_h - time_margin
-        gap = max(4, time_font_size // 3)
+        gap = max(4, badge_font_size // 2)
         bx = time_x - badge_w - gap
-        by = time_y + time_h - badge_h  # bottom-align with time text
+        by = time_y + (time_h - badge_h) // 2  # vertically center with time text
     else:
         bx = fig_width - badge_w - margin
         by = margin if position_top else fig_height - badge_h - margin

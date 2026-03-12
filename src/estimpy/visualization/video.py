@@ -282,11 +282,9 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._dr_ss_badge = None
 
         if self._dr_ss_enabled:
-            # Match axes label font size — use ratio of axes/time config sizes applied to
-            # the already-scaled time font pixel size (both are scaled by the same factor)
+            # Match time text font size for consistent appearance next to the timer
             if self._dr_time_enabled and hasattr(self, '_dr_time_font_size_px'):
-                axes_time_ratio = es.cfg['visualization.style.axes.font-size'] / es.cfg['visualization.style.time.font-size']
-                badge_font_size = max(8, int(self._dr_time_font_size_px * axes_time_ratio))
+                badge_font_size = self._dr_time_font_size_px
             else:
                 badge_font_size = max(8, int(fig_height * 0.015))
 
@@ -884,9 +882,9 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             margin = max(2, self._dr_time_font_size_px // 8)
             time_x = self._dr_fig_width - tw - margin
             time_y = margin if self._dr_time_position_top else self._dr_fig_height - th - margin
-            gap = max(4, self._dr_time_font_size_px // 3)
+            gap = max(4, self._dr_time_font_size_px // 2)
             bx = time_x - bw - gap
-            by = time_y + th - bh  # bottom-align with time text
+            by = time_y + (th - bh) // 2  # vertically center with time text
         else:
             # Fallback: top-right or bottom-right corner
             margin = max(2, bh // 4)
