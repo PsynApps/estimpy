@@ -147,6 +147,8 @@ def _add_global_arguments(parser):
         help='Minimum frequency to display on spectrogram.')
     parser.add_argument('--frequency-max', type=int, metavar='HZ',
         help='Maximum frequency to display on spectrogram. If not defined, spectrogram will be autoscaled.')
+    parser.add_argument('-ssp', '--stereo-stim-protection', action='store_true',
+        help='Apply stereo stim protection filters (bandpass 20 Hz–12 kHz) to make audio safer for direct-output stereostim devices.')
 
 
 def _add_save_arguments(parser):
@@ -201,6 +203,10 @@ def _handle_global_arguments(args):
     if args.get('frequency_max') is not None:
         es.cfg['analysis.spectrogram.frequency-max'] = args['frequency_max']
 
+    # Apply stereo stim protection
+    if args.get('stereo_stim_protection'):
+        es.cfg['audio.stereo-stim-protection.enabled'] = True
+
     # Apply triphase to all visualization modes
     if args.get('triphase'):
         es.cfg['visualization.image.display.triphase'] = True
@@ -223,9 +229,13 @@ def _get_files(args):
 
 
 def _load_audio(file, triphase=False):
-    """Load an audio file and optionally apply triphase transformation."""
+    """Load an audio file and optionally apply SSP filtering and triphase transformation."""
     with es.utils.Spinner(f'Loading file {file}... '):
         es_audio = es.audio.Audio(file=file)
+
+    if es.cfg['audio.stereo-stim-protection.enabled']:
+        with es.utils.Spinner(f'Applying stereo stim protection... '):
+            es_audio = es_audio.with_stereo_stim_protection()
 
     if triphase and es_audio.channels == 2:
         es_audio = es_audio.with_triphase()

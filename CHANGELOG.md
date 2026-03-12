@@ -34,7 +34,8 @@
 - `additional-config-profiles` key in config profiles to automatically load other profiles after the current one, enabling composable configuration chains
 - `estimpy-version` key in all config profiles for forward-compatible version identification, with a warning when a profile targets a newer version than the running installation
 - Benchmark audio generator script (`tests/generate_benchmark.py`)
-- Automated test suite (257 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
+- Stereo stim protection (`-ssp`/`--stereo-stim-protection`) applying a bandpass filter (configurable `audio.stereo-stim-protection.high-pass` and `.low-pass`) to remove DC offset, subsonic content, and high-frequency artifacts before playback or export, with an SSP badge overlay on exported videos, a toggle button (S key) in the player, and automatic audio re-encoding in the original codec during video export
+- Automated test suite (268 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed
 - Audio data stored as float32 instead of float64, halving memory usage for all audio operations

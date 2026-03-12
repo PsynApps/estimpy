@@ -45,6 +45,18 @@ analysis:
   window-size: 2048
   # Window overlap to use when processing audio data (in number of samples). Must be less than analysis.window-size. Defaults to 3 * analysis.window-size // 4
   window-overlap: ~
+audio:
+  stereo-stim-protection:
+    # Enable stereo stim protection mode. Applies a safety filter chain (bandpass) to the audio
+    # data before visualization and export, removing DC offset, subsonic content, and high-frequency
+    # content that could be harmful with direct-output stereostim devices.
+    enabled: False
+    # High-pass cutoff frequency in Hz. Removes DC offset and subsonic content that wastes energy
+    # as heat without producing sensation. Also prevents electrochemical damage from DC.
+    high-pass: 20
+    # Low-pass cutoff frequency in Hz. Reduces current delivery through the low-impedance
+    # high-frequency skin path.
+    low-pass: 12000
 files:
   input:
     # Search input file patterns recursively

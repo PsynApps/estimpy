@@ -37,6 +37,7 @@ def _parse_args(argv):
             sub.add_argument('--dynamic-range', type=int, metavar='DB')
             sub.add_argument('--frequency-min', type=int, metavar='HZ')
             sub.add_argument('--frequency-max', type=int, metavar='HZ')
+            sub.add_argument('-ssp', '--stereo-stim-protection', action='store_true')
 
             if cmd in ('save-image', 'save-video', 'save-metadata'):
                 sub.add_argument('-o', '--output-path', default='./', metavar='PATH')
@@ -136,6 +137,14 @@ class TestArgParsing:
         assert parsed['command'] == 'play'
         assert parsed['files'] == ['song.mp3']
 
+    def test_ssp_flag(self):
+        parsed = _parse_args(['play', '-ssp'])
+        assert parsed['stereo_stim_protection'] is True
+
+    def test_ssp_long_flag(self):
+        parsed = _parse_args(['save-video', '--stereo-stim-protection'])
+        assert parsed['stereo_stim_protection'] is True
+
 
 class TestConfigHandling:
     def test_triphase_sets_config(self):
@@ -175,6 +184,11 @@ class TestConfigHandling:
         args = _parse_args(['play', '-co', 'player.volume-start'])
         with pytest.raises(SystemExit):
             _handle_global_arguments(args)
+
+    def test_ssp_sets_config(self):
+        args = _parse_args(['play', '-ssp'])
+        _handle_global_arguments(args)
+        assert es.cfg['audio.stereo-stim-protection.enabled'] is True
 
     def test_config_profile_loads(self):
         args = _parse_args(['play', '-c', 'notitle'])

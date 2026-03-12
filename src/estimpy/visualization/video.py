@@ -276,6 +276,45 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             self._dr_time_border_color = tuple(int(c * 255) for c in border_color_rgb)
             self._dr_time_border_width = max(1, int(round(self._text_border_width * self._pt_to_px)))
 
+        # --- SSP badge rendering setup ---
+        self._dr_ssp_enabled = (
+            es.cfg['audio.stereo-stim-protection.enabled'] and self._mode is VisualizationMode.EXPORT)
+        self._dr_ssp_badge = None
+
+        if self._dr_ssp_enabled:
+            # Scale badge font to match time text size (or a fraction of figure height if time is disabled)
+            if self._dr_time_enabled and hasattr(self, '_dr_time_font_size_px'):
+                badge_font_size = max(8, int(self._dr_time_font_size_px * 0.75))
+            else:
+                badge_font_size = max(8, int(fig_height * 0.02))
+
+            font_file = es.cfg['visualization.style.font.text.file']
+            face_index = es.cfg['visualization.style.font.text.face-index']
+            badge_font = ImageFont.truetype(font_file, badge_font_size, index=face_index)
+
+            # Measure text
+            dummy = Image.new('RGBA', (1, 1), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(dummy)
+            bbox = draw.textbbox((0, 0), 'SSP', font=badge_font)
+            tw = bbox[2] - bbox[0]
+            th = bbox[3] - bbox[1]
+
+            # Create badge image with rounded rect background
+            pad_x = max(4, badge_font_size // 3)
+            pad_y = max(2, badge_font_size // 5)
+            badge_w = tw + 2 * pad_x
+            badge_h = th + 2 * pad_y
+            badge_img = Image.new('RGBA', (badge_w, badge_h), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(badge_img)
+            radius = max(3, badge_h // 3)
+            draw.rounded_rectangle(
+                [(0, 0), (badge_w - 1, badge_h - 1)],
+                radius=radius, fill=(255, 255, 255, 50), outline=(255, 255, 255, 140), width=1)
+            draw.text(
+                (pad_x - bbox[0], pad_y - bbox[1]),
+                'SSP', font=badge_font, fill=(255, 255, 255, 200))
+            self._dr_ssp_badge = np.array(badge_img)
+
         # --- Pre-compute axis overlay masks for data regions (for efficient compositing) ---
         self._axis_overlay_masks = {}
         for key in self._dr_data_axes_keys:
@@ -503,6 +542,9 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             self._dr_draw_time_text(t)
             if _profiling:
                 self._dr_profile_times['draw_time'] += time.perf_counter() - t0
+
+        if self._dr_ssp_enabled and self._dr_ssp_badge is not None:
+            self._dr_draw_ssp_badge()
 
         # Update state
         self._dr_prev_window_min = window_min
@@ -815,6 +857,29 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         fg = text_region[:, :, :3].astype(np.float32)
         blended = fg * alpha + bg * (1.0 - alpha)
         self._dr_frame_buffer[ty:ty_end, tx:tx_end] = blended.astype(np.uint8)
+
+    def _dr_draw_ssp_badge(self):
+        """Draw the SSP badge in the bottom-left corner of the frame buffer."""
+        badge = self._dr_ssp_badge
+        bh, bw = badge.shape[:2]
+        margin = max(2, bh // 4)
+        bx = margin
+        by = self._dr_fig_height - bh - margin
+
+        bx = max(0, bx)
+        by = max(0, by)
+        bx_end = min(self._dr_fig_width, bx + bw)
+        by_end = min(self._dr_fig_height, by + bh)
+
+        if bx >= bx_end or by >= by_end:
+            return
+
+        badge_region = badge[:by_end - by, :bx_end - bx]
+        alpha = badge_region[:, :, 3:4].astype(np.float32) / 255.0
+        bg = self._dr_frame_buffer[by:by_end, bx:bx_end].astype(np.float32)
+        fg = badge_region[:, :, :3].astype(np.float32)
+        blended = fg * alpha + bg * (1.0 - alpha)
+        self._dr_frame_buffer[by:by_end, bx:bx_end] = blended.astype(np.uint8)
 
     def _dr_get_time_text_image(self, text_string) -> np.ndarray:
         """Render time text to a cached RGBA numpy array."""

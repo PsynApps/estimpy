@@ -390,6 +390,14 @@ class PlayerWindow(QMainWindow):
         self._apply_channel_tint(self._triphase_container, channel_id=2)
         button_row.addWidget(self._triphase_container)
 
+        # --- SSP toggle button ---
+        self._btn_ssp = self._make_text_button(
+            'SSP', 28, 'Stereo Stim Protection (S)',
+            lambda: self._toggle_ssp(), width=40)
+        self._btn_ssp.setCheckable(True)
+        self._btn_ssp.setChecked(es.cfg['audio.stereo-stim-protection.enabled'])
+        button_row.addWidget(self._btn_ssp)
+
         controls_layout.addLayout(button_row)
         layout.addWidget(self._controls)
 
@@ -796,6 +804,31 @@ class PlayerWindow(QMainWindow):
         current_time = self._player.get_time()
         self._render_frame_at_time(current_time)
 
+    def _toggle_ssp(self):
+        """Toggle stereo stim protection mode. Reprocesses audio and rebuilds visualization."""
+        new_state = not es.cfg['audio.stereo-stim-protection.enabled']
+        es.cfg['audio.stereo-stim-protection.enabled'] = new_state
+        self._btn_ssp.setChecked(new_state)
+
+        was_playing = self._player.is_playing()
+        current_time = self._player.get_time()
+        if was_playing:
+            self._player.stop()
+
+        # Reload audio with or without SSP filtering
+        if new_state:
+            with es.utils.Spinner('Applying stereo stim protection... '):
+                ssp_audio = self._es_audio.with_stereo_stim_protection()
+        else:
+            ssp_audio = es.audio.Audio(file=self._player.get_audio_files()[self._player.get_current_file_index()])
+
+        # Reload into player and rebuild visualization
+        self._player.set_audio(es_audio=ssp_audio)
+
+        if was_playing:
+            self._player.set_time(current_time)
+            self._player.toggle_playing()
+
     def update_playlist(self):
         """Update the playlist window to reflect current player state."""
         if self._playlist_window is not None:
@@ -981,12 +1014,13 @@ class PlayerWindow(QMainWindow):
         # Re-initialize visualization
         self._init_visualization(self._get_viz_audio())
 
-        # Update triphase button state
+        # Update toggle button states
         self._btn_triphase.setEnabled(es_audio.channels == 2)
         if es_audio.channels != 2:
             self._btn_triphase.setChecked(False)
         else:
             self._btn_triphase.setChecked(es.cfg['visualization.video.display.triphase'])
+        self._btn_ssp.setChecked(es.cfg['audio.stereo-stim-protection.enabled'])
 
         # Rebuild per-channel volume controls if channel count changed
         self._rebuild_channel_volumes()
@@ -1131,6 +1165,8 @@ class PlayerWindow(QMainWindow):
         elif key == Qt.Key.Key_T:
             if self._es_audio.channels == 2:
                 self._toggle_triphase()
+        elif key == Qt.Key.Key_S:
+            self._toggle_ssp()
         else:
             super().keyPressEvent(event)
 

@@ -17,7 +17,5 @@ visualization:
         '-crf': 26
         '-profile:v': 'high'
         '-level': 3.1
-      preview:
-        enabled: False
       size: 1136x640
     window-length: 10

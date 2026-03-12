@@ -14,6 +14,35 @@ import estimpy as es
 _EXPORT_DPI = 8
 
 
+def _detect_audio_codec(es_audio: es.audio.Audio) -> str:
+    """Detect the appropriate audio encoder for the original file's format.
+
+    Uses FFprobe to identify the original codec, then maps it to an FFmpeg encoder name.
+    Falls back to 'aac' for unknown formats.
+    """
+    _codec_map = {
+        'mp3': 'libmp3lame',
+        'aac': 'aac',
+        'vorbis': 'libvorbis',
+        'opus': 'libopus',
+        'flac': 'flac',
+        'pcm_s16le': 'pcm_s16le',
+        'pcm_s24le': 'pcm_s24le',
+        'pcm_s32le': 'pcm_s32le',
+    }
+
+    try:
+        result = subprocess.run(
+            ['ffprobe', '-v', 'quiet', '-select_streams', 'a:0',
+             '-show_entries', 'stream=codec_name', '-of', 'csv=p=0',
+             es_audio.metadata.file],
+            capture_output=True, text=True, timeout=10)
+        codec = result.stdout.strip()
+        return _codec_map.get(codec, 'aac')
+    except Exception:
+        return 'aac'
+
+
 def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format: str = None,
                 width: int = None, height: int = None, overwrite: bool = None,
                 triphase: bool = None) -> str | None:
@@ -418,13 +447,19 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     else:
         concat_extra_args = ffmpeg_extra_args
 
+    # Determine audio codec — stream copy when possible, re-encode when SSP has modified the audio
+    if es.cfg['audio.stereo-stim-protection.enabled']:
+        audio_codec_args = ['-c:a', _detect_audio_codec(es_audio), '-strict', '-1']
+    else:
+        audio_codec_args = ['-c:a', 'copy', '-strict', '-1']
+
     ffmpeg_command = [
         'ffmpeg',
         '-f', 'concat', '-safe', '0',  # "-safe 0" allows for absolute paths to files
         '-i', video_segment_list_file,
         '-i', es_audio.file,
         '-c:v', concat_video_codec,
-        '-c:a', 'copy', '-strict', '-1',  # "-strict -1" allows for non-standard sample rates
+        *audio_codec_args,
         '-movflags', 'faststart',  # Improves playback and seeking efficiency
         *length_args,
         *concat_extra_args,

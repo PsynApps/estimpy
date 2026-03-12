@@ -87,6 +87,51 @@ class TestTriphase:
             synthetic_mono_audio.with_triphase()
 
 
+class TestStereoStimProtection:
+    def test_ssp_preserves_channels(self, synthetic_stereo_audio):
+        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
+        assert ssp.channels == synthetic_stereo_audio.channels
+
+    def test_ssp_preserves_sample_count(self, synthetic_stereo_audio):
+        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
+        assert ssp.sample_count == synthetic_stereo_audio.sample_count
+
+    def test_ssp_preserves_sample_rate(self, synthetic_stereo_audio):
+        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
+        assert ssp.sample_rate == synthetic_stereo_audio.sample_rate
+
+    def test_ssp_output_dtype_float32(self, synthetic_stereo_audio):
+        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
+        assert ssp.data.dtype == np.float32
+
+    def test_ssp_attenuates_dc(self, synthetic_stereo_audio):
+        """SSP high-pass filter should remove DC offset."""
+        # Add DC offset to audio
+        dc_audio = Audio(
+            audio_data=np.full((2, N_SAMPLES), 16000, dtype=np.int16),
+            sample_rate=SAMPLE_RATE, bit_depth=16)
+        ssp = dc_audio.with_stereo_stim_protection()
+        # DC should be nearly eliminated
+        assert abs(np.mean(ssp.data[0])) < 0.01
+
+    def test_ssp_passes_midrange(self, synthetic_stereo_audio):
+        """SSP should pass 440 Hz signal with minimal attenuation."""
+        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
+        original_rms = np.sqrt(np.mean(synthetic_stereo_audio.data[0] ** 2))
+        filtered_rms = np.sqrt(np.mean(ssp.data[0] ** 2))
+        # 440 Hz is well within passband — should retain >90% of energy
+        assert filtered_rms / original_rms > 0.9
+
+    def test_ssp_creates_temp_wav(self, synthetic_stereo_audio):
+        ssp = synthetic_stereo_audio.with_stereo_stim_protection()
+        assert ssp.file is not None
+        assert ssp.file.endswith('.wav')
+
+    def test_ssp_mono_works(self, synthetic_mono_audio):
+        ssp = synthetic_mono_audio.with_stereo_stim_protection()
+        assert ssp.channels == 1
+
+
 class TestTimeToDataIndex:
     def test_zero(self, synthetic_stereo_audio):
         assert synthetic_stereo_audio.time_to_data_index(0.0) == 0

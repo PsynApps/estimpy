@@ -178,6 +178,47 @@ class Audio:
 
         self.metadata.save()
 
+    def with_stereo_stim_protection(self) -> 'Audio':
+        """Create a new Audio with stereo stim protection filters applied.
+
+        Applies a bandpass Butterworth filter to remove DC offset, subsonic content,
+        and high-frequency content that could be harmful with direct-output stereostim
+        devices. Uses zero-phase filtering to preserve timing relationships.
+
+        Filter cutoffs are read from config:
+        - audio.stereo-stim-protection.high-pass (default 20 Hz)
+        - audio.stereo-stim-protection.low-pass (default 12000 Hz)
+
+        :return Audio: A new Audio instance with filtered data and a temp WAV file
+        """
+        hp = es.cfg['audio.stereo-stim-protection.high-pass']
+        lp = es.cfg['audio.stereo-stim-protection.low-pass']
+
+        # Design bandpass Butterworth filter (4th order, zero-phase doubles effective order to 8th)
+        sos = scipy.signal.butter(4, [hp, lp], btype='bandpass', fs=self.sample_rate, output='sos')
+        filtered = scipy.signal.sosfiltfilt(sos, self._data, axis=1).astype(np.float32)
+
+        # Write filtered audio to a temp WAV file for use by FFmpeg during export
+        temp_path = es.utils.get_temp_file_path(temp_file_name='ssp_audio.wav')
+        dtype = np.int16 if self._bit_depth <= 16 else np.int32
+        raw = (filtered * (2 ** (self._bit_depth - 1))).clip(
+            -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
+        ).astype(dtype)
+        # scipy.io.wavfile expects (samples, channels) layout
+        scipy.io.wavfile.write(temp_path, self.sample_rate, raw.T)
+        es.utils.add_temp_file(temp_path)
+
+        audio = Audio.__new__(Audio)
+        audio._metadata = self._metadata
+        audio._file = temp_path
+        audio._format = 'wav'
+        audio._sample_rate = self._sample_rate
+        audio._bit_depth = self._bit_depth
+        audio._data = np.ascontiguousarray(filtered)
+        audio._channels = self._channels
+        audio._sample_count = self._sample_count
+        return audio
+
     def with_triphase(self) -> 'Audio':
         """Create a 3-channel Audio with channels [A, B, -(A+B)] for triphase visualization.
 
