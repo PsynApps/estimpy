@@ -54,6 +54,7 @@ class Audio:
             audio_data = np.divide(audio_data, 2 ** (bit_depth - 1), dtype=np.float32)
 
         self._file = file  # type: str
+        self._source_file = file  # type: str
         self._format = format  # type: str
 
         self._sample_rate = sample_rate  # type int
@@ -111,9 +112,16 @@ class Audio:
     @property
     def file(self) -> str:
         """
-        :return str: The path to the file
+        :return str: The path to the audio file used for playback and encoding.
         """
         return self._file
+
+    @property
+    def source_file(self) -> str:
+        """
+        :return str: The path to the original source file (before any processing).
+        """
+        return self._source_file
 
     @property
     def format(self) -> str:
@@ -211,6 +219,7 @@ class Audio:
         audio = Audio.__new__(Audio)
         audio._metadata = self._metadata
         audio._file = temp_path
+        audio._source_file = self._source_file
         audio._format = 'wav'
         audio._sample_rate = self._sample_rate
         audio._bit_depth = self._bit_depth
@@ -236,6 +245,7 @@ class Audio:
         audio = Audio.__new__(Audio)
         audio._metadata = self._metadata
         audio._file = self._file
+        audio._source_file = self._source_file
         audio._format = self._format
         audio._sample_rate = self._sample_rate
         audio._bit_depth = self._bit_depth

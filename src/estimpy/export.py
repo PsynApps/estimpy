@@ -127,7 +127,7 @@ def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format:
 
     image_file = es.utils.get_output_file(
         output_path=output_path,
-        input_file_name=es_audio.file,
+        input_file_name=es_audio.source_file,
         file_format=image_format
     )
 
@@ -190,7 +190,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     video_file = es.utils.get_output_file(
         output_path=output_path,
-        input_file_name=es_audio.file,
+        input_file_name=es_audio.source_file,
         file_format=video_format
     )
 
