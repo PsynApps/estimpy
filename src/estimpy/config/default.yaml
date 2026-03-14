@@ -57,6 +57,16 @@ audio:
     # Low-pass cutoff frequency in Hz. Reduces current delivery through the low-impedance
     # high-frequency skin path.
     low-pass: 12000
+  ramp:
+    # Amplitude ramp level as a percentage (0-100). Determines how much the amplitude is reduced
+    # at the start of the ramp, increasing smoothly to 100% by the end of the file. A value of 0
+    # disables the ramp. A value of 20 starts playback at 80% amplitude, 100 starts from silence.
+    level: 0
+    # Exponential easing parameter controlling the ramp curve shape. A value of 0 produces a linear
+    # ramp. Negative values (-10 to 0) create a faster initial rise that slows toward the end.
+    # Positive values (0 to 10) create a slower initial rise that accelerates toward the end.
+    # The curve follows (e^(kt)-1)/(e^k-1) where k is this value and t is normalized time (0 to 1).
+    shape: 0
 files:
   input:
     # Search input file patterns recursively

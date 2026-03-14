@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from estimpy.audio import Audio, resample_audio_data
+from estimpy.audio import Audio, compute_ramp_gain, resample_audio_data
 from conftest import TEST_MP3, SAMPLE_RATE, DURATION, N_SAMPLES
 
 
@@ -130,6 +130,91 @@ class TestStereoStimProtection:
     def test_ss_mono_works(self, synthetic_mono_audio):
         ss =synthetic_mono_audio.with_stereo_stim()
         assert ss.channels == 1
+
+
+class TestComputeRampGain:
+    def test_zero_level_returns_one(self):
+        assert compute_ramp_gain(0.5, 0.0, 1.0, 0, 0) == 1.0
+
+    def test_at_end_returns_one(self):
+        assert compute_ramp_gain(1.0, 0.0, 1.0, 50, 0) == 1.0
+
+    def test_past_end_returns_one(self):
+        assert compute_ramp_gain(2.0, 0.0, 1.0, 50, 0) == 1.0
+
+    def test_at_start_returns_start_gain(self):
+        assert compute_ramp_gain(0.0, 0.0, 1.0, 50, 0) == pytest.approx(0.5)
+
+    def test_at_start_full_reduction(self):
+        assert compute_ramp_gain(0.0, 0.0, 1.0, 100, 0) == pytest.approx(0.0)
+
+    def test_before_start_returns_start_gain(self):
+        assert compute_ramp_gain(0.0, 0.5, 1.0, 50, 0) == pytest.approx(0.5)
+
+    def test_linear_midpoint(self):
+        # Linear ramp (shape=0) from 50% level: start_gain=0.5, midpoint should be 0.75
+        gain = compute_ramp_gain(0.5, 0.0, 1.0, 50, 0)
+        assert gain == pytest.approx(0.75)
+
+    def test_nonzero_shape_monotonic(self):
+        # With any shape, gain should increase monotonically
+        gains = [compute_ramp_gain(t, 0.0, 1.0, 80, 3) for t in np.linspace(0, 0.99, 20)]
+        for i in range(1, len(gains)):
+            assert gains[i] >= gains[i - 1]
+
+    def test_negative_shape_monotonic(self):
+        gains = [compute_ramp_gain(t, 0.0, 1.0, 80, -3) for t in np.linspace(0, 0.99, 20)]
+        for i in range(1, len(gains)):
+            assert gains[i] >= gains[i - 1]
+
+    def test_level_clamped_at_100(self):
+        # Level > 100 should be treated as 100
+        assert compute_ramp_gain(0.0, 0.0, 1.0, 150, 0) == pytest.approx(0.0)
+
+
+class TestRamp:
+    def test_ramp_preserves_channels(self, synthetic_stereo_audio):
+        ramped = synthetic_stereo_audio.with_ramp()
+        assert ramped.channels == synthetic_stereo_audio.channels
+
+    def test_ramp_preserves_sample_count(self, synthetic_stereo_audio):
+        ramped = synthetic_stereo_audio.with_ramp()
+        assert ramped.sample_count == synthetic_stereo_audio.sample_count
+
+    def test_ramp_preserves_sample_rate(self, synthetic_stereo_audio):
+        ramped = synthetic_stereo_audio.with_ramp()
+        assert ramped.sample_rate == synthetic_stereo_audio.sample_rate
+
+    def test_ramp_output_dtype_float32(self, synthetic_stereo_audio):
+        ramped = synthetic_stereo_audio.with_ramp()
+        assert ramped.data.dtype == np.float32
+
+    def test_ramp_creates_temp_wav(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.ramp.level'] = 50
+        es.cfg['audio.ramp.shape'] = 0
+        ramped = synthetic_stereo_audio.with_ramp()
+        assert ramped.file is not None
+        assert ramped.file.endswith('.wav')
+
+    def test_ramp_zero_level_returns_self(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.ramp.level'] = 0
+        ramped = synthetic_stereo_audio.with_ramp()
+        assert ramped is synthetic_stereo_audio
+
+    def test_ramp_reduces_start_amplitude(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.ramp.level'] = 50
+        es.cfg['audio.ramp.shape'] = 0
+        ramped = synthetic_stereo_audio.with_ramp()
+        # First samples should be ~50% of original
+        start_ratio = np.abs(ramped.data[0, :100]).mean() / np.abs(synthetic_stereo_audio.data[0, :100]).mean()
+        assert start_ratio == pytest.approx(0.5, abs=0.05)
+
+    def test_ramp_preserves_source_file(self, synthetic_stereo_audio):
+        ramped = synthetic_stereo_audio.with_ramp()
+        assert ramped.source_file == synthetic_stereo_audio.source_file
 
 
 class TestTimeToDataIndex:

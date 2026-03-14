@@ -14,7 +14,7 @@ visualization:
       codec: libx264
       ffmpeg-extra-args:
         '-pix_fmt': 'yuv420p'
-        '-crf': 26
+        '-crf': 30
         '-profile:v': 'high'
         '-level': 3.1
       size: 1136x640

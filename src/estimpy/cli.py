@@ -234,8 +234,12 @@ def _load_audio(file, triphase=False):
         es_audio = es.audio.Audio(file=file)
 
     if es.cfg['audio.stereo-stim.enabled']:
-        with es.utils.Spinner(f'Applying stereo stim... '):
+        with es.utils.Spinner(f'Applying stereo stim processing... '):
             es_audio = es_audio.with_stereo_stim()
+
+    if es.cfg['audio.ramp.level'] > 0:
+        with es.utils.Spinner(f'Applying amplitude ramp... '):
+            es_audio = es_audio.with_ramp()
 
     if triphase and es_audio.channels == 2:
         es_audio = es_audio.with_triphase()

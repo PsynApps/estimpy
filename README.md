@@ -46,7 +46,7 @@ Many commercial Estim units support custom stimulation signals using audio input
 - **Animated visualization**: Generates an animated sliding visualization of the audio file
   - **Video file export**: Animated visualization can be saved to a video file using a direct frame rendering pipeline
   - **Interactive player**: Animated visualization used within the Qt-based audio file player
-- **Audio player**: Plays Estim audio files for use with stereostim devices (***HIGHLY EXPERIMENTAL!***)
+- **Audio player**: Plays Estim audio files for use with estim devices (***HIGHLY EXPERIMENTAL!***)
   - **Real-time visualization**: Based on the animated visualization
   - **Separate channel output control**: Allows signal gain of each channel to be independently controlled
   - **Smooth intensity transitions**: Ensures that any changes in playback will transition smoothly to avoid sudden changes in output intensity
@@ -57,6 +57,7 @@ Many commercial Estim units support custom stimulation signals using audio input
   - **Stereo stim protection toggle**: Apply or remove safety filtering during playback
   - **Zoom controls**: Adjust the sliding window length during playback
 - **Stereo stim**: Optional safety filter chain for direct-output stereostim devices, applying a bandpass filter (default 20 Hz–12 kHz) to remove DC offset, subsonic content, and high-frequency content. Visualizations and exported media reflect the filtered audio. Indicated by an "SS" badge on exported videos.
+- **Amplitude ramp**: Gradually increases audio amplitude from a reduced level at the start of the file to full amplitude at the end. Configurable reduction level (`audio.ramp.level`, 0–100%) and curve shape (`audio.ramp.shape`): 0 for linear, negative values (−10 to 0) for a fast initial rise that slows toward the end, positive values (0 to 10) for a slow initial rise that accelerates toward the end. Applied to exported audio; also available as a real-time player control (G key) with adjustable level and shape sliders.
 - **Highly configurable**: Nearly all parameters related to the rendering and export of visualizations are determined from an easily customizable configuration file
 
 ## Disclaimer
@@ -382,6 +383,8 @@ For reference, the default configuration options and values are as follows:
 
 | Configuration Option                                         | Value                                        |
 |--------------------------------------------------------------|----------------------------------------------|
+| audio.ramp.level                                             | 0                                            |
+| audio.ramp.shape                                             | 0                                            |
 | audio.stereo-stim.enabled                         | False                                        |
 | audio.stereo-stim.high-pass                       | 20                                           |
 | audio.stereo-stim.low-pass                        | 12000                                        |

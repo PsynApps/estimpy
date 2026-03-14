@@ -32,6 +32,7 @@ _channels = []  # type: typing.List[pygame.mixer.Channel]
 _volumes = []  # type: typing.List[float]
 
 _es_audio = None  # type: es.audio.Audio | None
+_ramp_gain = 1.0  # type: float
 
 
 def get_time() -> float:
@@ -50,6 +51,23 @@ def get_time() -> float:
 def get_current_volume(channel: int) -> float:
     """Get the current actual volume for a channel (reflects smoothing ramp)."""
     return _volumes[channel]
+
+
+def get_ramp_gain() -> float:
+    """Return the current ramp gain multiplier (0.0 to 1.0)."""
+    return _ramp_gain
+
+
+def set_ramp_gain(gain: float) -> None:
+    """Set the ramp gain multiplier applied to all channel volumes.
+
+    Called each frame by the player window to modulate volume in real-time
+    without reprocessing audio data.
+
+    :param gain: Gain multiplier (0.0 to 1.0).
+    """
+    global _ramp_gain
+    _ramp_gain = max(0.0, min(1.0, gain))
 
 
 def initialize() -> None:
@@ -248,7 +266,7 @@ def stop():
         for step in range(fade_steps - 1, -1, -1):
             scale = step / fade_steps
             for i, ch in enumerate(_channels):
-                vol = (_volumes[i] / 100) * scale
+                vol = (_volumes[i] / 100) * _ramp_gain * scale
                 if len(_channels) == 1:
                     ch.set_volume(vol, vol)
                 elif i % 2 == 0:
@@ -283,9 +301,10 @@ def _set_channel_volume_unsafe(volume: float = None, channel: int = None):
     global _channels
 
     if _is_playing and _channels and -len(_channels) <= channel < len(_channels):
+        vol = volume / 100 * _ramp_gain
         if len(_channels) == 1:
-            _channels[channel].set_volume(volume / 100, volume / 100)
+            _channels[channel].set_volume(vol, vol)
         elif channel % 2 == 0:
-            _channels[channel].set_volume(volume / 100, 0)
+            _channels[channel].set_volume(vol, 0)
         else:
-            _channels[channel].set_volume(0, volume / 100)
+            _channels[channel].set_volume(0, vol)

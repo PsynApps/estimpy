@@ -35,7 +35,8 @@
 - `estimpy-version` key in all config profiles for forward-compatible version identification, with a warning when a profile targets a newer version than the running installation
 - Benchmark audio generator script (`tests/generate_benchmark.py`)
 - Stereo stim mode (`-ss`/`--stereo-stim`) applying a bandpass filter (configurable `audio.stereo-stim.high-pass` and `.low-pass`) to remove DC offset, subsonic content, and high-frequency artifacts before playback or export, with an SS badge overlay on exported videos, a toggle button (S key) in the player, and automatic audio re-encoding in the original codec during video export
-- Automated test suite (268 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
+- Amplitude ramp (`audio.ramp.level`, `audio.ramp.shape`) that gradually increases audio amplitude from a reduced level at the start of the file to full amplitude at the end, with configurable exponential easing curve shape; applied to exported audio and available as a real-time player control (G key to start/restart, with level and shape sliders)
+- Automated test suite (286 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
 
 ### Changed
 - Audio data stored as float32 instead of float64, halving memory usage for all audio operations

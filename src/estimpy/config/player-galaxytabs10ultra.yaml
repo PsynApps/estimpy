@@ -6,5 +6,7 @@ visualization:
       size: 2960x1848
   video:
     export:
+      ffmpeg-extra-args:
+        '-crf': 26
       segment-length: 1800
       size: 2960x1848

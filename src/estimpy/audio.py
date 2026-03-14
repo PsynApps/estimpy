@@ -9,6 +9,35 @@ import pydub
 import scipy
 
 
+def compute_ramp_gain(t: float, t_start: float, t_end: float, level: float, shape: float) -> float:
+    """Compute the ramp gain multiplier at a given time.
+
+    :param t: Current time in seconds.
+    :param t_start: Time when the ramp begins (gain is at its minimum).
+    :param t_end: Time when the ramp ends (gain reaches 1.0).
+    :param level: Reduction percentage at ramp start (0-100). 0 = no reduction, 100 = silence.
+    :param shape: Exponential easing parameter k. 0 = linear, negative = fast rise then slow,
+        positive = slow rise then fast. Curve: (e^(kt)-1)/(e^k-1).
+    :return float: Gain multiplier between 0.0 and 1.0.
+    """
+    if level <= 0 or t >= t_end:
+        return 1.0
+
+    start_gain = 1.0 - min(level, 100) / 100.0
+
+    if t <= t_start:
+        return start_gain
+
+    progress = (t - t_start) / (t_end - t_start)
+
+    if shape == 0:
+        eased = progress
+    else:
+        eased = (math.exp(shape * progress) - 1) / (math.exp(shape) - 1)
+
+    return start_gain + (1.0 - start_gain) * eased
+
+
 class Audio:
     def __init__(self, file: str = None, format: str = None, audio_data: np.ndarray = None,
                  sample_rate: int = None, bit_depth: int = None, metadata: dict = None):
@@ -224,6 +253,54 @@ class Audio:
         audio._sample_rate = self._sample_rate
         audio._bit_depth = self._bit_depth
         audio._data = np.ascontiguousarray(filtered)
+        audio._channels = self._channels
+        audio._sample_count = self._sample_count
+        return audio
+
+    def with_ramp(self, t_start: float = 0.0) -> 'Audio':
+        """Create a new Audio with an amplitude ramp applied.
+
+        Applies a gain envelope that ramps from a reduced level at t_start up to full
+        amplitude at the end of the file. The ramp shape is controlled by an exponential
+        easing parameter.
+
+        Ramp parameters are read from config:
+        - audio.ramp.level (0-100): percentage reduction at ramp start
+        - audio.ramp.shape: exponential easing parameter k (0 = linear)
+
+        :param t_start: Time in seconds where the ramp begins (default 0.0).
+        :return Audio: A new Audio instance with ramped data and a temp WAV file.
+        """
+        level = es.cfg['audio.ramp.level']
+        shape = es.cfg['audio.ramp.shape']
+
+        if level <= 0:
+            return self
+
+        # Build gain envelope across all samples
+        t_end = self.length
+        times = np.linspace(t_start, t_end, self._sample_count, endpoint=False)
+        gains = np.array([compute_ramp_gain(t, t_start, t_end, level, shape)
+                          for t in times], dtype=np.float32)
+        ramped = self._data * gains[np.newaxis, :]
+
+        # Write ramped audio to a temp WAV file for use by FFmpeg during export
+        temp_path = es.utils.get_temp_file_path(temp_file_name='ramp_audio.wav')
+        dtype = np.int16 if self._bit_depth <= 16 else np.int32
+        raw = (ramped * (2 ** (self._bit_depth - 1))).clip(
+            -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
+        ).astype(dtype)
+        scipy.io.wavfile.write(temp_path, self.sample_rate, raw.T)
+        es.utils.add_temp_file(temp_path)
+
+        audio = Audio.__new__(Audio)
+        audio._metadata = self._metadata
+        audio._file = temp_path
+        audio._source_file = self._source_file
+        audio._format = 'wav'
+        audio._sample_rate = self._sample_rate
+        audio._bit_depth = self._bit_depth
+        audio._data = np.ascontiguousarray(ramped)
         audio._channels = self._channels
         audio._sample_count = self._sample_count
         return audio

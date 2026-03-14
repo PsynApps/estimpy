@@ -154,6 +154,8 @@ class PlayerWindow(QMainWindow):
         self._player = player
         self._es_audio = es_audio
         self._ss_original_file = None
+        self._ramp_active = False
+        self._ramp_start_time = 0.0
         self._fps = es.cfg['visualization.video.export.fps']
         self._total_frames = max(1, math.floor(es_audio.length * self._fps))
         self._seeking = False
@@ -373,6 +375,51 @@ class PlayerWindow(QMainWindow):
         self._channel_vol_layout.setSpacing(4)
         self._rebuild_channel_volumes()
         button_row.addWidget(self._channel_vol_container)
+
+        self._add_separator(button_row)
+
+        # --- Ramp controls ---
+        self._btn_ramp = self._make_text_button(
+            'Start Ramp', 28, 'Start amplitude ramp (G)',
+            lambda: self._start_ramp(), width=90)
+        button_row.addWidget(self._btn_ramp)
+
+        self._ramp_gain_label = QLabel('')
+        self._ramp_gain_label.setFixedWidth(32)
+        self._ramp_gain_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        button_row.addWidget(self._ramp_gain_label)
+
+        ramp_level_label = QLabel('Level')
+        ramp_level_label.setFixedWidth(30)
+        button_row.addWidget(ramp_level_label)
+
+        self._ramp_level_slider = QSlider(Qt.Orientation.Horizontal)
+        self._ramp_level_slider.setRange(0, 100)
+        self._ramp_level_slider.setValue(es.cfg['audio.ramp.level'])
+        self._ramp_level_slider.setFixedWidth(60)
+        self._ramp_level_slider.valueChanged.connect(self._on_ramp_level_changed)
+        button_row.addWidget(self._ramp_level_slider)
+
+        self._ramp_level_value = QLabel(str(es.cfg['audio.ramp.level']))
+        self._ramp_level_value.setFixedWidth(22)
+        self._ramp_level_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        button_row.addWidget(self._ramp_level_value)
+
+        shape_label = QLabel('Shape')
+        shape_label.setFixedWidth(34)
+        button_row.addWidget(shape_label)
+
+        self._ramp_shape_slider = QSlider(Qt.Orientation.Horizontal)
+        self._ramp_shape_slider.setRange(-10, 10)
+        self._ramp_shape_slider.setValue(int(es.cfg['audio.ramp.shape']))
+        self._ramp_shape_slider.setFixedWidth(60)
+        self._ramp_shape_slider.valueChanged.connect(self._on_ramp_shape_changed)
+        button_row.addWidget(self._ramp_shape_slider)
+
+        self._ramp_shape_value = QLabel(str(int(es.cfg['audio.ramp.shape'])))
+        self._ramp_shape_value.setFixedWidth(18)
+        self._ramp_shape_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        button_row.addWidget(self._ramp_shape_value)
 
         self._add_separator(button_row)
 
@@ -832,6 +879,36 @@ class PlayerWindow(QMainWindow):
             self._player.set_time(current_time)
             self._player.toggle_playing()
 
+    def _start_ramp(self):
+        """Start (or restart) the amplitude ramp from the current playback position."""
+        self._ramp_active = True
+        self._ramp_start_time = es.player.audio.get_time() if self._player.is_playing() else 0.0
+        self._btn_ramp.setText('Restart Ramp')
+        # Apply initial gain immediately
+        gain = es.audio.compute_ramp_gain(
+            self._ramp_start_time, self._ramp_start_time, self._es_audio.length,
+            es.cfg['audio.ramp.level'], es.cfg['audio.ramp.shape'])
+        es.player.audio.set_ramp_gain(gain)
+        self._ramp_gain_label.setText(f'{int(gain * 100)}%')
+
+    def _stop_ramp(self):
+        """Reset ramp state and restore full volume."""
+        self._ramp_active = False
+        self._ramp_start_time = 0.0
+        self._btn_ramp.setText('Start Ramp')
+        es.player.audio.set_ramp_gain(1.0)
+        self._ramp_gain_label.setText('')
+
+    def _on_ramp_level_changed(self, value):
+        """Handle ramp level slider change."""
+        es.cfg['audio.ramp.level'] = value
+        self._ramp_level_value.setText(str(value))
+
+    def _on_ramp_shape_changed(self, value):
+        """Handle ramp shape slider change."""
+        es.cfg['audio.ramp.shape'] = value
+        self._ramp_shape_value.setText(str(value))
+
     def update_playlist(self):
         """Update the playlist window to reflect current player state."""
         if self._playlist_window is not None:
@@ -919,6 +996,14 @@ class PlayerWindow(QMainWindow):
 
         # Update time label
         self._time_label.setText(self._format_time(audio_time))
+
+        # Update ramp gain if active
+        if self._ramp_active:
+            gain = es.audio.compute_ramp_gain(
+                audio_time, self._ramp_start_time, self._es_audio.length,
+                es.cfg['audio.ramp.level'], es.cfg['audio.ramp.shape'])
+            es.player.audio.set_ramp_gain(gain)
+            self._ramp_gain_label.setText(f'{int(gain * 100)}%')
 
         # Sync volume sliders from player state
         self._sync_volume_sliders()
@@ -1024,6 +1109,9 @@ class PlayerWindow(QMainWindow):
         else:
             self._btn_triphase.setChecked(es.cfg['visualization.video.display.triphase'])
         self._btn_ss.setChecked(es.cfg['audio.stereo-stim.enabled'])
+
+        # Reset ramp state for new file
+        self._stop_ramp()
 
         # Rebuild per-channel volume controls if channel count changed
         self._rebuild_channel_volumes()
@@ -1170,6 +1258,8 @@ class PlayerWindow(QMainWindow):
                 self._toggle_triphase()
         elif key == Qt.Key.Key_S:
             self._toggle_ss()
+        elif key == Qt.Key.Key_G:
+            self._start_ramp()
         else:
             super().keyPressEvent(event)
 
