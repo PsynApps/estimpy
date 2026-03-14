@@ -1,6 +1,5 @@
 ---
 estimpy-version: 2.0.0
-visualization:
-  video:
-    export:
-      fps: 60
+video:
+  export:
+    fps: 60

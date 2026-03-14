@@ -1,5 +1,13 @@
 ---
 estimpy-version: 2.0.0
+video:
+  export:
+    codec: libx264
+    ffmpeg-extra-args:
+      '-pix_fmt': 'yuv420p'
+      '-crf': 30
+      '-profile:v': 'high'
+      '-level': 3.1
 visualization:
   image:
     export:
@@ -11,11 +19,5 @@ visualization:
       font-size: 48
   video:
     export:
-      codec: libx264
-      ffmpeg-extra-args:
-        '-pix_fmt': 'yuv420p'
-        '-crf': 30
-        '-profile:v': 'high'
-        '-level': 3.1
       size: 1136x640
     window-length: 10

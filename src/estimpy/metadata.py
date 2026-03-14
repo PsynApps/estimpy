@@ -5,11 +5,13 @@ import re
 import typing
 
 import estimpy as es
+import mutagen.flac
 import mutagen.id3
 import mutagen.mp4
 
 
 class MetadataFileFormats(enum.StrEnum):
+    FLAC = 'flac'
     M4A = 'm4a'
     MOV = 'mov'
     MP3 = 'mp3'
@@ -145,7 +147,9 @@ class Metadata:
         # Read tag data from file if it exists.
         # These values take precedence if overlapping fields from file name matching.
         metadata = {}
-        if self._format == MetadataFileFormats.MP3:
+        if self._format == MetadataFileFormats.FLAC:
+            metadata = MetadataFormatFLAC.load(self.file)
+        elif self._format == MetadataFileFormats.MP3:
             metadata = MetadataFormatMP3.load(self.file)
         elif self._format in (MetadataFileFormats.M4A, MetadataFileFormats.MOV, MetadataFileFormats.MP4):
             metadata = MetadataFormatMP4.load(self.file)
@@ -164,6 +168,8 @@ class Metadata:
             raise Exception('No filename specified')
         elif self._format not in MetadataFileFormats._value2member_map_:
             raise Exception('Unsupported file format')
+        elif self._format == MetadataFileFormats.FLAC:
+            MetadataFormatFLAC.save(self.file, self._data)
         elif self._format == MetadataFileFormats.MP3:
             MetadataFormatMP3.save(self.file, self._data)
         elif self._format in (MetadataFileFormats.M4A, MetadataFileFormats.MOV, MetadataFileFormats.MP4):
@@ -353,6 +359,50 @@ class MetadataFormatMP4(MetadataFormat, abc.ABC):
 
             if value is not None:
                 file_tags[file_tag_field] = value
+
+
+class MetadataFormatFLAC(MetadataFormat, abc.ABC):
+    @classmethod
+    def _tag_fields(cls) -> dict:
+        return {
+            'album': 'album',
+            'artist': 'artist',
+            'genre': 'genre',
+            'title': 'title'
+        }
+
+    @classmethod
+    def _get_metadata_image(cls, file_tags: mutagen.flac.FLAC) -> MetadataImage | None:
+        if file_tags.pictures:
+            pic = file_tags.pictures[0]
+            return MetadataImage(image_data=pic.data, mime_type=pic.mime)
+        return None
+
+    @classmethod
+    def _load_file_tags(cls, file: str) -> mutagen.flac.FLAC | None:
+        try:
+            return mutagen.flac.FLAC(file)
+        except Exception as e:
+            print(f'Warning: Could not read FLAC tags from "{file}": {e}')
+            return None
+
+    @classmethod
+    def _set_file_tag_value(cls, file_tags: mutagen.flac.FLAC, tag: str, value):
+        if value is None:
+            return
+
+        if tag == 'image':
+            if isinstance(value, MetadataImage) and value.image_data is not None:
+                pic = mutagen.flac.Picture()
+                pic.type = mutagen.id3.PictureType.COVER_FRONT
+                pic.mime = value.mime_type
+                pic.desc = 'cover'
+                pic.data = value.image_data
+                file_tags.clear_pictures()
+                file_tags.add_picture(pic)
+        elif tag in cls._tag_fields():
+            file_tag_field = cls._tag_fields()[tag]
+            file_tags[file_tag_field] = [str(value)]
 
 
 def write_metadata(es_audio, image_file: str = None):

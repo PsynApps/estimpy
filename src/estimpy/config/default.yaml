@@ -46,6 +46,27 @@ analysis:
   # Window overlap to use when processing audio data (in number of samples). Must be less than analysis.window-size. Defaults to 3 * analysis.window-size // 4
   window-overlap: ~
 audio:
+  # Configuration for audio export
+  export:
+    # Audio codec (passed to ffmpeg)
+    codec: libmp3lame
+    # FFmpeg extra arguments (keys are argument name, values are argument values)
+    ffmpeg-extra-args:
+      '-q:a': 0
+    # Output file format / container
+    format: mp3
+    # Output sample rate in Hz. If not set (~), preserves the source sample rate.
+    sample-rate: ~
+  ramp:
+    # Amplitude ramp level as a percentage (0-100). Determines how much the amplitude is reduced
+    # at the start of the ramp, increasing smoothly to 100% by the end of the file. A value of 0
+    # disables the ramp. A value of 20 starts playback at 80% amplitude, 100 starts from silence.
+    level: 0
+    # Exponential easing parameter controlling the ramp curve shape. A value of 0 produces a linear
+    # ramp. Negative values (-10 to 0) create a faster initial rise that slows toward the end.
+    # Positive values (0 to 10) create a slower initial rise that accelerates toward the end.
+    # The curve follows (e^(kt)-1)/(e^k-1) where k is this value and t is normalized time (0 to 1).
+    shape: 0
   stereo-stim:
     # Enable stereo stim mode. Applies a safety filter chain (bandpass) to the audio
     # data before visualization and export, removing DC offset, subsonic content, and high-frequency
@@ -57,16 +78,6 @@ audio:
     # Low-pass cutoff frequency in Hz. Reduces current delivery through the low-impedance
     # high-frequency skin path.
     low-pass: 12000
-  ramp:
-    # Amplitude ramp level as a percentage (0-100). Determines how much the amplitude is reduced
-    # at the start of the ramp, increasing smoothly to 100% by the end of the file. A value of 0
-    # disables the ramp. A value of 20 starts playback at 80% amplitude, 100 starts from silence.
-    level: 0
-    # Exponential easing parameter controlling the ramp curve shape. A value of 0 produces a linear
-    # ramp. Negative values (-10 to 0) create a faster initial rise that slows toward the end.
-    # Positive values (0 to 10) create a slower initial rise that accelerates toward the end.
-    # The curve follows (e^(kt)-1)/(e^k-1) where k is this value and t is normalized time (0 to 1).
-    shape: 0
 files:
   input:
     # Search input file patterns recursively
@@ -102,6 +113,42 @@ player:
   volume-ramp-min-length: 1
   # Maximum amount of time to smoothly transition to a new volume (i.e. with a volume change of 100)
   volume-ramp-max-length: 5
+# Configuration for video export encoding
+video:
+  export:
+    # Codec to encode the video (passed to ffmpeg)
+    codec: libx265
+    # FFmpeg extra arguments (keys are argument name, values are argument values, empty string value will just include the argument name)
+    ffmpeg-extra-args:
+      '-hide_banner': ''
+      '-loglevel': 'error'
+      '-y': ''
+      '-pix_fmt': 'yuv420p10le'
+      '-colorspace': 'bt709'
+      '-crf': 22
+      '-preset': medium
+      '-movflags': '+faststart'
+      '-tune': animation
+    # Container format of the video
+    format: mp4
+    # Frames per second of the video
+    fps: 30
+    # Maximum number of seconds between keyframes (longer intervals will produce smaller files but can cause motion artifacts)
+    keyframe-interval: ~
+    # Show a preview image of the entire video at the beginning of the video
+    preview:
+      # Enable the preview image
+      enabled: True
+      # Number of seconds to show the preview image (including fade)
+      length: 2
+      # Number of seconds to fade from the preview image into the video
+      fade-length: 1
+    # Re-encode final video when concatenating segments. Takes more time but will result in a smaller file. May also improve compatibility or performance with players.
+    reencode-segments: False
+    # Number of seconds to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur). Smaller values will result in larger video files. Must be an integer to ensure seamless concatenation.
+    segment-length: 3600
+    # Maximum length of video to encode
+    video-length-max: ~
 visualization:
   # Configuration for image visualizations
   image:
@@ -293,7 +340,7 @@ visualization:
     video:
       # Time position line color
       position-line-color: '#ffffff'
-  # Configuration for saving videos
+  # Configuration for video visualizations
   video:
     # Configuration for displaying video interactively
     display:
@@ -313,39 +360,8 @@ visualization:
         enabled: True
       # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
       window-length: 20
-    # Configuration for exporting video
+    # Configuration for exported video visualization appearance
     export:
-      # Codec to encode the video (passed to ffmpeg)
-      codec: libx265
-      # FFmpeg extra arguments (keys are argument name, values are argument values, empty string value will just include the argument name)
-      ffmpeg-extra-args:
-        '-hide_banner': ''
-        '-loglevel': 'error'
-        '-y': ''
-        '-pix_fmt': 'yuv420p10le'
-        '-colorspace': 'bt709'
-        '-crf': 22
-        '-preset': medium
-        '-movflags': '+faststart'
-        '-tune': animation
-      # Container format of the video
-      format: mp4
-      # Frames per second of the video
-      fps: 30
-      # Maximum number of seconds between keyframes (longer intervals will produce smaller files but can cause motion artifacts)
-      keyframe-interval: ~
-      # Show a preview image of the entire video at the beginning of the video
-      preview:
-        # Enable the preview image
-        enabled: True
-        # Number of seconds to show the preview image (including fade)
-        length: 2
-        # Number of seconds to fade from the preview image into the video
-        fade-length: 1
-      # Re-encode final video when concatenating segments. Takes more time but will result in a smaller file. May also improve compatibility or performance with players.
-      reencode-segments: False
-      # Number of seconds to encode before writing a temporary video file and restarting a new ffmpeg process (decrease this if out of memory errors occur). Smaller values will result in larger video files. Must be an integer to ensure seamless concatenation.
-      segment-length: 3600
       # Size of video (in pixels)
       size: 1920x1080
       # Configuration for the time display
@@ -360,7 +376,5 @@ visualization:
         enabled: True
       # Visualize stereo audio as 3 channels: A, B, and the triphase signal -(A+B) at the common electrode
       triphase: True
-      # Maximum length of video to encode
-      video-length-max: ~
       # Number of seconds of data to show in sliding panels of video (half of this value shown before and after the current time)
       window-length: 20

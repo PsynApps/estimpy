@@ -14,7 +14,7 @@ def _parse_args(argv):
     """
     with mock.patch.object(sys, 'argv', ['estimpy'] + argv):
         # Replicate the subcommand-defaulting logic from main()
-        subcommands = {'play', 'show-image', 'save-image', 'save-video', 'save-metadata'}
+        subcommands = {'play', 'show-image', 'save-image', 'save-audio', 'save-video', 'save-metadata'}
         args = sys.argv[1:]
         has_subcommand = any(a in subcommands for a in args)
         if not has_subcommand and '-h' not in args and '--help' not in args:
@@ -25,7 +25,7 @@ def _parse_args(argv):
         parser.add_argument('--version', action='store_true')
         subparsers = parser.add_subparsers(dest='command', metavar='<command>')
 
-        for cmd in ['play', 'show-image', 'save-image', 'save-video', 'save-metadata']:
+        for cmd in ['play', 'show-image', 'save-image', 'save-audio', 'save-video', 'save-metadata']:
             sub = subparsers.add_parser(cmd)
             sub.add_argument('files', nargs='*', default=None)
             # Global args
@@ -71,6 +71,10 @@ class TestArgParsing:
     def test_save_video_command(self):
         parsed = _parse_args(['save-video'])
         assert parsed['command'] == 'save-video'
+
+    def test_save_audio_command(self):
+        parsed = _parse_args(['save-audio'])
+        assert parsed['command'] == 'save-audio'
 
     def test_save_metadata_command(self):
         parsed = _parse_args(['save-metadata'])

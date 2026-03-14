@@ -15,6 +15,27 @@ import estimpy as es
 _EXPORT_DPI = 8
 
 
+def _build_ffmpeg_extra_args(cfg_prefix: str) -> list:
+    """Build an FFmpeg argument list from config keys under the given prefix.
+
+    Iterates through all config keys starting with ``cfg_prefix``, extracting the
+    argument name from the key suffix and its value. Keys with None values are skipped.
+    Empty-string values emit only the argument name (flag-style).
+
+    :param cfg_prefix: Config key prefix ending with a dot, e.g. ``'video.export.ffmpeg-extra-args.'``.
+    :return list: Flat list of FFmpeg argument strings.
+    """
+    args = []
+    for key, value in es.cfg.items():
+        if key.startswith(cfg_prefix):
+            arg_name = key[len(cfg_prefix):]
+            if value is not None:
+                args.append(arg_name)
+                if value != '':
+                    args.append(str(value))
+    return args
+
+
 def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, time_position):
     """Draw the SS badge onto a saved image file if stereo stim mode is enabled."""
     if not es.cfg['audio.stereo-stim.enabled']:
@@ -119,6 +140,93 @@ def _detect_audio_codec(es_audio: es.audio.Audio) -> str:
         return 'aac'
 
 
+def write_audio(es_audio: es.audio.Audio, output_path: str = None,
+                audio_format: str = None, overwrite: bool = None) -> dict | None:
+    """Export processed audio to a file via FFmpeg.
+
+    Encodes the audio from ``es_audio.file`` (which may be a temp WAV from the
+    processing chain) to the configured codec and format. After encoding, generates
+    a visualization image and embeds it as album art along with metadata tags.
+
+    :param es_audio: Audio instance (with processing already applied).
+    :param output_path: Output directory or file path.
+    :param audio_format: Output format override (default from config).
+    :param overwrite: Overwrite behavior override.
+    :return dict: ``{file, encoding_time, file_size}`` on success, ``None`` on failure.
+    """
+    output_path = output_path if output_path is not None else es.cfg['files.output.path']
+    audio_format = audio_format if audio_format is not None else es.cfg['audio.export.format']
+
+    output_file = es.utils.get_output_file(
+        output_path=output_path,
+        input_file_name=es_audio.source_file,
+        file_format=audio_format
+    )
+
+    try:
+        output_valid = es.utils.validate_output_file(output_file=output_file, overwrite=overwrite)
+        if not output_valid:
+            return None
+    except Exception as e:
+        print(e)
+        return None
+
+    # Build FFmpeg command
+    codec = es.cfg['audio.export.codec']
+    sample_rate = es.cfg['audio.export.sample-rate']
+    ffmpeg_extra_args = _build_ffmpeg_extra_args('audio.export.ffmpeg-extra-args.')
+
+    cmd = [
+        'ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
+        '-i', es_audio.file,
+        '-c:a', codec,
+    ]
+
+    if sample_rate is not None:
+        cmd += ['-ar', str(sample_rate)]
+
+    cmd += ffmpeg_extra_args
+    cmd.append(output_file)
+
+    with es.utils.Spinner(f'Encoding audio ({codec})... '):
+        encoding_start = time.time()
+        subprocess.run(cmd, check=True)
+        encoding_time = time.time() - encoding_start
+
+    # Generate visualization image and write metadata to the encoded file
+    try:
+        # Generate album art from the processed audio (with triphase if configured for image export)
+        viz_audio = es_audio
+        if es.cfg['visualization.image.export.triphase'] and es_audio.channels == 2:
+            viz_audio = es_audio.with_triphase()
+
+        image_file = write_image(es_audio=viz_audio, output_path=es.utils.get_temp_file_path())
+        es.utils.add_temp_file(image_file)
+
+        output_metadata = es.metadata.Metadata(file=output_file)
+        output_metadata.set_metadata(es_audio.metadata.get_metadata())
+
+        image_data = open(image_file, 'rb').read()
+        output_metadata.set_tag('image', image_data)
+
+        with es.utils.Spinner(f'Writing metadata... '):
+            output_metadata.save()
+    except Exception as e:
+        print(f'Warning: Failed to write metadata to audio file: {e}')
+
+    es.utils.delete_temp_files()
+
+    file_size = os.path.getsize(output_file)
+
+    print(f'Saved file "{output_file}" ({file_size} bytes).')
+
+    return {
+        'file': output_file,
+        'encoding_time': encoding_time,
+        'file_size': file_size,
+    }
+
+
 def write_image(es_audio: es.audio.Audio, output_path: str = None, image_format: str = None,
                 width: int = None, height: int = None, overwrite: bool = None,
                 triphase: bool = None) -> str | None:
@@ -182,11 +290,11 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 image_file: str = None, overwrite: bool = None,
                 profiling: bool = False) -> dict | None:
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
-    video_format = video_format if video_format is not None else es.cfg['visualization.video.export.format']
+    video_format = video_format if video_format is not None else es.cfg['video.export.format']
     segment_start = segment_start if segment_start is not None else 1
 
     # Determine the number of frames per segment
-    frames_per_segment = es.cfg['visualization.video.export.segment-length'] * es.cfg['visualization.video.export.fps']
+    frames_per_segment = es.cfg['video.export.segment-length'] * es.cfg['video.export.fps']
 
     video_file = es.utils.get_output_file(
         output_path=output_path,
@@ -215,19 +323,19 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                                       include_scrub=True)
 
     # Set the total length of the video
-    seconds_total = float(es.cfg['visualization.video.export.video-length-max']) if \
-        es.cfg['visualization.video.export.video-length-max'] is not None else es_audio.length
+    seconds_total = float(es.cfg['video.export.video-length-max']) if \
+        es.cfg['video.export.video-length-max'] is not None else es_audio.length
 
     # Set the total number of frames
-    frames_total = math.floor(seconds_total * es.cfg['visualization.video.export.fps'])
+    frames_total = math.floor(seconds_total * es.cfg['video.export.fps'])
 
     # Set preview parameters
     preview_seconds = (
-        min(es.cfg['visualization.video.export.preview.length'], seconds_total) if es.cfg['visualization.video.export.preview.enabled']
+        min(es.cfg['video.export.preview.length'], seconds_total) if es.cfg['video.export.preview.enabled']
         else 0
     )
-    preview_frames = preview_seconds * es.cfg['visualization.video.export.fps']
-    fade_seconds = min(es.cfg['visualization.video.export.preview.fade-length'], seconds_total)
+    preview_frames = preview_seconds * es.cfg['video.export.fps']
+    fade_seconds = min(es.cfg['video.export.preview.fade-length'], seconds_total)
 
     # If a starting frame is specified rather than a segment, determine the starting segment based upon the frame
     if frame_start is not None:
@@ -236,7 +344,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     # Generate list of video segments
     video_segment_ids = []
 
-    if es.cfg['visualization.video.export.preview.enabled']:
+    if es.cfg['video.export.preview.enabled']:
         video_segment_ids.append('preview')
 
     # Create segment ids for all remaining segments
@@ -287,25 +395,13 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
     ffmpeg_extra_args = []
 
     # Set the maximum keyframe interval if defined
-    if es.cfg['visualization.video.export.keyframe-interval'] is not None:
+    if es.cfg['video.export.keyframe-interval'] is not None:
         ffmpeg_extra_args.extend([
             '-g',
-            str(es.cfg['visualization.video.export.keyframe-interval'] * es.cfg['visualization.video.export.fps'])
+            str(es.cfg['video.export.keyframe-interval'] * es.cfg['video.export.fps'])
         ])
 
-    # Configuration key prefix for ffmpeg extra arguments
-    ffmpeg_extra_args_cfg_prefix = 'visualization.video.export.ffmpeg-extra-args.'
-
-    # Iterate through the configuration to find ffmpeg extra args
-    for arg_name_key, arg_value in es.cfg.items():
-        if arg_name_key.startswith(ffmpeg_extra_args_cfg_prefix):
-            # Extract the argument name from the configuration key
-            arg_name = arg_name_key[len(ffmpeg_extra_args_cfg_prefix):]
-            # Add the argument name and value to the argument list if it is not None
-            if arg_value is not None:
-                ffmpeg_extra_args.append(arg_name)
-                if arg_value != '':
-                    ffmpeg_extra_args.append(str(arg_value))
+    ffmpeg_extra_args += _build_ffmpeg_extra_args('video.export.ffmpeg-extra-args.')
 
     # Store start time of encoding
     encoding_time_start = time.time()
@@ -375,12 +471,12 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             temp_file_name=f'{video_file_base}_{video_segment_id}.{video_format}'
         )
 
-        segment_length = frame_count * es.cfg["visualization.video.export.fps"]
+        segment_length = frame_count * es.cfg["video.export.fps"]
 
         # The last frame of the segment must be a keyframe to allow concatenation without re-encoding
         ffmpeg_keyframe_args = [
             '-force_key_frames',
-            f'expr:gte(t,{segment_length - 1 / es.cfg["visualization.video.export.fps"]})'
+            f'expr:gte(t,{segment_length - 1 / es.cfg["video.export.fps"]})'
         ]
 
         # Initialize progress bar
@@ -393,9 +489,9 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             '-vcodec', 'rawvideo',
             '-s', f'{width}x{height}',
             '-pix_fmt', 'rgb24',
-            '-r', str(es.cfg['visualization.video.export.fps']),
+            '-r', str(es.cfg['video.export.fps']),
             '-i', 'pipe:0',
-            '-c:v', es.cfg['visualization.video.export.codec'],
+            '-c:v', es.cfg['video.export.codec'],
             *ffmpeg_extra_args,
             *ffmpeg_keyframe_args,
             video_segment_encoding_file
@@ -473,8 +569,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 f'[1:v]fade=t=out:st={preview_seconds - fade_seconds}:d={fade_seconds}:alpha=1[faded]; '
                 f'[0:v][faded]overlay=0:0:enable=\'between(t,0,{preview_seconds})\'[output]',
                 '-map', '[output]',
-                '-r', str(es.cfg['visualization.video.export.fps']),
-                '-c:v', es.cfg['visualization.video.export.codec'],
+                '-r', str(es.cfg['video.export.fps']),
+                '-c:v', es.cfg['video.export.codec'],
                 *(ffmpeg_extra_args + ffmpeg_keyframe_args),
                 video_file_temp_with_preview
             ]
@@ -501,7 +597,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
     # Determine whether to re-encode or just concatenate segments
     concat_video_codec = (
-        es.cfg['visualization.video.export.codec'] if segments_total > 1 and es.cfg['visualization.video.export.reencode-segments']
+        es.cfg['video.export.codec'] if segments_total > 1 and es.cfg['video.export.reencode-segments']
         else 'copy'
     )
 

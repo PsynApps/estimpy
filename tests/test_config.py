@@ -15,6 +15,24 @@ class TestConfigLoading:
         assert 'visualization.style.amplitude.padding' in es.cfg
         assert 'metadata.default-genre' in es.cfg
 
+    def test_video_export_keys_exist(self):
+        assert 'video.export.codec' in es.cfg
+        assert 'video.export.format' in es.cfg
+        assert 'video.export.fps' in es.cfg
+        assert 'video.export.segment-length' in es.cfg
+
+    def test_audio_export_keys_exist(self):
+        assert 'audio.export.codec' in es.cfg
+        assert 'audio.export.format' in es.cfg
+        assert 'audio.export.sample-rate' in es.cfg
+
+    def test_visualization_video_export_keys_are_visual(self):
+        """Encoding-mechanic keys should be under video.export, not visualization.video.export."""
+        assert 'visualization.video.export.size' in es.cfg
+        assert 'visualization.video.export.triphase' in es.cfg
+        assert 'visualization.video.export.window-length' in es.cfg
+        assert 'video.export.codec' not in [k for k in es.cfg if k.startswith('visualization.')]
+
     def test_base_cfg_has_expected_keys(self):
         assert 'analysis.window-size' in es.base_cfg
         assert 'metadata.default-genre' in es.base_cfg

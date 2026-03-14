@@ -42,10 +42,14 @@ Many commercial Estim units support custom stimulation signals using audio input
   - **Image file export**: Image visualization can be saved to an image file
   - **Album art embedding**: Image visualization can be directly embedded in the metadata of the audio file
     - During playback, album art is often rendered at the same width as the time position slider. Using the image visualization as album art, the file can be easily navigated and upcoming changes in the session can be anticipated.
+    - Supported for MP3, MP4, M4A, MOV, and FLAC files
   - **Interactive display**: Image visualization can be rendered on an interactive plot to allow detailed inspection of the audio file
 - **Animated visualization**: Generates an animated sliding visualization of the audio file
   - **Video file export**: Animated visualization can be saved to a video file using a direct frame rendering pipeline
   - **Interactive player**: Animated visualization used within the Qt-based audio file player
+- **Audio export**: Exports processed audio files with the full processing chain applied (amplitude ramp, stereo stim filtering), generates a visualization image, and embeds it as album art with metadata tags
+  - **Configurable output format**: Supports MP3 (default), WAV, FLAC, and any other format supported by FFmpeg via `audio.export.*` config keys
+  - **Included profiles**: `audio-wav` (24-bit PCM) and `audio-flac` (lossless) config profiles for common lossless export scenarios
 - **Audio player**: Plays Estim audio files for use with estim devices (***HIGHLY EXPERIMENTAL!***)
   - **Real-time visualization**: Based on the animated visualization
   - **Separate channel output control**: Allows signal gain of each channel to be independently controlled
@@ -184,7 +188,8 @@ If no command is given, the player is launched. If no files are given, a file di
 | `show-image`      | Display an interactive window with the image visualization of the input file(s)                                    |
 | `save-image`      | Save an image file with visualization of the input file(s). Output uses the same base name as the input file.      |
 | `save-video`      | Save a video file with an animated visualization. Output uses the input file as the audio track.                   |
-| `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, and m4a files.      |
+| `save-audio`      | Save processed audio file(s) with the audio processing chain applied (amplitude ramp, stereo stim). Generates a visualization image and embeds it as album art along with metadata tags. Output format is configurable via `audio.export.*` config keys. |
+| `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, m4a, and flac files. |
 | `benchmark`       | Benchmark video encoding across all video profiles and display a comparison table of performance and file size. Supports `-o` to keep encoded files (named `benchmark-YYYYMMDDHHMMSS-profile.ext`) and `-c` to benchmark a specific combination of profiles instead of all video profiles (the `video-` prefix may be omitted). |
 
 ### Global options
@@ -205,7 +210,7 @@ If no command is given, the player is launched. If no files are given, a file di
 
 ### Save options
 
-These options are available on `save-image`, `save-video`, and `save-metadata`:
+These options are available on `save-image`, `save-audio`, `save-video`, and `save-metadata`:
 
 | Option                                 | Description                                                                                            |
 |----------------------------------------|--------------------------------------------------------------------------------------------------------|
@@ -267,6 +272,16 @@ These options are only available on `save-video`:
   estimpy save-metadata ../library/* -r
   ```
 
+- **Save processed audio with stereo stim filtering applied**
+  ```
+  estimpy save-audio input.mp3 -ss
+  ```
+
+- **Save processed audio as FLAC with amplitude ramp**
+  ```
+  estimpy save-audio input.mp3 -c audio-flac -co audio.ramp.level 50
+  ```
+
 - **Save animated visualization to a video file**
   ```
   estimpy save-video input.mp3
@@ -319,6 +334,8 @@ The following additional configuration profiles are included with **EstimPy**:
 | Profile Name         | Description                                                    |
 |----------------------|----------------------------------------------------------------|
 | `default`            | The default base configuration (loaded automatically)          |
+| `audio-flac`                | Export audio as FLAC (lossless)                                      |
+| `audio-wav`                 | Export audio as WAV (24-bit PCM, lossless)                           |
 | `image-4k-square`           | Generate image visualization in 4K with a square aspect ratio        |
 | `image-8k-square`           | Generate image visualization in 8K with a square aspect ratio        |
 | `image-videopreview`        | Generate image visualization in 1440p with a 16:9 aspect ratio       |
@@ -383,6 +400,10 @@ For reference, the default configuration options and values are as follows:
 
 | Configuration Option                                         | Value                                        |
 |--------------------------------------------------------------|----------------------------------------------|
+| audio.export.codec                                           | libmp3lame                                   |
+| audio.export.ffmpeg-extra-args.-q:a                          | 0                                            |
+| audio.export.format                                          | mp3                                          |
+| audio.export.sample-rate                                     | None                                         |
 | audio.ramp.level                                             | 0                                            |
 | audio.ramp.shape                                             | 0                                            |
 | audio.stereo-stim.enabled                         | False                                        |
@@ -501,31 +522,31 @@ For reference, the default configuration options and values are as follows:
 | visualization.video.display.title.enabled                    | False                                        |
 | visualization.video.display.triphase                         | True                                         |
 | visualization.video.display.window-length                    | 20                                           |
-| visualization.video.export.codec                             | libx265                                      |
-| visualization.video.export.ffmpeg-extra-args.-hide_banner    |                                              |
-| visualization.video.export.ffmpeg-extra-args.-loglevel       | error                                        |
-| visualization.video.export.ffmpeg-extra-args.-y              |                                              |
-| visualization.video.export.ffmpeg-extra-args.-pix_fmt        | yuv420p10le                                  |
-| visualization.video.export.ffmpeg-extra-args.-colorspace     | bt709                                        |
-| visualization.video.export.ffmpeg-extra-args.-crf            | 22                                           |
-| visualization.video.export.ffmpeg-extra-args.-preset         | medium                                       |
-| visualization.video.export.ffmpeg-extra-args.-movflags       | +faststart                                   |
-| visualization.video.export.ffmpeg-extra-args.-tune           | animation                                    |
-| visualization.video.export.format                            | mp4                                          |
-| visualization.video.export.fps                               | 30                                           |
+| video.export.codec                                           | libx265                                      |
+| video.export.ffmpeg-extra-args.-hide_banner                  |                                              |
+| video.export.ffmpeg-extra-args.-loglevel                     | error                                        |
+| video.export.ffmpeg-extra-args.-y                            |                                              |
+| video.export.ffmpeg-extra-args.-pix_fmt                      | yuv420p10le                                  |
+| video.export.ffmpeg-extra-args.-colorspace                   | bt709                                        |
+| video.export.ffmpeg-extra-args.-crf                          | 22                                           |
+| video.export.ffmpeg-extra-args.-preset                       | medium                                       |
+| video.export.ffmpeg-extra-args.-movflags                     | +faststart                                   |
+| video.export.ffmpeg-extra-args.-tune                         | animation                                    |
+| video.export.format                                          | mp4                                          |
+| video.export.fps                                             | 30                                           |
+| video.export.keyframe-interval                               | None                                         |
+| video.export.preview.enabled                                 | True                                         |
+| video.export.preview.length                                  | 2                                            |
+| video.export.preview.fade-length                             | 1                                            |
+| video.export.reencode-segments                               | False                                        |
+| video.export.segment-length                                  | 3600                                         |
+| video.export.video-length-max                                | None                                         |
 | visualization.video.export.oscilloscope.enabled              | True                                         |
-| visualization.video.export.keyframe-interval                 | None                                         |
-| visualization.video.export.preview.enabled                   | True                                         |
-| visualization.video.export.preview.length                    | 2                                            |
-| visualization.video.export.preview.fade-length               | 1                                            |
-| visualization.video.export.reencode-segments                 | False                                        |
-| visualization.video.export.segment-length                    | 3600                                         |
 | visualization.video.export.size                              | 1920x1080                                    |
 | visualization.video.export.time.enabled                      | True                                         |
 | visualization.video.export.time.position                     | top                                          |
 | visualization.video.export.title.enabled                     | False                                        |
 | visualization.video.export.triphase                          | True                                         |
-| visualization.video.export.video-length-max                  | None                                         |
 | visualization.video.export.window-length                     | 20                                           |
 
 ## Development

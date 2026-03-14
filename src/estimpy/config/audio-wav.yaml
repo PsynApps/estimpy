@@ -1,0 +1,8 @@
+---
+estimpy-version: 2.0.0
+audio:
+  export:
+    codec: pcm_s24le
+    format: wav
+    ffmpeg-extra-args:
+      '-q:a': ~

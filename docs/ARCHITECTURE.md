@@ -1,6 +1,6 @@
 # EstimPy Architecture
 
-EstimPy is a Python toolkit for visualizing and playing back estim audio files. It provides a CLI (`estimpy`) that can launch an interactive real-time player, render static image visualizations, export animated videos, and embed album art into audio file metadata. The core abstractions are: **Audio** (load and normalize audio data), **Analysis** (compute spectrograms and envelopes via DSP), **Visualization** (render panels using matplotlib and direct pixel manipulation), and **Player** (real-time playback with a Qt GUI). All behavior is driven by a hierarchical YAML configuration system with `default.yaml` as the single source of truth for defaults.
+EstimPy is a Python toolkit for visualizing and playing back estim audio files. It provides a CLI (`estimpy`) that can launch an interactive real-time player, render static image visualizations, export animated videos, export processed audio files, and embed album art into audio file metadata. The core abstractions are: **Audio** (load and normalize audio data), **Analysis** (compute spectrograms and envelopes via DSP), **Visualization** (render panels using matplotlib and direct pixel manipulation), and **Player** (real-time playback with a Qt GUI). All behavior is driven by a hierarchical YAML configuration system with `default.yaml` as the single source of truth for defaults.
 
 ## Directory Structure
 
@@ -15,8 +15,8 @@ src/estimpy/
 │   ├── base.py              # Visualization class (static images), enums, show_image, set_optimal_nfft
 │   ├── video.py             # VideoVisualization: direct render pipeline, shift-and-paint
 │   └── oscilloscope.py      # OscilloscopeMixin: per-channel waveform overlay
-├── export.py                # File export: images (matplotlib) and videos (ffmpeg pipe)
-├── metadata.py              # ID3/MP4 tag reading/writing via mutagen
+├── export.py                # File export: images (matplotlib), videos (ffmpeg pipe), audio (ffmpeg encode)
+├── metadata.py              # ID3/MP4/FLAC tag reading/writing via mutagen
 ├── utils.py                 # Shared helpers: file dialogs, spinners, temp files, formatting
 ├── player/
 │   ├── __init__.py          # Re-exports Player class
@@ -77,16 +77,16 @@ tests/
 - **Dependents:** export, player/window.
 
 ### `export.py` — File Output
-- **Responsibility:** Write images via matplotlib and encode videos by piping raw RGB frames to ffmpeg.
-- **Key functions:** `write_image()`, `write_video()`. `write_video()` returns a result dict (`file`, `encoding_fps`, `total_frames`, `encoding_time`, `file_size`) on success, `None` on failure.
-- **Notable:** Video export uses segment-based encoding (configurable segment length, default 3600s) with resume support. Segments are concatenated with ffmpeg's concat demuxer. Supports preview frames with fade overlay. Metadata embedding is non-fatal — failures produce a warning rather than discarding the encoded video.
+- **Responsibility:** Write images via matplotlib, encode videos by piping raw RGB frames to ffmpeg, and export processed audio via ffmpeg encoding.
+- **Key functions:** `write_image()`, `write_video()`, `write_audio()`. Both `write_video()` and `write_audio()` return a result dict on success, `None` on failure. Shared helper `_build_ffmpeg_extra_args()` constructs ffmpeg argument lists from config key prefixes (`video.export.ffmpeg-extra-args.*`, `audio.export.ffmpeg-extra-args.*`).
+- **Notable:** Video export uses segment-based encoding (configurable segment length, default 3600s) with resume support. Segments are concatenated with ffmpeg's concat demuxer. Supports preview frames with fade overlay. Audio export encodes to the configured format (default MP3, with WAV/FLAC profiles available), generates a visualization image for album art, and embeds metadata. Metadata embedding is non-fatal for both video and audio — failures produce a warning rather than discarding the encoded file.
 - **Dependencies:** visualization (creates figures), subprocess (ffmpeg), tqdm (progress bars).
 
 ### `metadata.py` — Audio Tags
-- **Responsibility:** Read/write ID3 (MP3), MP4/M4A, and MOV tags. Extracts artist/title from filenames via regex.
-- **Key classes:** `Metadata`, `MetadataFormat` (abstract), `MetadataFormatMP3`, `MetadataFormatMP4`, `MetadataImage`.
-- **Dependencies:** mutagen.
-- **Dependents:** audio (auto-loads metadata), export (embeds album art in videos), cli (save-metadata command).
+- **Responsibility:** Read/write ID3 (MP3), MP4/M4A/MOV, and FLAC tags. Extracts artist/title from filenames via regex.
+- **Key classes:** `Metadata`, `MetadataFormat` (abstract), `MetadataFormatMP3`, `MetadataFormatMP4`, `MetadataFormatFLAC`, `MetadataImage`.
+- **Dependencies:** mutagen (id3, mp4, flac).
+- **Dependents:** audio (auto-loads metadata), export (embeds album art in videos and audio), cli (save-metadata and save-audio commands).
 
 ### `player/player.py` — Playback State Machine
 - **Responsibility:** Manage playlist, playback state, per-channel volume/mute, repeat modes (`none`/`one`/`all`), seeking.
@@ -160,6 +160,29 @@ sequenceDiagram
     Export->>Export: Embed metadata + album art
 ```
 
+### CLI Invocation: `estimpy save-audio song.mp3 -ss`
+
+```mermaid
+sequenceDiagram
+    participant CLI as cli.py
+    participant Audio as audio.py
+    participant Export as export.py
+    participant FFmpeg as ffmpeg (subprocess)
+    participant Viz as visualization/
+    participant Meta as metadata.py
+
+    CLI->>Audio: Audio(file="song.mp3")
+    Note over Audio: pydub → numpy float32
+    CLI->>Audio: with_ramp() (if level > 0)
+    CLI->>Audio: with_stereo_stim() (if -ss)
+    Note over Audio: Bandpass filter → temp WAV
+    CLI->>Export: write_audio(es_audio)
+    Export->>FFmpeg: Encode audio (codec, format, sample-rate)
+    FFmpeg-->>Export: Output file
+    Export->>Viz: write_image() for album art
+    Export->>Meta: Embed metadata + album art
+```
+
 ### CLI Invocation: `estimpy benchmark`
 
 ```mermaid
@@ -220,9 +243,15 @@ analysis:                             # analysis.spectrogram.reassign: True
 
 **Design rules:**
 - `default.yaml` is the **single source of truth** for all default values. Code uses `es.cfg['key']` (bracket access, raises KeyError if missing) — never `es.cfg.get('key', fallback)`.
-- Named profiles (e.g., `video-4k.yaml`, `video-av1.yaml`) override specific keys when loaded via `-c profile_name`.
+- Named profiles (e.g., `video-4k.yaml`, `video-av1.yaml`, `audio-flac.yaml`) override specific keys when loaded via `-c profile_name`.
 - CLI `--config-option key value` overrides individual keys at runtime.
 - The `config.updated` event notifies listeners (e.g., `analysis._on_config_updated()`) when config changes. Derived values (like `analysis.window-overlap` computed from `analysis.window-size`) are set in these handlers.
+
+**Namespace conventions:**
+- `video.export.*` — encoding mechanics (codec, format, fps, segment-length, keyframe-interval, preview, reencode-segments, video-length-max, ffmpeg-extra-args). These control how ffmpeg produces the video container.
+- `visualization.video.export.*` — visual appearance of exported video (size, triphase, time, title, oscilloscope, window-length). These control what the video looks like.
+- `audio.export.*` — audio encoding mechanics (codec, format, sample-rate, ffmpeg-extra-args).
+- The distinction: keys that exist under both `visualization.video.display.*` and `visualization.video.export.*` are visual (stay under `visualization.*`). Keys only under `export` are encoding mechanics (live at `video.export.*` or `audio.export.*`).
 
 ## Extension Points
 
@@ -243,9 +272,9 @@ analysis:                             # analysis.spectrogram.reassign: True
 3. If it requires derived computation, add a handler in the relevant module's `_on_config_updated()` listener.
 
 **Adding a new audio format for metadata:**
-1. Subclass `MetadataFormat` in `metadata.py`.
-2. Implement `_load_file_tags()`, `_set_file_tag_value()`, `_get_metadata_image()`.
-3. Register the format extension in `Metadata.__init__()`.
+1. Add the format to `MetadataFileFormats` enum in `metadata.py`.
+2. Subclass `MetadataFormat` and implement `_tag_fields()`, `_load_file_tags()`, `_set_file_tag_value()`, `_get_metadata_image()` (see `MetadataFormatFLAC` for a clean example).
+3. Add branches for the new format in `Metadata.load()` and `Metadata.save()`.
 
 **Adding a new config profile:**
 1. Create a `.yaml` file in `src/estimpy/config/` with only the keys you want to override.

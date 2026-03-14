@@ -36,9 +36,14 @@
 - Benchmark audio generator script (`tests/generate_benchmark.py`)
 - Stereo stim mode (`-ss`/`--stereo-stim`) applying a bandpass filter (configurable `audio.stereo-stim.high-pass` and `.low-pass`) to remove DC offset, subsonic content, and high-frequency artifacts before playback or export, with an SS badge overlay on exported videos, a toggle button (S key) in the player, and automatic audio re-encoding in the original codec during video export
 - Amplitude ramp (`audio.ramp.level`, `audio.ramp.shape`) that gradually increases audio amplitude from a reduced level at the start of the file to full amplitude at the end, with configurable exponential easing curve shape; applied to exported audio and available as a real-time player control (G key to start/restart, with level and shape sliders)
-- Automated test suite (286 tests) covering audio loading, DSP analysis, configuration, metadata, and utilities
+- `save-audio` CLI command for exporting processed audio files with the full processing chain applied (amplitude ramp → stereo stim), with configurable output format via `audio.export.*` config keys (codec, format, sample-rate, ffmpeg-extra-args), automatic visualization album art generation, and metadata embedding
+- Audio export config profiles: `audio-wav` (24-bit PCM) and `audio-flac` (lossless) for common lossless export scenarios
+- FLAC metadata support (read/write via mutagen) including Vorbis comments and embedded cover art
+- Automated test suite (290 tests) covering audio loading, DSP analysis, configuration, CLI, metadata, and utilities
 
 ### Changed
+- Video encoding config keys moved from `visualization.video.export.*` to `video.export.*` (codec, format, fps, segment-length, keyframe-interval, preview.*, reencode-segments, video-length-max, ffmpeg-extra-args). Visualization-appearance keys (size, triphase, time.*, title.*, oscilloscope.*, window-length) remain under `visualization.video.export.*`. All config profiles updated accordingly.
+- Audio processing chain reordered from stereo stim → ramp → triphase to ramp → stereo stim → triphase, ensuring stereo stim filtering is always the last safety step before the visualization-only triphase derivation
 - Audio data stored as float32 instead of float64, halving memory usage for all audio operations
 - Spectrogram computation uses float32/complex64 throughout, halving memory for all intermediate and final arrays
 - Reassigned spectrogram computed in chunks to limit peak memory usage, with histograms accumulated across batches

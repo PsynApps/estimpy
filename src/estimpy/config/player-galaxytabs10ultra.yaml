@@ -1,12 +1,14 @@
 ---
 estimpy-version: 2.0.0
+video:
+  export:
+    ffmpeg-extra-args:
+      '-crf': 26
+    segment-length: 1800
 visualization:
   image:
     export:
       size: 2960x1848
   video:
     export:
-      ffmpeg-extra-args:
-        '-crf': 26
-      segment-length: 1800
       size: 2960x1848

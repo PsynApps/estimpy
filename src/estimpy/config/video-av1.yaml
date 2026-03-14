@@ -1,10 +1,9 @@
 ---
 estimpy-version: 2.0.0
-visualization:
-  video:
-    export:
-      codec: libsvtav1
-      ffmpeg-extra-args:
-        '-tune': ~
-        '-crf': 30
-        '-preset': 5
+video:
+  export:
+    codec: libsvtav1
+    ffmpeg-extra-args:
+      '-tune': ~
+      '-crf': 30
+      '-preset': 5

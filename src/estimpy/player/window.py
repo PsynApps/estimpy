@@ -156,7 +156,7 @@ class PlayerWindow(QMainWindow):
         self._ss_original_file = None
         self._ramp_active = False
         self._ramp_start_time = 0.0
-        self._fps = es.cfg['visualization.video.export.fps']
+        self._fps = es.cfg['video.export.fps']
         self._total_frames = max(1, math.floor(es_audio.length * self._fps))
         self._seeking = False
         self._full_screen = False

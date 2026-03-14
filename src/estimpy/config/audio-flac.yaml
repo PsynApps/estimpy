@@ -1,0 +1,8 @@
+---
+estimpy-version: 2.0.0
+audio:
+  export:
+    codec: flac
+    format: flac
+    ffmpeg-extra-args:
+      '-q:a': ~

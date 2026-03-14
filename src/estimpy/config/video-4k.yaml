@@ -1,13 +1,15 @@
 ---
 estimpy-version: 2.0.0
+video:
+  export:
+    ffmpeg-extra-args:
+      '-tile-columns': 2
+      '-tile-rows': 1
+    segment-length: 900
 visualization:
   image:
     export:
       size: 3840x2160
   video:
     export:
-      ffmpeg-extra-args:
-        '-tile-columns': 2
-        '-tile-rows': 1
-      segment-length: 900
       size: 3840x2160

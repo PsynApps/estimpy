@@ -8,6 +8,7 @@ Usage:
     estimpy play [files...]             Launch the interactive player
     estimpy show-image [files...]       Show a static image visualization
     estimpy save-image [files...]       Save image visualization to file(s)
+    estimpy save-audio [files...]       Save processed audio to file(s)
     estimpy save-video [files...]       Save animated visualization to video file(s)
     estimpy save-metadata [files...]    Write album art to audio file metadata
     estimpy benchmark [file]            Benchmark video encoding profiles
@@ -35,7 +36,7 @@ def main():
         sys.exit()
 
     # Check if any argument is a known subcommand. If not, default to 'play'.
-    subcommands = {'play', 'show-image', 'save-image', 'save-video', 'save-metadata', 'benchmark'}
+    subcommands = {'play', 'show-image', 'save-image', 'save-audio', 'save-video', 'save-metadata', 'benchmark'}
     args = sys.argv[1:]
     has_subcommand = any(a in subcommands for a in args)
     if not has_subcommand and '-h' not in args and '--help' not in args:
@@ -73,6 +74,15 @@ def main():
     parser_save_image.add_argument('files', nargs='*', default=None, help='Input audio file(s). Supports wildcards.')
     _add_global_arguments(parser_save_image)
     _add_save_arguments(parser_save_image)
+
+    # save-audio
+    parser_save_audio = subparsers.add_parser('save-audio',
+        help='Save processed audio to file(s)',
+        description='Save audio file(s) with the audio processing chain applied (amplitude ramp, stereo stim). '
+                    'Generates a visualization image and embeds it as album art along with metadata tags.')
+    parser_save_audio.add_argument('files', nargs='*', default=None, help='Input audio file(s). Supports wildcards.')
+    _add_global_arguments(parser_save_audio)
+    _add_save_arguments(parser_save_audio)
 
     # save-video
     parser_save_video = subparsers.add_parser('save-video',
@@ -122,6 +132,8 @@ def main():
         _run_show_image(parsed)
     elif command == 'save-image':
         _run_save_image(parsed)
+    elif command == 'save-audio':
+        _run_save_audio(parsed)
     elif command == 'save-video':
         _run_save_video(parsed)
     elif command == 'save-metadata':
@@ -229,17 +241,22 @@ def _get_files(args):
 
 
 def _load_audio(file, triphase=False):
-    """Load an audio file and optionally apply stereo stim filtering and triphase transformation."""
+    """Load an audio file and apply the audio processing chain.
+
+    Processing order: ramp → stereo stim → triphase. Stereo stim is applied last
+    (before the visualization-only triphase step) to ensure any artifacts introduced
+    by earlier processing are filtered out.
+    """
     with es.utils.Spinner(f'Loading file {file}... '):
         es_audio = es.audio.Audio(file=file)
-
-    if es.cfg['audio.stereo-stim.enabled']:
-        with es.utils.Spinner(f'Applying stereo stim processing... '):
-            es_audio = es_audio.with_stereo_stim()
 
     if es.cfg['audio.ramp.level'] > 0:
         with es.utils.Spinner(f'Applying amplitude ramp... '):
             es_audio = es_audio.with_ramp()
+
+    if es.cfg['audio.stereo-stim.enabled']:
+        with es.utils.Spinner(f'Applying stereo stim processing... '):
+            es_audio = es_audio.with_stereo_stim()
 
     if triphase and es_audio.channels == 2:
         es_audio = es_audio.with_triphase()
@@ -285,6 +302,21 @@ def _run_save_image(args):
         try:
             es_audio = _load_audio(file, triphase=es.cfg['visualization.image.export.triphase'])
             es.export.write_image(es_audio=es_audio)
+        except Exception as e:
+            print(e)
+
+
+def _run_save_audio(args):
+    """Save processed audio for each input file."""
+    files = _get_files(args)
+
+    if args.get('yes'):
+        es.cfg['files.output.overwrite-default'] = True
+
+    for file in files:
+        try:
+            es_audio = _load_audio(file, triphase=False)
+            es.export.write_audio(es_audio=es_audio)
         except Exception as e:
             print(e)
 
@@ -412,14 +444,14 @@ def _run_benchmark(args):
                 continue
 
         # Disable preview to focus on encode timing
-        es.cfg['visualization.video.export.preview.enabled'] = False
+        es.cfg['video.export.preview.enabled'] = False
         es.cfg['files.output.overwrite-default'] = True
         es.trigger_event('config.updated')
 
         # Read effective settings for this profile
-        codec = es.cfg['visualization.video.export.codec']
+        codec = es.cfg['video.export.codec']
         resolution = f'{es.cfg["visualization.video.export.width"]}x{es.cfg["visualization.video.export.height"]}'
-        fps = es.cfg['visualization.video.export.fps']
+        fps = es.cfg['video.export.fps']
 
         print(f'[{i + 1}/{len(runs)}] {display_name} ({codec}, {resolution}, {fps} fps)')
         print('─' * 60)

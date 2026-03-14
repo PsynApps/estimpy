@@ -26,7 +26,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                  mode: VisualizationMode = VisualizationMode.EXPORT):
         super().__init__(es_audio=es_audio, mode=mode)
 
-        self._fps = es.cfg['visualization.video.export.fps'] if fps is None else fps
+        self._fps = es.cfg['video.export.fps'] if fps is None else fps
         self._frames = range(math.floor(es_audio.length * self.fps)) if frames is None else frames
         self._frame = 0
 

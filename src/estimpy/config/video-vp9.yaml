@@ -1,13 +1,12 @@
 ---
 estimpy-version: 2.0.0
-visualization:
-  video:
-    export:
-      codec: libvpx-vp9
-      ffmpeg-extra-args:
-        '-preset': ~                                                                                                                                                                                        
-        '-tune': ~
-        '-b:v': 0
-        '-crf': 34
-        '-cpu-used': 3
-        '-row-mt': 1
+video:
+  export:
+    codec: libvpx-vp9
+    ffmpeg-extra-args:
+      '-preset': ~
+      '-tune': ~
+      '-b:v': 0
+      '-crf': 34
+      '-cpu-used': 3
+      '-row-mt': 1

@@ -1,12 +1,11 @@
 ---
 estimpy-version: 2.0.0
-visualization:
-  video:
-    export:
-      codec: hevc_nvenc
-      ffmpeg-extra-args:
-        '-crf': ~
-        '-cq': 22
-        '-preset': p6
-        '-tune': hq
-        '-spatial-aq': 1
+video:
+  export:
+    codec: hevc_nvenc
+    ffmpeg-extra-args:
+      '-crf': ~
+      '-cq': 22
+      '-preset': p6
+      '-tune': hq
+      '-spatial-aq': 1
