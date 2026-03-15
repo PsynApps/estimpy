@@ -40,6 +40,7 @@
 - Audio export config profiles: `audio-wav` (24-bit PCM) and `audio-flac` (lossless) for common lossless export scenarios
 - FLAC metadata support (read/write via mutagen) including Vorbis comments and embedded cover art
 - Frequency transform (`audio.frequency.scale`, `audio.frequency.shift`) for shifting and/or scaling audio frequency content via STFT-based bin manipulation, preserving duration. Scale multiplies all frequencies (preserves harmonic relationships); shift adds a constant Hz offset (changes harmonic relationships). Both can be combined (scale applied first). Content pushed above Nyquist or below 0 Hz is discarded.
+- Player now respects CLI audio processing parameters: frequency transform and amplitude ramp are applied when loading files (including playlist navigation), and stereo stim activates the player's SS toggle with filtered audio. The player's real-time ramp (G key) layers on top of any CLI-applied ramp.
 - Automated test suite (308 tests) covering audio loading, DSP analysis, configuration, CLI, metadata, and utilities
 
 ### Changed

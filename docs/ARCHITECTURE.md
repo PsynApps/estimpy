@@ -89,8 +89,8 @@ tests/
 - **Dependents:** audio (auto-loads metadata), export (embeds album art in videos and audio), cli (save-metadata and save-audio commands).
 
 ### `player/player.py` — Playback State Machine
-- **Responsibility:** Manage playlist, playback state, per-channel volume/mute, repeat modes (`none`/`one`/`all`), seeking.
-- **Key class:** `Player` — orchestrates `player.audio` (sound) and `player.window` (GUI).
+- **Responsibility:** Manage playlist, playback state, per-channel volume/mute, repeat modes (`none`/`one`/`all`), seeking, and applying the non-interactive audio processing chain (frequency transform, ramp) to files on load.
+- **Key class:** `Player` — orchestrates `player.audio` (sound) and `player.window` (GUI). The `_process_audio()` method applies frequency transform and ramp to each file when loaded; stereo stim is handled separately via the window's interactive SS toggle.
 - **Dependencies:** player.audio, player.window (lazy import to avoid circular dependency).
 
 ### `player/audio.py` — Pygame Audio Engine
@@ -101,7 +101,7 @@ tests/
 ### `player/window.py` — Qt Player GUI
 - **Responsibility:** PyQt6 main window with visualization widget, playback controls, volume sliders, waveform scrubber, zoom controls, oscilloscope duration controls, keyboard shortcuts, fullscreen.
 - **Key classes:** `PlayerWindow(QMainWindow)`, `VisualizationWidget(QWidget)`.
-- **Notable:** Frame updates driven by QTimer. Overrides VideoVisualization settings to use display config (not export config). Supports triphase toggle, file drag-and-drop via playlist dialog.
+- **Notable:** Frame updates driven by QTimer. Overrides VideoVisualization settings to use display config (not export config). Supports triphase toggle, file drag-and-drop via playlist dialog. SS toggle saves/restores the pre-SS `Audio` object (not just a file path) so that processed audio (frequency transform, ramp) is preserved when toggling SS on/off.
 - **Dependencies:** PyQt6, visualization, player.
 
 ## Data Flow
@@ -119,6 +119,8 @@ sequenceDiagram
 
     CLI->>Audio: Audio(file="song.mp3")
     Note over Audio: pydub → numpy float32
+    CLI->>Audio: _process_audio(): freq transform, ramp
+    CLI->>Audio: with_stereo_stim() (if -ss)
     CLI->>Engine: load(es_audio)
     CLI->>Window: PlayerWindow(player, es_audio)
     Window->>Viz: VideoVisualization(es_audio)

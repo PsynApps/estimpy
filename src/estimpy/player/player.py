@@ -23,8 +23,15 @@ class Player:
         if not self._audio_files:
             return
 
-        # Estim audio of current file
+        # Estim audio of current file — apply the non-interactive processing chain
         self._es_audio = es.audio.Audio(file=self._audio_files[self._current_file]) #  type: es.audio.Audio
+        self._es_audio = self._process_audio(self._es_audio)
+
+        # Apply stereo stim if enabled from CLI so the player starts with filtered audio
+        ss_pre_audio = None
+        if es.cfg['audio.stereo-stim.enabled']:
+            ss_pre_audio = self._es_audio
+            self._es_audio = self._es_audio.with_stereo_stim()
 
         self._channel_muted = [False] * self._es_audio.channels  # type: typing.List[bool]
         self._channel_volumes = [es.cfg['player.volume-start']] * self._es_audio.channels  # type: typing.List[float]
@@ -38,6 +45,9 @@ class Player:
         # Lazy import to avoid circular dependency (player is imported before visualization in __init__.py)
         from estimpy.player.window import PlayerWindow
         self._window = PlayerWindow(player=self, es_audio=self._es_audio)
+        # Set the window's pre-SS audio reference so toggling SS off can restore processed (but unfiltered) audio
+        if ss_pre_audio is not None:
+            self._window._ss_pre_audio = ss_pre_audio
 
     def get_audio_files(self) -> list:
         """Return the playlist file paths."""
@@ -217,6 +227,25 @@ class Player:
         if self._window:
             self._window.update_playlist()
 
+    def _process_audio(self, es_audio: es.audio.Audio) -> es.audio.Audio:
+        """Apply the non-interactive audio processing chain.
+
+        Applies frequency transform and amplitude ramp to the audio data.
+        These are "baked in" transformations that modify the audio data itself.
+        Stereo stim is NOT applied here — it is handled by the player's SS toggle
+        so the user can enable/disable it interactively.
+
+        :param es_audio: Raw audio to process.
+        :return Audio: Processed audio (may be the same instance if no transforms apply).
+        """
+        if es.cfg['audio.frequency.scale'] != 1 or es.cfg['audio.frequency.shift'] != 0:
+            es_audio = es_audio.with_frequency_transform()
+
+        if es.cfg['audio.ramp.level'] > 0:
+            es_audio = es_audio.with_ramp()
+
+        return es_audio
+
     def set_audio(self, es_audio: es.audio.Audio = None, file_index: int = None) -> None:
         """Load a new audio source, either from an Audio object or a playlist index."""
         was_playing = self.is_playing()
@@ -229,8 +258,13 @@ class Player:
         elif -len(self._audio_files) <= file_index < len(self._audio_files):
             es_audio = es.audio.Audio(file=self._audio_files[file_index])
             if es_audio:
-                self._es_audio = es_audio
+                self._es_audio = self._process_audio(es_audio)
                 self._current_file = file_index
+
+                # Apply stereo stim if enabled so the new file starts filtered
+                if es.cfg['audio.stereo-stim.enabled'] and self._window:
+                    self._window._ss_pre_audio = self._es_audio
+                    self._es_audio = self._es_audio.with_stereo_stim()
 
         # Resize channel state lists if the channel count changed
         new_channels = self._es_audio.channels
