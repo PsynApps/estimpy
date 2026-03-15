@@ -397,6 +397,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._dr_buffer_initialized = False
         self._dr_prev_window_min = None
         self._dr_scroll_accumulator = 0.0
+        self._dr_saved_position_lines = []
         self._dr_saved_regions = []
         self._dr_overlay_underlay = {}
         self._dr_time_text_cache = {}
@@ -461,15 +462,16 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
         if not self._dr_buffer_initialized:
             # Full re-render of all panels (first frame or after zoom change).
-            # Restore any previous overlays first -- position lines drawn on the
-            # scrub panels are baked into the frame buffer and must be erased
-            # before re-rendering, since scrub panels are not repainted here.
+            # Restore all layers first -- overlays drawn on the scrub panels
+            # are baked into the frame buffer and must be erased before
+            # re-rendering, since scrub panels are not repainted here.
             self._dr_restore_overlay_regions()
             self._dr_restore_axis_underlay()
+            self._dr_restore_position_line_regions()
             self._dr_render_full_panels(window_min, window_max)
             self._dr_buffer_initialized = True
         else:
-            # Subsequent frames: restore previous overlays, then shift or re-render
+            # Subsequent frames: restore all layers, then shift or re-render
             if _profiling:
                 t0 = time.perf_counter()
             self._dr_restore_overlay_regions()
@@ -478,6 +480,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
                 t0 = time.perf_counter()
             self._dr_restore_axis_underlay()
+            self._dr_restore_position_line_regions()
             if _profiling:
                 self._dr_profile_times['restore_axis'] += time.perf_counter() - t0
 
@@ -508,7 +511,15 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                 if _profiling:
                     self._dr_profile_times['paint_strips'] += time.perf_counter() - t0
 
-        # Apply axis overlay (layer 1 -> 2)
+        # Position lines (layer 1 -> 2): drawn on clean data, behind axes and all overlays
+        if _profiling:
+            t0 = time.perf_counter()
+        self._dr_save_position_line_regions(t, axes_xlim)
+        self._dr_draw_position_lines(t, axes_xlim)
+        if _profiling:
+            self._dr_profile_times['draw_lines'] += time.perf_counter() - t0
+
+        # Axis overlay (layer 2 -> 3): axes, ticks, channel labels stamp on top of position lines
         if _profiling:
             t0 = time.perf_counter()
         self._dr_save_axis_underlay()
@@ -520,14 +531,13 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         if _profiling:
             self._dr_profile_times['apply_axis'] += time.perf_counter() - t0
 
-        # Apply overlays (layer 2 -> 3): oscilloscope, position lines, time text
+        # Dynamic overlays (layer 3 -> 4): oscilloscope, time text, SS badge
         if _profiling:
             t0 = time.perf_counter()
         self._dr_save_overlay_regions(t, axes_xlim)
         if _profiling:
             self._dr_profile_times['save_overlays'] += time.perf_counter() - t0
 
-        # Oscilloscope overlays (drawn before position lines so lines appear on top)
         if self._osc_enabled:
             if _profiling:
                 t0 = time.perf_counter()
@@ -535,12 +545,6 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                 self._dr_osc_draw(ch, t)
             if _profiling:
                 self._dr_profile_times['draw_oscilloscope'] += time.perf_counter() - t0
-
-        if _profiling:
-            t0 = time.perf_counter()
-        self._dr_draw_position_lines(t, axes_xlim)
-        if _profiling:
-            self._dr_profile_times['draw_lines'] += time.perf_counter() - t0
 
         if self._dr_time_enabled and self._handles['time'] is not None:
             if _profiling:
@@ -743,9 +747,9 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             ys, xs = self._dr_overlay_indices[key]
             self._dr_frame_buffer[ys, xs] = self._dr_overlay_values[key]
 
-    def _dr_save_overlay_regions(self, t, axes_xlim):
-        """Save pixel regions under position lines and time text before drawing."""
-        self._dr_saved_regions = []
+    def _dr_save_position_line_regions(self, t, axes_xlim):
+        """Save pixel regions under position lines before drawing them."""
+        self._dr_saved_position_lines = []
         half_lw = self._position_line_width_px // 2
         xlim_min, xlim_max = axes_xlim
         xlim_range = xlim_max - xlim_min
@@ -761,18 +765,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                 x_end = min(x1, x_px + half_lw + 1)
                 if x_start < x_end:
                     saved = self._dr_frame_buffer[y0:y1, x_start:x_end].copy()
-                    self._dr_saved_regions.append((y0, y1, x_start, x_end, saved))
-
-        # Oscilloscope box regions
-        self._dr_osc_boxes = {}
-        if self._osc_enabled:
-            for ch, _ in self._channel_layout:
-                box = self._dr_osc_compute_box(ch)
-                if box is not None:
-                    self._dr_osc_boxes[ch] = box
-                    bx0, by0, bx1, by1 = box
-                    saved = self._dr_frame_buffer[by0:by1, bx0:bx1].copy()
-                    self._dr_saved_regions.append((by0, by1, bx0, bx1, saved))
+                    self._dr_saved_position_lines.append((y0, y1, x_start, x_end, saved))
 
         # Scrub panel position lines
         if self.es_audio.length > 0:
@@ -785,7 +778,28 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
                 x_end = min(x1, x_px + half_lw + 1)
                 if x_start < x_end:
                     saved = self._dr_frame_buffer[y0:y1, x_start:x_end].copy()
-                    self._dr_saved_regions.append((y0, y1, x_start, x_end, saved))
+                    self._dr_saved_position_lines.append((y0, y1, x_start, x_end, saved))
+
+    def _dr_restore_position_line_regions(self):
+        """Restore pixel regions saved from previous frame's position lines."""
+        for y0, y1, x_start, x_end, saved_pixels in self._dr_saved_position_lines:
+            self._dr_frame_buffer[y0:y1, x_start:x_end] = saved_pixels
+        self._dr_saved_position_lines = []
+
+    def _dr_save_overlay_regions(self, t, axes_xlim):
+        """Save pixel regions under oscilloscope, time text, and SS badge before drawing."""
+        self._dr_saved_regions = []
+
+        # Oscilloscope box regions
+        self._dr_osc_boxes = {}
+        if self._osc_enabled:
+            for ch, _ in self._channel_layout:
+                box = self._dr_osc_compute_box(ch)
+                if box is not None:
+                    self._dr_osc_boxes[ch] = box
+                    bx0, by0, bx1, by1 = box
+                    saved = self._dr_frame_buffer[by0:by1, bx0:bx1].copy()
+                    self._dr_saved_regions.append((by0, by1, bx0, bx1, saved))
 
         # SS badge region (save before time text so badge region is restored cleanly)
         if self._dr_ss_enabled and self._dr_ss_badge is not None:
