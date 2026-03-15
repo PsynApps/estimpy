@@ -218,9 +218,20 @@ class Audio:
     def with_frequency_transform(self) -> 'Audio':
         """Create a new Audio with frequency content shifted and/or scaled.
 
-        Uses STFT-based bin manipulation to transform frequency content while
-        preserving duration. When both scale and shift are active, scaling is
-        applied first (f → f*scale), then shifting (f → f + shift).
+        Uses two complementary techniques to transform frequency content while
+        preserving duration:
+
+        - **Scale** (f → f × scale): Full-signal FFT with forward bin mapping.
+          Each source bin's complex coefficient is distributed to the scaled target
+          position, preserving both magnitude and phase. Harmonic relationships are
+          maintained.
+
+        - **Shift** (f → f + shift): Hilbert transform / single-sideband (SSB)
+          modulation. Multiplies the analytic signal by exp(j·2π·Δf·t), which
+          translates all frequency content by a constant offset. Harmonic
+          relationships are NOT preserved (intervals change).
+
+        When both are active, scaling is applied first, then shifting.
 
         Transform parameters are read from config:
         - audio.frequency.scale: multiplicative factor (1 = no change)
@@ -236,51 +247,40 @@ class Audio:
         if scale == 1 and shift == 0:
             return self
 
-        # STFT parameters — use a large window for good frequency resolution
-        nperseg = min(4096, self._sample_count)
-        noverlap = nperseg * 3 // 4
-        freq_resolution = self._sample_rate / nperseg
-
-        # Convert shift from Hz to bins
-        shift_bins = shift / freq_resolution
-
         transformed_channels = []
 
         for ch in range(self._channels):
-            f, t, Zxx = scipy.signal.stft(
-                self._data[ch], fs=self._sample_rate,
-                nperseg=nperseg, noverlap=noverlap)
+            channel_data = self._data[ch]
 
-            n_freq = Zxx.shape[0]
-            new_Zxx = np.zeros_like(Zxx)
+            # Step 1: Frequency scaling via FFT forward bin mapping
+            if scale != 1:
+                X = scipy.fft.rfft(channel_data)
+                n_bins = len(X)
+                Y = np.zeros(n_bins, dtype=np.complex128)
 
-            for i in range(n_freq):
-                # Reverse map: output bin i came from source bin (i - shift_bins) / scale
-                source_bin = (i - shift_bins) / scale if scale != 0 else n_freq
-                if source_bin < 0 or source_bin >= n_freq - 1:
-                    continue
+                src_bins = np.arange(n_bins)
+                targets = src_bins * scale
+                valid = targets < n_bins
+                src_valid = src_bins[valid]
+                targets_valid = targets[valid]
+                low_bins = targets_valid.astype(int)
+                fracs = targets_valid - low_bins
 
-                # Linear interpolation between adjacent source bins
-                low = int(source_bin)
-                high = low + 1
-                frac = source_bin - low
+                np.add.at(Y, low_bins, (1 - fracs) * X[src_valid])
 
-                if high < n_freq:
-                    new_Zxx[i] = (1 - frac) * Zxx[low] + frac * Zxx[high]
-                else:
-                    new_Zxx[i] = Zxx[low]
+                high_bins = low_bins + 1
+                high_valid = high_bins < n_bins
+                np.add.at(Y, high_bins[high_valid], fracs[high_valid] * X[src_valid[high_valid]])
 
-            _, reconstructed = scipy.signal.istft(
-                new_Zxx, fs=self._sample_rate,
-                nperseg=nperseg, noverlap=noverlap)
+                channel_data = scipy.fft.irfft(Y, n=self._sample_count).astype(np.float32)
 
-            # ISTFT may produce slightly different length — trim or pad to match
-            if len(reconstructed) >= self._sample_count:
-                reconstructed = reconstructed[:self._sample_count]
-            else:
-                reconstructed = np.pad(reconstructed, (0, self._sample_count - len(reconstructed)))
+            # Step 2: Frequency shifting via Hilbert SSB modulation
+            if shift != 0:
+                t = np.arange(self._sample_count) / self._sample_rate
+                analytic = scipy.signal.hilbert(channel_data)
+                channel_data = np.real(analytic * np.exp(1j * 2 * np.pi * shift * t)).astype(np.float32)
 
-            transformed_channels.append(reconstructed.astype(np.float32))
+            transformed_channels.append(channel_data)
 
         transformed = np.ascontiguousarray(np.vstack(transformed_channels))
 

@@ -54,8 +54,8 @@ tests/
 
 ### `audio.py` — Audio Data
 - **Responsibility:** Load audio files (via pydub/ffmpeg), normalize to float32 `[-1, 1]`, expose as numpy arrays shaped `(channels, samples)`.
-- **Key class:** `Audio` — properties: `data`, `data_raw`, `sample_rate`, `channels`, `length`, `metadata`. Methods: `with_frequency_transform()` (STFT-based frequency shift/scale), `with_ramp()` (amplitude ramp), `with_stereo_stim()` (bandpass safety filter), `with_triphase()` (derive 3rd channel as `-(A+B)`), `resample()`.
-- **Dependencies:** pydub, numpy, scipy (resampling, STFT, filtering).
+- **Key class:** `Audio` — properties: `data`, `data_raw`, `sample_rate`, `channels`, `length`, `metadata`. Methods: `with_frequency_transform()` (FFT bin mapping for scale, Hilbert SSB for shift), `with_ramp()` (amplitude ramp), `with_stereo_stim()` (bandpass safety filter), `with_triphase()` (derive 3rd channel as `-(A+B)`), `resample()`.
+- **Dependencies:** pydub, numpy, scipy (resampling, FFT, Hilbert transform, filtering).
 - **Dependents:** analysis, visualization, player, export, metadata.
 
 ### `analysis.py` — DSP Engine
