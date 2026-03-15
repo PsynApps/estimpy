@@ -47,9 +47,9 @@ Many commercial Estim units support custom stimulation signals using audio input
 - **Animated visualization**: Generates an animated sliding visualization of the audio file
   - **Video file export**: Animated visualization can be saved to a video file using a direct frame rendering pipeline
   - **Interactive player**: Animated visualization used within the Qt-based audio file player
-- **Audio export**: Exports processed audio files with the full processing chain applied (amplitude ramp, stereo stim filtering), generates a visualization image, and embeds it as album art with metadata tags
-  - **Configurable output format**: Supports MP3 (default), WAV, FLAC, and any other format supported by FFmpeg via `audio.export.*` config keys
-  - **Included profiles**: `audio-wav` (24-bit PCM) and `audio-flac` (lossless) config profiles for common lossless export scenarios
+- **Audio export**: Exports processed audio files with the full processing chain applied (frequency transform, amplitude ramp, stereo stim filtering), generates a visualization image, and embeds it as album art with metadata tags
+  - **Automatic format detection**: Output format is inferred from the output file extension, or matches the input format when no output file is specified. Supports MP3, WAV, FLAC, M4A/AAC, OGG, and Opus.
+  - **Included profiles**: `audio-mp3` (highest quality VBR), `audio-wav` (24-bit PCM), and `audio-flac` (lossless) config profiles for common export scenarios
 - **Audio player**: Plays Estim audio files for use with estim devices (***HIGHLY EXPERIMENTAL!***)
   - **Real-time visualization**: Based on the animated visualization
   - **Separate channel output control**: Allows signal gain of each channel to be independently controlled
@@ -192,7 +192,7 @@ If no command is given, the player is launched. If no files are given, a file di
 | `show-image`      | Display an interactive window with the image visualization of the input file(s)                                    |
 | `save-image`      | Save an image file with visualization of the input file(s). Output uses the same base name as the input file.      |
 | `save-video`      | Save a video file with an animated visualization. Output uses the input file as the audio track.                   |
-| `save-audio`      | Save processed audio file(s) with the audio processing chain applied (amplitude ramp, stereo stim). Generates a visualization image and embeds it as album art along with metadata tags. Output format is configurable via `audio.export.*` config keys. |
+| `save-audio`      | Save processed audio file(s) with the audio processing chain applied (frequency transform, amplitude ramp, stereo stim). Output format is autodetected from the `-o` file extension or matches the input format. Generates a visualization image and embeds it as album art along with metadata tags. |
 | `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, m4a, and flac files. |
 | `benchmark`       | Benchmark video encoding across all video profiles and display a comparison table of performance and file size. Supports `-o` to keep encoded files (named `benchmark-YYYYMMDDHHMMSS-profile.ext`) and `-c` to benchmark a specific combination of profiles instead of all video profiles (the `video-` prefix may be omitted). |
 
@@ -278,12 +278,17 @@ These options are only available on `save-video`:
   estimpy save-metadata ../library/* -r
   ```
 
-- **Save processed audio with stereo stim filtering applied**
+- **Save processed audio with stereo stim filtering applied** (output matches input format)
   ```
   estimpy save-audio input.mp3 -ss
   ```
 
-- **Save processed audio as FLAC with amplitude ramp**
+- **Save processed audio as FLAC** (autodetected from output extension)
+  ```
+  estimpy save-audio input.mp3 -o output.flac
+  ```
+
+- **Save processed audio as FLAC with amplitude ramp** (using config profile)
   ```
   estimpy save-audio input.mp3 -c audio-flac -co audio.ramp.level 50
   ```
@@ -350,6 +355,7 @@ The following additional configuration profiles are included with **EstimPy**:
 | Profile Name         | Description                                                    |
 |----------------------|----------------------------------------------------------------|
 | `default`            | The default base configuration (loaded automatically)          |
+| `audio-mp3`                 | Export audio as MP3 (highest quality VBR)                            |
 | `audio-flac`                | Export audio as FLAC (lossless)                                      |
 | `audio-wav`                 | Export audio as WAV (24-bit PCM, lossless)                           |
 | `image-4k-square`           | Generate image visualization in 4K with a square aspect ratio        |
@@ -416,9 +422,8 @@ For reference, the default configuration options and values are as follows:
 
 | Configuration Option                                         | Value                                        |
 |--------------------------------------------------------------|----------------------------------------------|
-| audio.export.codec                                           | libmp3lame                                   |
-| audio.export.ffmpeg-extra-args.-q:a                          | 0                                            |
-| audio.export.format                                          | mp3                                          |
+| audio.export.codec                                           | None (auto)                                  |
+| audio.export.format                                          | None (auto)                                  |
 | audio.export.sample-rate                                     | None                                         |
 | audio.frequency.scale                                        | 1                                            |
 | audio.frequency.shift                                        | 0                                            |

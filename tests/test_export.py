@@ -1,8 +1,188 @@
 import math
+import os
+from unittest.mock import patch
 
 import pytest
 
 import estimpy as es
+from estimpy.export import (
+    _resolve_audio_codec, _resolve_audio_format, _resolve_audio_extra_args,
+    _resolve_video_audio_codec, _is_audio_modified,
+    _EXTENSION_CODEC_MAP, _CODEC_FORMAT_MAP, _AUTO_QUALITY_ARGS,
+    _CONTAINER_SAFE_AUDIO_CODECS,
+)
+
+
+class TestResolveAudioCodec:
+    """Tests for auto-resolving audio codec from config, extension, or source file."""
+
+    def test_explicit_config_wins(self, synthetic_stereo_audio):
+        es.cfg['audio.export.codec'] = 'libvorbis'
+        assert _resolve_audio_codec(synthetic_stereo_audio) == 'libvorbis'
+
+    def test_output_extension_mp3(self, synthetic_stereo_audio):
+        assert _resolve_audio_codec(synthetic_stereo_audio, output_file='out.mp3') == 'libmp3lame'
+
+    def test_output_extension_flac(self, synthetic_stereo_audio):
+        assert _resolve_audio_codec(synthetic_stereo_audio, output_file='out.flac') == 'flac'
+
+    def test_output_extension_wav(self, synthetic_stereo_audio):
+        assert _resolve_audio_codec(synthetic_stereo_audio, output_file='out.wav') == 'pcm_s24le'
+
+    def test_output_extension_m4a(self, synthetic_stereo_audio):
+        assert _resolve_audio_codec(synthetic_stereo_audio, output_file='out.m4a') == 'aac'
+
+    def test_output_extension_ogg(self, synthetic_stereo_audio):
+        assert _resolve_audio_codec(synthetic_stereo_audio, output_file='out.ogg') == 'libvorbis'
+
+    def test_output_extension_opus(self, synthetic_stereo_audio):
+        assert _resolve_audio_codec(synthetic_stereo_audio, output_file='out.opus') == 'libopus'
+
+    def test_source_file_detection(self):
+        """When no config or output extension, detect from source file."""
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        assert _resolve_audio_codec(audio) == 'libmp3lame'
+
+    def test_fallback_to_libmp3lame(self, synthetic_stereo_audio):
+        """When nothing else works, fall back to libmp3lame."""
+        assert _resolve_audio_codec(synthetic_stereo_audio) == 'libmp3lame'
+
+    def test_explicit_config_overrides_extension(self, synthetic_stereo_audio):
+        es.cfg['audio.export.codec'] = 'flac'
+        assert _resolve_audio_codec(synthetic_stereo_audio, output_file='out.mp3') == 'flac'
+
+    def test_extension_map_completeness(self):
+        """All extension map entries should resolve to known codecs."""
+        for ext, codec in _EXTENSION_CODEC_MAP.items():
+            assert isinstance(codec, str) and len(codec) > 0
+
+
+class TestResolveAudioFormat:
+
+    def test_explicit_config_wins(self, synthetic_stereo_audio):
+        es.cfg['audio.export.format'] = 'ogg'
+        assert _resolve_audio_format(synthetic_stereo_audio, codec='libvorbis') == 'ogg'
+
+    def test_infer_from_codec(self, synthetic_stereo_audio):
+        assert _resolve_audio_format(synthetic_stereo_audio, codec='flac') == 'flac'
+        assert _resolve_audio_format(synthetic_stereo_audio, codec='libmp3lame') == 'mp3'
+        assert _resolve_audio_format(synthetic_stereo_audio, codec='aac') == 'm4a'
+        assert _resolve_audio_format(synthetic_stereo_audio, codec='pcm_s24le') == 'wav'
+
+    def test_source_file_extension(self):
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        # Unknown codec → falls through to source extension
+        assert _resolve_audio_format(audio, codec='unknown_codec') == 'mp3'
+
+    def test_fallback_to_mp3(self, synthetic_stereo_audio):
+        assert _resolve_audio_format(synthetic_stereo_audio, codec='unknown_codec') == 'mp3'
+
+    def test_codec_format_map_completeness(self):
+        """Every codec that can be resolved should have a format mapping."""
+        for codec in _EXTENSION_CODEC_MAP.values():
+            assert codec in _CODEC_FORMAT_MAP, f'{codec} missing from _CODEC_FORMAT_MAP'
+
+
+class TestResolveAudioExtraArgs:
+
+    def test_explicit_config_args(self):
+        es.cfg['audio.export.ffmpeg-extra-args.-b:a'] = '320k'
+        args = _resolve_audio_extra_args('libmp3lame')
+        assert '-b:a' in args
+        assert '320k' in args
+
+    def test_auto_quality_for_mp3(self):
+        args = _resolve_audio_extra_args('libmp3lame')
+        assert args == ['-q:a', '0']
+
+    def test_auto_quality_for_aac(self):
+        args = _resolve_audio_extra_args('aac')
+        assert args == ['-b:a', '256k']
+
+    def test_auto_quality_for_flac(self):
+        args = _resolve_audio_extra_args('flac')
+        assert args == []
+
+    def test_auto_quality_for_pcm(self):
+        args = _resolve_audio_extra_args('pcm_s24le')
+        assert args == []
+
+    def test_auto_quality_for_unknown_codec(self):
+        args = _resolve_audio_extra_args('some_unknown_codec')
+        assert args == []
+
+
+class TestIsAudioModified:
+
+    def test_unmodified(self):
+        assert not _is_audio_modified()
+
+    def test_stereo_stim(self):
+        es.cfg['audio.stereo-stim.enabled'] = True
+        assert _is_audio_modified()
+
+    def test_ramp(self):
+        es.cfg['audio.ramp.level'] = 50
+        assert _is_audio_modified()
+
+    def test_frequency_scale(self):
+        es.cfg['audio.frequency.scale'] = 2
+        assert _is_audio_modified()
+
+    def test_frequency_shift(self):
+        es.cfg['audio.frequency.shift'] = 100
+        assert _is_audio_modified()
+
+
+class TestResolveVideoAudioCodec:
+
+    def test_unmodified_mp3_stream_copy(self):
+        """Unmodified MP3 in MP4 should stream copy (MP3 is MP4-safe)."""
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        args = _resolve_video_audio_codec(audio)
+        assert args == ['-c:a', 'copy']
+
+    def test_modified_audio_uses_aac_default(self):
+        """Modified audio with no explicit codec should use AAC for MP4."""
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        es.cfg['audio.stereo-stim.enabled'] = True
+        args = _resolve_video_audio_codec(audio)
+        assert args == ['-c:a', 'aac']
+
+    def test_modified_audio_explicit_compatible_codec(self):
+        """Modified audio with explicit MP4-compatible codec should use it."""
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        es.cfg['audio.stereo-stim.enabled'] = True
+        es.cfg['audio.export.codec'] = 'libmp3lame'
+        args = _resolve_video_audio_codec(audio)
+        assert args == ['-c:a', 'libmp3lame']
+
+    def test_modified_audio_explicit_incompatible_codec_falls_back(self, capsys):
+        """Modified audio with FLAC codec in MP4 should fall back to AAC with warning."""
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        es.cfg['audio.stereo-stim.enabled'] = True
+        es.cfg['audio.export.codec'] = 'flac'
+        args = _resolve_video_audio_codec(audio)
+        assert args == ['-c:a', 'aac']
+        captured = capsys.readouterr()
+        assert 'not widely supported' in captured.out
+
+    def test_unmodified_incompatible_codec_reencodes(self, capsys):
+        """Unmodified audio with incompatible source codec should re-encode."""
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        # Simulate a FLAC source by mocking the detection
+        with patch('estimpy.export._detect_source_audio_codec', return_value='flac'):
+            args = _resolve_video_audio_codec(audio)
+        assert args == ['-c:a', 'aac']
+        captured = capsys.readouterr()
+        assert 'Re-encoding' in captured.out
+
+    def test_frequency_transform_counts_as_modified(self):
+        """Frequency transform should trigger re-encoding."""
+        audio = es.audio.Audio(file=os.path.join(os.path.dirname(__file__), 'input', 'test.mp3'))
+        es.cfg['audio.frequency.scale'] = 2
+        args = _resolve_video_audio_codec(audio)
+        assert args == ['-c:a', 'aac']
 
 
 class TestSegmentCalculations:

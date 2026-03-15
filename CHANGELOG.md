@@ -36,12 +36,14 @@
 - Benchmark audio generator script (`tests/generate_benchmark.py`)
 - Stereo stim mode (`-ss`/`--stereo-stim`) applying a bandpass filter (configurable `audio.stereo-stim.high-pass` and `.low-pass`) to remove DC offset, subsonic content, and high-frequency artifacts before playback or export, with an SS badge overlay on exported videos, a toggle button (S key) in the player, and automatic audio re-encoding in the original codec during video export
 - Amplitude ramp (`audio.ramp.level`, `audio.ramp.shape`) that gradually increases audio amplitude from a reduced level at the start of the file to full amplitude at the end, with configurable exponential easing curve shape; applied to exported audio and available as a real-time player control (G key to start/restart, with level and shape sliders)
-- `save-audio` CLI command for exporting processed audio files with the full processing chain applied (amplitude ramp → stereo stim), with configurable output format via `audio.export.*` config keys (codec, format, sample-rate, ffmpeg-extra-args), automatic visualization album art generation, and metadata embedding
-- Audio export config profiles: `audio-wav` (24-bit PCM) and `audio-flac` (lossless) for common lossless export scenarios
+- `save-audio` CLI command for exporting processed audio files with the full processing chain applied (frequency transform → amplitude ramp → stereo stim), with automatic format detection from output file extension or input file format, visualization album art generation, and metadata embedding
+- Audio export format autodetection: output codec and format are inferred from the `-o` file extension (e.g., `-o song.flac` encodes as FLAC without loading a profile), or from the source file's codec when no output is specified. Explicit `audio.export.codec`/`audio.export.format` config values override autodetection.
+- Audio export config profiles: `audio-mp3` (highest quality VBR), `audio-wav` (24-bit PCM), and `audio-flac` (lossless)
+- Container-aware video audio encoding: video export checks audio codec compatibility with the video container format (e.g., MP4). Incompatible codecs (like FLAC in MP4) are automatically re-encoded as AAC with a user-visible message. Unmodified audio with a compatible codec is stream-copied without re-encoding.
 - FLAC metadata support (read/write via mutagen) including Vorbis comments and embedded cover art
-- Frequency transform (`audio.frequency.scale`, `audio.frequency.shift`) for shifting and/or scaling audio frequency content via STFT-based bin manipulation, preserving duration. Scale multiplies all frequencies (preserves harmonic relationships); shift adds a constant Hz offset (changes harmonic relationships). Both can be combined (scale applied first). Content pushed above Nyquist or below 0 Hz is discarded.
+- Frequency transform (`audio.frequency.scale`, `audio.frequency.shift`) for shifting and/or scaling audio frequency content, preserving duration. Scale uses FFT forward bin mapping to multiply all frequencies (preserves harmonic relationships); shift uses Hilbert SSB modulation to add a constant Hz offset (changes harmonic relationships). Both can be combined (scale applied first). Content pushed above Nyquist or below 0 Hz is discarded.
 - Player now respects CLI audio processing parameters: frequency transform and amplitude ramp are applied when loading files (including playlist navigation), and stereo stim activates the player's SS toggle with filtered audio. The player's real-time ramp (G key) layers on top of any CLI-applied ramp.
-- Automated test suite (308 tests) covering audio loading, DSP analysis, configuration, CLI, metadata, and utilities
+- Automated test suite (342 tests) covering audio loading, DSP analysis, configuration, CLI, metadata, export, and utilities
 
 ### Changed
 - Video encoding config keys moved from `visualization.video.export.*` to `video.export.*` (codec, format, fps, segment-length, keyframe-interval, preview.*, reencode-segments, video-length-max, ffmpeg-extra-args). Visualization-appearance keys (size, triphase, time.*, title.*, oscilloscope.*, window-length) remain under `visualization.video.export.*`. All config profiles updated accordingly.
@@ -74,6 +76,8 @@
 - Refactored `visualization.py` into a `visualization/` subpackage with separate modules: `base.py` (static images), `video.py` (direct render pipeline), `oscilloscope.py` (waveform overlay mixin)
 - `write_video()` returns a result dict (`file`, `encoding_fps`, `total_frames`, `encoding_time`, `file_size`) instead of a plain file path, providing encoding statistics to callers
 - Font face index for TTC files now stored as derived config key (`visualization.style.font.text.face-index`) instead of a module-level variable
+- Audio export defaults changed from hardcoded `libmp3lame`/`mp3` to auto-detection (`audio.export.codec` and `audio.export.format` default to `~`/null), with context-aware resolution: output file extension → source file codec → `libmp3lame`/`mp3` fallback
+- Video export audio handling replaced inline codec logic with container-aware resolution: unmodified audio with a compatible codec is stream-copied; modified or incompatible audio is re-encoded using AAC (for MP4/MOV) with a user-visible message
 
 ### Removed
 - Removed `estimpy-visualizer` and `estimpy-player` CLI entry points, replaced by unified `estimpy` command

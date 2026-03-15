@@ -26,6 +26,10 @@ class TestConfigLoading:
         assert 'audio.export.format' in es.cfg
         assert 'audio.export.sample-rate' in es.cfg
 
+    def test_audio_export_defaults_are_auto(self):
+        assert es.cfg['audio.export.codec'] is None
+        assert es.cfg['audio.export.format'] is None
+
     def test_audio_frequency_keys_exist(self):
         assert 'audio.frequency.scale' in es.cfg
         assert 'audio.frequency.shift' in es.cfg

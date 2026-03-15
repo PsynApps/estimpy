@@ -48,13 +48,17 @@ analysis:
 audio:
   # Configuration for audio export
   export:
-    # Audio codec (passed to ffmpeg)
-    codec: libmp3lame
-    # FFmpeg extra arguments (keys are argument name, values are argument values)
-    ffmpeg-extra-args:
-      '-q:a': 0
-    # Output file format / container
-    format: mp3
+    # Audio codec (passed to ffmpeg). If not set (~), automatically determined:
+    # for save-audio, matches the output file extension or the input file's codec;
+    # for video export, uses a container-compatible codec (AAC for MP4/MOV).
+    codec: ~
+    # FFmpeg extra arguments (keys are argument name, values are argument values).
+    # When codec is auto (~), sensible quality defaults are applied per codec.
+    # Explicit args here override the auto defaults.
+    ffmpeg-extra-args: {}
+    # Output file format / container. If not set (~), inferred from the output file
+    # extension or the input file's format.
+    format: ~
     # Output sample rate in Hz. If not set (~), preserves the source sample rate.
     sample-rate: ~
   # Frequency transform — shift and/or scale the frequency content of the audio

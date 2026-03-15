@@ -78,8 +78,9 @@ def main():
     # save-audio
     parser_save_audio = subparsers.add_parser('save-audio',
         help='Save processed audio to file(s)',
-        description='Save audio file(s) with the audio processing chain applied (amplitude ramp, stereo stim). '
-                    'Generates a visualization image and embeds it as album art along with metadata tags.')
+        description='Save audio file(s) with the audio processing chain applied (frequency transform, amplitude ramp, stereo stim). '
+                    'Generates a visualization image and embeds it as album art along with metadata tags. '
+                    'Output format is autodetected: from the -o file extension if specified, otherwise matches the input format.')
     parser_save_audio.add_argument('files', nargs='*', default=None, help='Input audio file(s). Supports wildcards.')
     _add_global_arguments(parser_save_audio)
     _add_save_arguments(parser_save_audio)

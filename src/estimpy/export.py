@@ -14,6 +14,51 @@ import estimpy as es
 # keeping matplotlib element proportions (fonts, lines, ticks) correct via the scale factor
 _EXPORT_DPI = 8
 
+# Maps file extensions to FFmpeg encoder names for audio codec autodetection
+_EXTENSION_CODEC_MAP = {
+    'mp3': 'libmp3lame',
+    'flac': 'flac',
+    'wav': 'pcm_s24le',
+    'm4a': 'aac',
+    'aac': 'aac',
+    'ogg': 'libvorbis',
+    'opus': 'libopus',
+}
+
+# Maps FFmpeg encoder names to their natural file extensions
+_CODEC_FORMAT_MAP = {
+    'libmp3lame': 'mp3',
+    'flac': 'flac',
+    'pcm_s16le': 'wav',
+    'pcm_s24le': 'wav',
+    'pcm_s32le': 'wav',
+    'aac': 'm4a',
+    'libvorbis': 'ogg',
+    'libopus': 'opus',
+}
+
+# Sensible quality defaults applied when codec is auto-resolved and no explicit
+# ffmpeg-extra-args are configured. Keyed by FFmpeg encoder name.
+_AUTO_QUALITY_ARGS = {
+    'libmp3lame': ['-q:a', '0'],
+    'aac': ['-b:a', '256k'],
+    'libvorbis': ['-q:a', '8'],
+    'libopus': ['-b:a', '256k'],
+}
+
+# Audio codecs that are widely supported in each video container format.
+# Codecs not in this set may cause playback issues on some devices/players.
+_CONTAINER_SAFE_AUDIO_CODECS = {
+    'mp4': {'aac', 'libmp3lame', 'mp3', 'ac3', 'eac3'},
+    'mov': {'aac', 'libmp3lame', 'mp3', 'ac3', 'pcm_s16le', 'pcm_s24le', 'pcm_s32le'},
+}
+
+# Default audio codec to use when re-encoding audio for a video container
+_CONTAINER_DEFAULT_AUDIO_CODEC = {
+    'mp4': 'aac',
+    'mov': 'aac',
+}
+
 
 def _build_ffmpeg_extra_args(cfg_prefix: str) -> list:
     """Build an FFmpeg argument list from config keys under the given prefix.
@@ -111,11 +156,10 @@ def _draw_ss_badge_on_image(image_path, fig_width, fig_height, time_enabled, tim
     img.convert('RGB').save(image_path)
 
 
-def _detect_audio_codec(es_audio: es.audio.Audio) -> str:
-    """Detect the appropriate audio encoder for the original file's format.
+def _detect_source_audio_codec(es_audio: es.audio.Audio) -> str | None:
+    """Detect the audio codec of the original source file via FFprobe.
 
-    Uses FFprobe to identify the original codec, then maps it to an FFmpeg encoder name.
-    Falls back to 'aac' for unknown formats.
+    :return str | None: FFmpeg encoder name, or None if detection fails.
     """
     _codec_map = {
         'mp3': 'libmp3lame',
@@ -134,10 +178,143 @@ def _detect_audio_codec(es_audio: es.audio.Audio) -> str:
              '-show_entries', 'stream=codec_name', '-of', 'csv=p=0',
              es_audio.metadata.file],
             capture_output=True, text=True, timeout=10)
-        codec = result.stdout.strip()
-        return _codec_map.get(codec, 'aac')
+        codec = result.stdout.strip().rstrip(',')
+        return _codec_map.get(codec)
     except Exception:
-        return 'aac'
+        return None
+
+
+def _is_audio_modified() -> bool:
+    """Check whether the audio processing chain has modified the audio data."""
+    return (es.cfg['audio.stereo-stim.enabled']
+            or es.cfg['audio.ramp.level'] > 0
+            or es.cfg['audio.frequency.scale'] != 1
+            or es.cfg['audio.frequency.shift'] != 0)
+
+
+def _resolve_audio_codec(es_audio: es.audio.Audio, output_file: str = None) -> str:
+    """Resolve the audio codec to use for encoding.
+
+    Resolution priority:
+    1. Explicit config value (``audio.export.codec`` is not None) — use it.
+    2. Output file extension — infer codec from the extension.
+    3. Source file codec — detect and match the input file's codec.
+    4. Fallback — ``libmp3lame``.
+
+    :param es_audio: Audio instance to detect source codec from.
+    :param output_file: Output file path (used for extension-based inference).
+    :return str: FFmpeg encoder name.
+    """
+    # 1. Explicit config
+    configured = es.cfg['audio.export.codec']
+    if configured is not None:
+        return configured
+
+    # 2. Output file extension
+    if output_file:
+        ext = os.path.splitext(output_file)[1].lstrip('.').lower()
+        if ext in _EXTENSION_CODEC_MAP:
+            return _EXTENSION_CODEC_MAP[ext]
+
+    # 3. Source file codec
+    detected = _detect_source_audio_codec(es_audio)
+    if detected:
+        return detected
+
+    # 4. Fallback
+    return 'libmp3lame'
+
+
+def _resolve_audio_format(es_audio: es.audio.Audio, codec: str) -> str:
+    """Resolve the audio output format (container/extension).
+
+    Resolution priority:
+    1. Explicit config value (``audio.export.format`` is not None) — use it.
+    2. Infer from the resolved codec.
+    3. Source file extension.
+    4. Fallback — ``mp3``.
+
+    :param es_audio: Audio instance to detect source format from.
+    :param codec: The resolved codec (used for format inference).
+    :return str: File extension string (e.g. ``'mp3'``, ``'flac'``).
+    """
+    # 1. Explicit config
+    configured = es.cfg['audio.export.format']
+    if configured is not None:
+        return configured
+
+    # 2. Infer from codec
+    if codec in _CODEC_FORMAT_MAP:
+        return _CODEC_FORMAT_MAP[codec]
+
+    # 3. Source file extension
+    if es_audio.source_file:
+        ext = os.path.splitext(es_audio.source_file)[1].lstrip('.').lower()
+        if ext:
+            return ext
+
+    # 4. Fallback
+    return 'mp3'
+
+
+def _resolve_audio_extra_args(codec: str) -> list:
+    """Resolve FFmpeg extra arguments for audio encoding.
+
+    If explicit ``audio.export.ffmpeg-extra-args`` are configured, those are used.
+    Otherwise, sensible quality defaults are applied based on the codec.
+
+    :param codec: The resolved FFmpeg encoder name.
+    :return list: Flat list of FFmpeg argument strings.
+    """
+    configured_args = _build_ffmpeg_extra_args('audio.export.ffmpeg-extra-args.')
+    if configured_args:
+        return configured_args
+
+    return list(_AUTO_QUALITY_ARGS.get(codec, []))
+
+
+def _resolve_video_audio_codec(es_audio: es.audio.Audio) -> list:
+    """Resolve the audio codec arguments for the video export concat step.
+
+    When audio is unmodified and the source codec is compatible with the video
+    container, stream-copies the audio. Otherwise re-encodes using the configured
+    or container-appropriate codec.
+
+    :param es_audio: Audio instance.
+    :return list: FFmpeg arguments for the audio codec (e.g. ``['-c:a', 'copy']``).
+    """
+    video_format = es.cfg['video.export.format']
+    safe_codecs = _CONTAINER_SAFE_AUDIO_CODECS.get(video_format)
+    container_default = _CONTAINER_DEFAULT_AUDIO_CODEC.get(video_format, 'aac')
+
+    # Check if an explicit audio codec was configured
+    configured_codec = es.cfg['audio.export.codec']
+
+    if not _is_audio_modified():
+        # Audio is unmodified — try to stream copy
+        source_codec = _detect_source_audio_codec(es_audio)
+
+        if safe_codecs is None or source_codec in safe_codecs:
+            # Source codec is compatible (or container has no restrictions) — copy
+            return ['-c:a', 'copy']
+        else:
+            # Source codec isn't container-safe — must re-encode
+            codec_name = source_codec or 'unknown'
+            print(f'Note: Re-encoding audio as {container_default.upper()} '
+                  f'({codec_name} is not widely supported in {video_format.upper()} containers).')
+            return ['-c:a', container_default]
+    else:
+        # Audio was modified — must re-encode
+        if configured_codec is not None:
+            # User explicitly set a codec — check container compatibility
+            if safe_codecs is not None and configured_codec not in safe_codecs:
+                print(f'Warning: {configured_codec} is not widely supported in {video_format.upper()} '
+                      f'containers. Using {container_default} instead.')
+                return ['-c:a', container_default]
+            return ['-c:a', configured_codec]
+        else:
+            # Auto — use container default
+            return ['-c:a', container_default]
 
 
 def write_audio(es_audio: es.audio.Audio, output_path: str = None,
@@ -148,6 +325,10 @@ def write_audio(es_audio: es.audio.Audio, output_path: str = None,
     processing chain) to the configured codec and format. After encoding, generates
     a visualization image and embeds it as album art along with metadata tags.
 
+    When ``audio.export.codec`` and ``audio.export.format`` are auto (None), the
+    codec and format are inferred from the output file extension (if the output path
+    specifies a file), or from the source file's codec and format.
+
     :param es_audio: Audio instance (with processing already applied).
     :param output_path: Output directory or file path.
     :param audio_format: Output format override (default from config).
@@ -155,7 +336,17 @@ def write_audio(es_audio: es.audio.Audio, output_path: str = None,
     :return dict: ``{file, encoding_time, file_size}`` on success, ``None`` on failure.
     """
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
-    audio_format = audio_format if audio_format is not None else es.cfg['audio.export.format']
+
+    # When the output path points to a specific file, use its extension for codec/format
+    # resolution before computing the final output file path
+    output_file_hint = None
+    if output_path and not os.path.isdir(output_path):
+        _, ext = os.path.splitext(output_path)
+        if ext:
+            output_file_hint = output_path
+
+    codec = _resolve_audio_codec(es_audio, output_file=output_file_hint)
+    audio_format = audio_format if audio_format is not None else _resolve_audio_format(es_audio, codec)
 
     output_file = es.utils.get_output_file(
         output_path=output_path,
@@ -172,9 +363,8 @@ def write_audio(es_audio: es.audio.Audio, output_path: str = None,
         return None
 
     # Build FFmpeg command
-    codec = es.cfg['audio.export.codec']
     sample_rate = es.cfg['audio.export.sample-rate']
-    ffmpeg_extra_args = _build_ffmpeg_extra_args('audio.export.ffmpeg-extra-args.')
+    ffmpeg_extra_args = _resolve_audio_extra_args(codec)
 
     cmd = [
         'ffmpeg', '-hide_banner', '-loglevel', 'error', '-y',
@@ -624,10 +814,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
         concat_extra_args = ffmpeg_extra_args
 
     # Determine audio codec — stream copy when possible, re-encode when audio has been modified
-    if es.cfg['audio.stereo-stim.enabled'] or es.cfg['audio.ramp.level'] > 0:
-        audio_codec_args = ['-c:a', _detect_audio_codec(es_audio), '-strict', '-1']
-    else:
-        audio_codec_args = ['-c:a', 'copy', '-strict', '-1']
+    # or when the source codec isn't compatible with the video container
+    audio_codec_args = _resolve_video_audio_codec(es_audio) + ['-strict', '-1']
 
     ffmpeg_command = [
         'ffmpeg',
