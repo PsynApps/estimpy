@@ -26,6 +26,14 @@ class TestConfigLoading:
         assert 'audio.export.format' in es.cfg
         assert 'audio.export.sample-rate' in es.cfg
 
+    def test_audio_frequency_keys_exist(self):
+        assert 'audio.frequency.scale' in es.cfg
+        assert 'audio.frequency.shift' in es.cfg
+
+    def test_audio_frequency_defaults(self):
+        assert es.cfg['audio.frequency.scale'] == 1
+        assert es.cfg['audio.frequency.shift'] == 0
+
     def test_visualization_video_export_keys_are_visual(self):
         """Encoding-mechanic keys should be under video.export, not visualization.video.export."""
         assert 'visualization.video.export.size' in es.cfg

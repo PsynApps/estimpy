@@ -154,11 +154,11 @@ def _add_global_arguments(parser):
     parser.add_argument('-col', '--config-option-list', action='store_true',
         help='List all valid config options and exit.')
     parser.add_argument('--dynamic-range', type=int, metavar='DB',
-        help='Dynamic range to display on spectrogram (in decibels).')
+        help='[Deprecated: use -co visualization.style.spectrogram.dynamic-range DB] Dynamic range to display on spectrogram (in decibels).')
     parser.add_argument('--frequency-min', type=int, metavar='HZ',
-        help='Minimum frequency to display on spectrogram.')
+        help='[Deprecated: use -co analysis.spectrogram.frequency-min HZ] Minimum frequency to display on spectrogram.')
     parser.add_argument('--frequency-max', type=int, metavar='HZ',
-        help='Maximum frequency to display on spectrogram. If not defined, spectrogram will be autoscaled.')
+        help='[Deprecated: use -co analysis.spectrogram.frequency-max HZ] Maximum frequency to display on spectrogram. If not defined, spectrogram will be autoscaled.')
     parser.add_argument('-ss', '--stereo-stim', action='store_true',
         help='Apply stereo stim filters (bandpass 20 Hz–12 kHz) to make audio safer for direct-output stereostim devices.')
 
@@ -207,12 +207,15 @@ def _handle_global_arguments(args):
         es.cfg['files.output.path'] = args['output_path']
 
     if args.get('dynamic_range') is not None:
+        print('Warning: --dynamic-range is deprecated. Use: -co visualization.style.spectrogram.dynamic-range VALUE')
         es.cfg['visualization.style.spectrogram.dynamic-range'] = args['dynamic_range']
 
     if args.get('frequency_min') is not None:
+        print('Warning: --frequency-min is deprecated. Use: -co analysis.spectrogram.frequency-min VALUE')
         es.cfg['analysis.spectrogram.frequency-min'] = args['frequency_min']
 
     if args.get('frequency_max') is not None:
+        print('Warning: --frequency-max is deprecated. Use: -co analysis.spectrogram.frequency-max VALUE')
         es.cfg['analysis.spectrogram.frequency-max'] = args['frequency_max']
 
     # Apply stereo stim mode
@@ -243,12 +246,18 @@ def _get_files(args):
 def _load_audio(file, triphase=False):
     """Load an audio file and apply the audio processing chain.
 
-    Processing order: ramp → stereo stim → triphase. Stereo stim is applied last
-    (before the visualization-only triphase step) to ensure any artifacts introduced
-    by earlier processing are filtered out.
+    Processing order: frequency transform → ramp → stereo stim → triphase.
+    Frequency transform changes the fundamental signal content. Ramp adjusts
+    amplitude over time. Stereo stim is applied last (before the visualization-only
+    triphase step) to ensure any artifacts introduced by earlier processing are
+    filtered out.
     """
     with es.utils.Spinner(f'Loading file {file}... '):
         es_audio = es.audio.Audio(file=file)
+
+    if es.cfg['audio.frequency.scale'] != 1 or es.cfg['audio.frequency.shift'] != 0:
+        with es.utils.Spinner(f'Applying frequency transform... '):
+            es_audio = es_audio.with_frequency_transform()
 
     if es.cfg['audio.ramp.level'] > 0:
         with es.utils.Spinner(f'Applying amplitude ramp... '):

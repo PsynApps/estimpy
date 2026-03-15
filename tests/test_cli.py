@@ -199,3 +199,24 @@ class TestConfigHandling:
         _handle_global_arguments(args)
         assert es.cfg['visualization.image.display.title.enabled'] is False
         assert es.cfg['visualization.video.display.title.enabled'] is False
+
+    def test_deprecated_dynamic_range_warns(self, capsys):
+        args = _parse_args(['play', '--dynamic-range', '60'])
+        _handle_global_arguments(args)
+        assert es.cfg['visualization.style.spectrogram.dynamic-range'] == 60
+        captured = capsys.readouterr()
+        assert 'deprecated' in captured.out.lower()
+
+    def test_deprecated_frequency_min_warns(self, capsys):
+        args = _parse_args(['play', '--frequency-min', '100'])
+        _handle_global_arguments(args)
+        assert es.cfg['analysis.spectrogram.frequency-min'] == 100
+        captured = capsys.readouterr()
+        assert 'deprecated' in captured.out.lower()
+
+    def test_deprecated_frequency_max_warns(self, capsys):
+        args = _parse_args(['play', '--frequency-max', '5000'])
+        _handle_global_arguments(args)
+        assert es.cfg['analysis.spectrogram.frequency-max'] == 5000
+        captured = capsys.readouterr()
+        assert 'deprecated' in captured.out.lower()

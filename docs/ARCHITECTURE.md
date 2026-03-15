@@ -54,8 +54,8 @@ tests/
 
 ### `audio.py` — Audio Data
 - **Responsibility:** Load audio files (via pydub/ffmpeg), normalize to float32 `[-1, 1]`, expose as numpy arrays shaped `(channels, samples)`.
-- **Key class:** `Audio` — properties: `data`, `data_raw`, `sample_rate`, `channels`, `length`, `metadata`. Methods: `with_triphase()` (derive 3rd channel as `-(A+B)`), `resample()`.
-- **Dependencies:** pydub, numpy, scipy (resampling).
+- **Key class:** `Audio` — properties: `data`, `data_raw`, `sample_rate`, `channels`, `length`, `metadata`. Methods: `with_frequency_transform()` (STFT-based frequency shift/scale), `with_ramp()` (amplitude ramp), `with_stereo_stim()` (bandpass safety filter), `with_triphase()` (derive 3rd channel as `-(A+B)`), `resample()`.
+- **Dependencies:** pydub, numpy, scipy (resampling, STFT, filtering).
 - **Dependents:** analysis, visualization, player, export, metadata.
 
 ### `analysis.py` — DSP Engine
@@ -173,6 +173,8 @@ sequenceDiagram
 
     CLI->>Audio: Audio(file="song.mp3")
     Note over Audio: pydub → numpy float32
+    CLI->>Audio: with_frequency_transform() (if scale≠1 or shift≠0)
+    Note over Audio: STFT bin manipulation → temp WAV
     CLI->>Audio: with_ramp() (if level > 0)
     CLI->>Audio: with_stereo_stim() (if -ss)
     Note over Audio: Bandpass filter → temp WAV

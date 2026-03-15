@@ -215,6 +215,96 @@ class Audio:
 
         self.metadata.save()
 
+    def with_frequency_transform(self) -> 'Audio':
+        """Create a new Audio with frequency content shifted and/or scaled.
+
+        Uses STFT-based bin manipulation to transform frequency content while
+        preserving duration. When both scale and shift are active, scaling is
+        applied first (f → f*scale), then shifting (f → f + shift).
+
+        Transform parameters are read from config:
+        - audio.frequency.scale: multiplicative factor (1 = no change)
+        - audio.frequency.shift: additive offset in Hz (0 = no change)
+
+        Content pushed above Nyquist or below 0 Hz is discarded.
+
+        :return Audio: A new Audio instance with transformed data and a temp WAV file.
+        """
+        scale = es.cfg['audio.frequency.scale']
+        shift = es.cfg['audio.frequency.shift']
+
+        if scale == 1 and shift == 0:
+            return self
+
+        # STFT parameters — use a large window for good frequency resolution
+        nperseg = min(4096, self._sample_count)
+        noverlap = nperseg * 3 // 4
+        freq_resolution = self._sample_rate / nperseg
+
+        # Convert shift from Hz to bins
+        shift_bins = shift / freq_resolution
+
+        transformed_channels = []
+
+        for ch in range(self._channels):
+            f, t, Zxx = scipy.signal.stft(
+                self._data[ch], fs=self._sample_rate,
+                nperseg=nperseg, noverlap=noverlap)
+
+            n_freq = Zxx.shape[0]
+            new_Zxx = np.zeros_like(Zxx)
+
+            for i in range(n_freq):
+                # Reverse map: output bin i came from source bin (i - shift_bins) / scale
+                source_bin = (i - shift_bins) / scale if scale != 0 else n_freq
+                if source_bin < 0 or source_bin >= n_freq - 1:
+                    continue
+
+                # Linear interpolation between adjacent source bins
+                low = int(source_bin)
+                high = low + 1
+                frac = source_bin - low
+
+                if high < n_freq:
+                    new_Zxx[i] = (1 - frac) * Zxx[low] + frac * Zxx[high]
+                else:
+                    new_Zxx[i] = Zxx[low]
+
+            _, reconstructed = scipy.signal.istft(
+                new_Zxx, fs=self._sample_rate,
+                nperseg=nperseg, noverlap=noverlap)
+
+            # ISTFT may produce slightly different length — trim or pad to match
+            if len(reconstructed) >= self._sample_count:
+                reconstructed = reconstructed[:self._sample_count]
+            else:
+                reconstructed = np.pad(reconstructed, (0, self._sample_count - len(reconstructed)))
+
+            transformed_channels.append(reconstructed.astype(np.float32))
+
+        transformed = np.ascontiguousarray(np.vstack(transformed_channels))
+
+        # Write transformed audio to a temp WAV file for use by FFmpeg during export
+        temp_path = es.utils.get_temp_file_path(temp_file_name='freq_transform_audio.wav')
+        dtype = np.int16 if self._bit_depth <= 16 else np.int32
+        raw = (transformed * (2 ** (self._bit_depth - 1))).clip(
+            -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
+        ).astype(dtype)
+        scipy.io.wavfile.write(temp_path, self.sample_rate, raw.T)
+        es.utils.add_temp_file(temp_path)
+
+        audio = Audio.__new__(Audio)
+        audio._metadata = self._metadata
+        audio._file = temp_path
+        audio._source_file = self._source_file
+        audio._format = 'wav'
+        audio._sample_rate = self._sample_rate
+        audio._bit_depth = self._bit_depth
+        audio._data = transformed
+        audio._channels = self._channels
+        audio._sample_count = self._sample_count
+        return audio
+
     def with_stereo_stim(self) -> 'Audio':
         """Create a new Audio with stereo stim filters applied.
 

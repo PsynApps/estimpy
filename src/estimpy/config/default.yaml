@@ -57,6 +57,19 @@ audio:
     format: mp3
     # Output sample rate in Hz. If not set (~), preserves the source sample rate.
     sample-rate: ~
+  # Frequency transform — shift and/or scale the frequency content of the audio
+  frequency:
+    # Multiplicative frequency scaling factor. All frequency components are multiplied
+    # by this value. A value of 2 doubles all frequencies; 0.5 halves them. 1 = no change.
+    # Harmonic relationships are preserved. Content pushed above Nyquist (half the sample
+    # rate) is discarded; similarly, the stereo stim bandpass filter downstream will
+    # remove content outside its passband.
+    scale: 1
+    # Additive frequency shift in Hz. All frequency components are shifted by this amount.
+    # A value of 250 shifts everything up by 250 Hz; -100 shifts down by 100 Hz. 0 = no change.
+    # Unlike scaling, shifting does NOT preserve harmonic relationships (ratios change).
+    # Content shifted below 0 Hz is discarded.
+    shift: 0
   ramp:
     # Amplitude ramp level as a percentage (0-100). Determines how much the amplitude is reduced
     # at the start of the ramp, increasing smoothly to 100% by the end of the file. A value of 0

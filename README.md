@@ -60,6 +60,10 @@ Many commercial Estim units support custom stimulation signals using audio input
   - **Triphase toggle**: Instantly switch between stereo and triphase visualization during playback
   - **Stereo stim protection toggle**: Apply or remove safety filtering during playback
   - **Zoom controls**: Adjust the sliding window length during playback
+- **Frequency transform**: Shift and/or scale the frequency content of audio files via STFT-based bin manipulation, preserving duration
+  - **Frequency scale** (`audio.frequency.scale`): Multiplicative scaling of all frequency components. A value of 2 doubles all frequencies. Preserves harmonic relationships. Default 1 (no change).
+  - **Frequency shift** (`audio.frequency.shift`): Additive shift of all frequency components in Hz. A value of 250 raises everything by 250 Hz. Does not preserve harmonic relationships. Default 0 (no change).
+  - Both can be combined (scale is applied first, then shift). Content pushed above Nyquist or below 0 Hz is discarded.
 - **Stereo stim**: Optional safety filter chain for direct-output stereostim devices, applying a bandpass filter (default 20 Hz–12 kHz) to remove DC offset, subsonic content, and high-frequency content. Visualizations and exported media reflect the filtered audio. Indicated by an "SS" badge on exported videos.
 - **Amplitude ramp**: Gradually increases audio amplitude from a reduced level at the start of the file to full amplitude at the end. Configurable reduction level (`audio.ramp.level`, 0–100%) and curve shape (`audio.ramp.shape`): 0 for linear, negative values (−10 to 0) for a fast initial rise that slows toward the end, positive values (0 to 10) for a slow initial rise that accelerates toward the end. Applied to exported audio; also available as a real-time player control (G key) with adjustable level and shape sliders.
 - **Highly configurable**: Nearly all parameters related to the rendering and export of visualizations are determined from an easily customizable configuration file
@@ -203,10 +207,12 @@ If no command is given, the player is launched. If no files are given, a file di
 | `-c PROFILE [...]`, `--config`                     | Apply additional configuration profile(s).                                                                             |
 | `-co K V [...]`, `--config-option`                 | Override specific configuration option(s).                                                                             |
 | `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
-| `--dynamic-range DB`                               | Set the dynamic range (in decibels) for the spectrogram display.                                                       |
-| `--frequency-min HZ`                               | Set the minimum frequency (in Hz) for the spectrogram display.                                                         |
-| `--frequency-max HZ`                               | Set the maximum frequency (in Hz) for the spectrogram display. If not defined, it will be auto-scaled.                 |
 | `-ss`, `--stereo-stim`                 | Apply stereo stim filters (bandpass 20 Hz–12 kHz) for safer use with direct-output stereostim devices.      |
+
+> **Deprecated flags** (still functional, will be removed in a future version):
+> `--dynamic-range DB` → use `-co visualization.style.spectrogram.dynamic-range DB`
+> `--frequency-min HZ` → use `-co analysis.spectrogram.frequency-min HZ`
+> `--frequency-max HZ` → use `-co analysis.spectrogram.frequency-max HZ`
 
 ### Save options
 
@@ -280,6 +286,16 @@ These options are only available on `save-video`:
 - **Save processed audio as FLAC with amplitude ramp**
   ```
   estimpy save-audio input.mp3 -c audio-flac -co audio.ramp.level 50
+  ```
+
+- **Double the carrier frequency for stereostim use**
+  ```
+  estimpy save-audio input.mp3 -ss -co audio.frequency.scale 2
+  ```
+
+- **Shift all frequencies up by 250 Hz**
+  ```
+  estimpy save-audio input.mp3 -co audio.frequency.shift 250
   ```
 
 - **Save animated visualization to a video file**
@@ -404,6 +420,8 @@ For reference, the default configuration options and values are as follows:
 | audio.export.ffmpeg-extra-args.-q:a                          | 0                                            |
 | audio.export.format                                          | mp3                                          |
 | audio.export.sample-rate                                     | None                                         |
+| audio.frequency.scale                                        | 1                                            |
+| audio.frequency.shift                                        | 0                                            |
 | audio.ramp.level                                             | 0                                            |
 | audio.ramp.shape                                             | 0                                            |
 | audio.stereo-stim.enabled                         | False                                        |

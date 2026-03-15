@@ -217,6 +217,115 @@ class TestRamp:
         assert ramped.source_file == synthetic_stereo_audio.source_file
 
 
+class TestFrequencyTransform:
+    def test_no_transform_returns_self(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 1
+        es.cfg['audio.frequency.shift'] = 0
+        result = synthetic_stereo_audio.with_frequency_transform()
+        assert result is synthetic_stereo_audio
+
+    def test_scale_preserves_channels(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_stereo_audio.with_frequency_transform()
+        assert result.channels == synthetic_stereo_audio.channels
+
+    def test_scale_preserves_sample_count(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_stereo_audio.with_frequency_transform()
+        assert result.sample_count == synthetic_stereo_audio.sample_count
+
+    def test_scale_preserves_sample_rate(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_stereo_audio.with_frequency_transform()
+        assert result.sample_rate == synthetic_stereo_audio.sample_rate
+
+    def test_scale_output_dtype_float32(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_stereo_audio.with_frequency_transform()
+        assert result.data.dtype == np.float32
+
+    def test_scale_creates_temp_wav(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_stereo_audio.with_frequency_transform()
+        assert result.file is not None
+        assert result.file.endswith('.wav')
+
+    def test_scale_doubles_frequency(self, synthetic_stereo_audio):
+        """Scaling by 2 should move the 440 Hz tone to ~880 Hz."""
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_stereo_audio.with_frequency_transform()
+
+        # Compute FFT of left channel and find peak frequency
+        fft = np.abs(np.fft.rfft(result.data[0]))
+        freqs = np.fft.rfftfreq(result.sample_count, 1.0 / result.sample_rate)
+        peak_freq = freqs[np.argmax(fft)]
+        assert abs(peak_freq - 880) < 50  # Within 50 Hz tolerance
+
+    def test_shift_moves_frequency(self, synthetic_stereo_audio):
+        """Shifting by +250 Hz should move the 440 Hz tone to ~690 Hz."""
+        import estimpy as es
+        es.cfg['audio.frequency.shift'] = 250
+        result = synthetic_stereo_audio.with_frequency_transform()
+
+        fft = np.abs(np.fft.rfft(result.data[0]))
+        freqs = np.fft.rfftfreq(result.sample_count, 1.0 / result.sample_rate)
+        peak_freq = freqs[np.argmax(fft)]
+        assert abs(peak_freq - 690) < 50
+
+    def test_scale_and_shift_combined(self, synthetic_stereo_audio):
+        """Scale 2x then shift +100 should move 440 Hz to ~980 Hz."""
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        es.cfg['audio.frequency.shift'] = 100
+        result = synthetic_stereo_audio.with_frequency_transform()
+
+        fft = np.abs(np.fft.rfft(result.data[0]))
+        freqs = np.fft.rfftfreq(result.sample_count, 1.0 / result.sample_rate)
+        peak_freq = freqs[np.argmax(fft)]
+        assert abs(peak_freq - 980) < 50
+
+    def test_negative_shift(self, synthetic_stereo_audio):
+        """Shifting by -200 Hz should move the 440 Hz tone to ~240 Hz."""
+        import estimpy as es
+        es.cfg['audio.frequency.shift'] = -200
+        result = synthetic_stereo_audio.with_frequency_transform()
+
+        fft = np.abs(np.fft.rfft(result.data[0]))
+        freqs = np.fft.rfftfreq(result.sample_count, 1.0 / result.sample_rate)
+        peak_freq = freqs[np.argmax(fft)]
+        assert abs(peak_freq - 240) < 50
+
+    def test_downscale(self, synthetic_stereo_audio):
+        """Scaling by 0.5 should move the 440 Hz tone to ~220 Hz."""
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 0.5
+        result = synthetic_stereo_audio.with_frequency_transform()
+
+        fft = np.abs(np.fft.rfft(result.data[0]))
+        freqs = np.fft.rfftfreq(result.sample_count, 1.0 / result.sample_rate)
+        peak_freq = freqs[np.argmax(fft)]
+        assert abs(peak_freq - 220) < 50
+
+    def test_mono_works(self, synthetic_mono_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_mono_audio.with_frequency_transform()
+        assert result.channels == 1
+
+    def test_preserves_source_file(self, synthetic_stereo_audio):
+        import estimpy as es
+        es.cfg['audio.frequency.scale'] = 2
+        result = synthetic_stereo_audio.with_frequency_transform()
+        assert result.source_file == synthetic_stereo_audio.source_file
+
+
 class TestTimeToDataIndex:
     def test_zero(self, synthetic_stereo_audio):
         assert synthetic_stereo_audio.time_to_data_index(0.0) == 0

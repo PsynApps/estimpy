@@ -39,11 +39,13 @@
 - `save-audio` CLI command for exporting processed audio files with the full processing chain applied (amplitude ramp → stereo stim), with configurable output format via `audio.export.*` config keys (codec, format, sample-rate, ffmpeg-extra-args), automatic visualization album art generation, and metadata embedding
 - Audio export config profiles: `audio-wav` (24-bit PCM) and `audio-flac` (lossless) for common lossless export scenarios
 - FLAC metadata support (read/write via mutagen) including Vorbis comments and embedded cover art
-- Automated test suite (290 tests) covering audio loading, DSP analysis, configuration, CLI, metadata, and utilities
+- Frequency transform (`audio.frequency.scale`, `audio.frequency.shift`) for shifting and/or scaling audio frequency content via STFT-based bin manipulation, preserving duration. Scale multiplies all frequencies (preserves harmonic relationships); shift adds a constant Hz offset (changes harmonic relationships). Both can be combined (scale applied first). Content pushed above Nyquist or below 0 Hz is discarded.
+- Automated test suite (308 tests) covering audio loading, DSP analysis, configuration, CLI, metadata, and utilities
 
 ### Changed
 - Video encoding config keys moved from `visualization.video.export.*` to `video.export.*` (codec, format, fps, segment-length, keyframe-interval, preview.*, reencode-segments, video-length-max, ffmpeg-extra-args). Visualization-appearance keys (size, triphase, time.*, title.*, oscilloscope.*, window-length) remain under `visualization.video.export.*`. All config profiles updated accordingly.
-- Audio processing chain reordered from stereo stim → ramp → triphase to ramp → stereo stim → triphase, ensuring stereo stim filtering is always the last safety step before the visualization-only triphase derivation
+- Audio processing chain reordered to frequency transform → ramp → stereo stim → triphase, ensuring stereo stim filtering is always the last safety step before the visualization-only triphase derivation
+- Deprecated `--dynamic-range`, `--frequency-min`, and `--frequency-max` CLI shortcut flags in favor of `-co` config option syntax; flags still work but print a deprecation warning
 - Audio data stored as float32 instead of float64, halving memory usage for all audio operations
 - Spectrogram computation uses float32/complex64 throughout, halving memory for all intermediate and final arrays
 - Reassigned spectrogram computed in chunks to limit peak memory usage, with histograms accumulated across batches
