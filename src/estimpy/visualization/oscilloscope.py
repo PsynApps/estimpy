@@ -433,13 +433,15 @@ class OscilloscopeMixin:
         return f'{int(round(freq_hz))} Hz'
 
     @staticmethod
-    def _dr_osc_format_rms_db(waveform):
-        """Compute RMS of a waveform and format as dBFS."""
+    def _dr_osc_format_level(waveform):
+        """Compute peak and RMS levels of a waveform and format as dBFS."""
+        peak = np.max(np.abs(waveform))
         rms = np.sqrt(np.mean(waveform ** 2))
-        if rms < 1e-10:
-            return '-\u221e dB'  # −∞ dB
-        db = 20 * math.log10(rms)
-        return f'{db:.0f} dB'
+        if peak < 1e-10:
+            return 'Peak -\u221e dB \u00b7 RMS -\u221e dB'
+        peak_db = 20 * math.log10(peak)
+        rms_db = 20 * math.log10(max(rms, 1e-10))
+        return f'Peak {peak_db:.0f} dB \u00b7 RMS {rms_db:.0f} dB'
 
     def _dr_osc_draw(self, channel_id, current_time):
         """Draw the oscilloscope overlay for one channel."""
@@ -567,21 +569,35 @@ class OscilloscopeMixin:
 
                 self._dr_frame_buffer[by0 + y_top_px:by0 + y_bot_px + 1, bx0 + x] = line_color
 
-        # Draw labels: duration (left), peak frequency (center), RMS level (right)
+        # Draw labels: duration (left), peak frequency (center), peak+RMS level (right)
         margin = max(2, self._dr_osc_font_size_px // 4)
         inner_left = border_width + margin
         inner_right = box_width - border_width - margin
 
-        # Duration label — bottom-left
+        # Prepare all label images and positions
         dur_text = self._dr_osc_format_duration(duration)
         dur_img = self._dr_osc_get_label(dur_text)
         dur_h, dur_w = dur_img.shape[:2]
-        ly = box_height - dur_h - border_width - margin
+        dur_x = inner_left
+        dur_y = box_height - dur_h - border_width - margin
 
-        if inner_left + dur_w <= inner_right and ly >= 0:
-            self._dr_osc_composite_label(dur_img, bx0, by0, inner_left, ly)
+        level_text = self._dr_osc_format_level(waveform)
+        level_img = self._dr_osc_get_label(level_text)
+        level_h, level_w = level_img.shape[:2]
+        level_x = inner_right - level_w
+        level_y = box_height - level_h - border_width - margin
 
-        # Peak frequency — bottom-center
+        # Duration — bottom-left (always drawn if it fits)
+        if dur_x + dur_w <= inner_right and dur_y >= 0:
+            self._dr_osc_composite_label(dur_img, bx0, by0, dur_x, dur_y)
+
+        # Peak + RMS level — bottom-right (only if it doesn't overlap duration)
+        level_drawn = False
+        if level_x >= dur_x + dur_w + margin and level_y >= 0:
+            self._dr_osc_composite_label(level_img, bx0, by0, level_x, level_y)
+            level_drawn = True
+
+        # Peak frequency — bottom-center (only if it fits between the other two)
         peak_freq = self._dr_osc_estimate_peak_freq(waveform, self._es_audio.sample_rate)
         if peak_freq > 0:
             freq_text = self._dr_osc_format_freq(peak_freq)
@@ -589,14 +605,8 @@ class OscilloscopeMixin:
             freq_h, freq_w = freq_img.shape[:2]
             freq_x = (box_width - freq_w) // 2
             freq_y = box_height - freq_h - border_width - margin
-            if freq_x >= inner_left + dur_w and freq_x + freq_w <= inner_right and freq_y >= 0:
+            right_bound = level_x - margin if level_drawn else inner_right
+            if (freq_x >= dur_x + dur_w + margin
+                    and freq_x + freq_w <= right_bound
+                    and freq_y >= 0):
                 self._dr_osc_composite_label(freq_img, bx0, by0, freq_x, freq_y)
-
-        # RMS level — bottom-right
-        rms_text = self._dr_osc_format_rms_db(waveform)
-        rms_img = self._dr_osc_get_label(rms_text)
-        rms_h, rms_w = rms_img.shape[:2]
-        rms_x = inner_right - rms_w
-        rms_y = box_height - rms_h - border_width - margin
-        if rms_x >= inner_left and rms_y >= 0:
-            self._dr_osc_composite_label(rms_img, bx0, by0, rms_x, rms_y)
