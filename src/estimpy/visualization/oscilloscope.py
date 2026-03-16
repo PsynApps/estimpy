@@ -6,9 +6,12 @@ the oscilloscope methods share extensive instance state with VideoVisualization
 (frame buffer, data regions, amplitude colors, spectrogram times, etc.).
 """
 
+import math
+
 import estimpy as es
 import matplotlib.colors
 import numpy as np
+import scipy.fft
 from PIL import Image, ImageDraw, ImageFont
 
 from estimpy.visualization.base import AxisTypes
@@ -43,9 +46,15 @@ class OscilloscopeMixin:
         self._dr_osc_mode_hold_until = {ch: initial_hold for ch, _ in self._channel_layout}
         self._dr_osc_last_time = {}  # per-channel: last seen time for detecting seeks
 
-        # Oscilloscope duration label font setup
+        # Oscilloscope label font setup — scale font size the same way resize_figure
+        # scales matplotlib text elements: proportional to output height vs canonical
+        # display height. This ensures labels remain readable at all resolutions.
+        fig_height = fig.canvas.get_width_height()[1]
+        display_height = es.cfg['visualization.image.display.height']
+        height_scale = fig_height / display_height
+
         osc_font_size_pt = es.cfg['visualization.style.oscilloscope.font-size']
-        self._dr_osc_font_size_px = max(1, int(round(osc_font_size_pt * self._pt_to_px)))
+        self._dr_osc_font_size_px = max(1, int(round(osc_font_size_pt * height_scale * self._pt_to_px)))
         font_file = es.cfg['visualization.style.font.text.file']
         face_index = es.cfg['visualization.style.font.text.face-index']
         self._dr_osc_font = ImageFont.truetype(font_file, self._dr_osc_font_size_px, index=face_index)
@@ -59,13 +68,14 @@ class OscilloscopeMixin:
         self._dr_osc_line_width_px = max(1, int(round(
             es.cfg['visualization.style.oscilloscope.line-width'] * self._pt_to_px)))
 
-        # Pre-render duration label images
+        # Label image cache — duration labels are stable (keyed by ms value),
+        # frequency and RMS labels change per frame and are keyed by their string
         self._dr_osc_label_cache = {}
         duration_tone = es.cfg['analysis.oscilloscope.window-length']
         duration_pulse = es.cfg['analysis.oscilloscope.pulse-detection.window-length']
         for dur_ms in (duration_tone, duration_pulse):
             label = f'{int(dur_ms)} ms' if dur_ms == int(dur_ms) else f'{dur_ms} ms'
-            self._dr_osc_label_cache[float(dur_ms)] = self._dr_osc_render_label(label)
+            self._dr_osc_label_cache[label] = self._dr_osc_render_label(label)
 
     def _dr_osc_compute_box(self, channel_id):
         """Compute pixel bounding box (x0, y0, x1, y1) for oscilloscope overlay on a channel.
@@ -372,6 +382,65 @@ class OscilloscopeMixin:
 
         return np.array(text_img)
 
+    def _dr_osc_get_label(self, text):
+        """Get a cached rendered label image, rendering on demand if needed."""
+        label_img = self._dr_osc_label_cache.get(text)
+        if label_img is None:
+            label_img = self._dr_osc_render_label(text)
+            self._dr_osc_label_cache[text] = label_img
+        return label_img
+
+    def _dr_osc_composite_label(self, label_img, bx0, by0, lx, ly):
+        """Alpha-composite a rendered label image onto the frame buffer."""
+        lh, lw = label_img.shape[:2]
+        alpha = label_img[:, :, 3:4].astype(np.float32) / 255.0
+        bg_region = self._dr_frame_buffer[by0 + ly:by0 + ly + lh, bx0 + lx:bx0 + lx + lw].astype(np.float32)
+        fg = label_img[:, :, :3].astype(np.float32)
+        composited = fg * alpha + bg_region * (1.0 - alpha)
+        self._dr_frame_buffer[by0 + ly:by0 + ly + lh, bx0 + lx:bx0 + lx + lw] = composited.astype(np.uint8)
+
+    @staticmethod
+    def _dr_osc_format_duration(duration_s):
+        """Format a duration in seconds as a human-readable string."""
+        duration_ms = duration_s * 1000.0
+        if duration_ms >= 1000:
+            secs = duration_ms / 1000.0
+            return f'{int(secs)} s' if secs == int(secs) else f'{secs:.1f} s'
+        if duration_ms == int(duration_ms):
+            return f'{int(duration_ms)} ms'
+        return f'{duration_ms:.1f} ms'
+
+    @staticmethod
+    def _dr_osc_estimate_peak_freq(waveform, sample_rate):
+        """Estimate the peak frequency of a waveform using zero-padded FFT."""
+        n = len(waveform)
+        if n < 4:
+            return 0.0
+        # Zero-pad to at least 4x for sub-bin frequency resolution
+        nfft = max(n * 4, 1024)
+        windowed = waveform * np.hanning(n)
+        spectrum = np.abs(scipy.fft.rfft(windowed, n=nfft))
+        # Skip DC bin
+        peak_bin = np.argmax(spectrum[1:]) + 1
+        return peak_bin * sample_rate / nfft
+
+    @staticmethod
+    def _dr_osc_format_freq(freq_hz):
+        """Format a frequency in Hz as a human-readable string."""
+        if freq_hz >= 1000:
+            khz = freq_hz / 1000.0
+            return f'{khz:.1f} kHz' if khz != int(khz) else f'{int(khz)} kHz'
+        return f'{int(round(freq_hz))} Hz'
+
+    @staticmethod
+    def _dr_osc_format_rms_db(waveform):
+        """Compute RMS of a waveform and format as dBFS."""
+        rms = np.sqrt(np.mean(waveform ** 2))
+        if rms < 1e-10:
+            return '-\u221e dB'  # −∞ dB
+        db = 20 * math.log10(rms)
+        return f'{db:.0f} dB'
+
     def _dr_osc_draw(self, channel_id, current_time):
         """Draw the oscilloscope overlay for one channel."""
         if channel_id not in self._dr_osc_boxes:
@@ -498,25 +567,36 @@ class OscilloscopeMixin:
 
                 self._dr_frame_buffer[by0 + y_top_px:by0 + y_bot_px + 1, bx0 + x] = line_color
 
-        # Draw duration label in bottom-left corner of box
-        duration_ms = duration * 1000.0
-        label_img = self._dr_osc_label_cache.get(duration_ms)
-        if label_img is None:
-            # Render on demand for durations not pre-cached (e.g. manual mode)
-            label = f'{int(duration_ms)} ms' if duration_ms == int(duration_ms) else f'{duration_ms:.1f} ms'
-            if duration_ms >= 1000:
-                secs = duration_ms / 1000.0
-                label = f'{int(secs)} s' if secs == int(secs) else f'{secs:.1f} s'
-            label_img = self._dr_osc_render_label(label)
-            self._dr_osc_label_cache[duration_ms] = label_img
-        if label_img is not None:
-            lh, lw = label_img.shape[:2]
-            margin = max(2, self._dr_osc_font_size_px // 4)
-            lx = border_width + margin
-            ly = box_height - lh - border_width - margin
-            if lx + lw <= box_width and ly >= 0:
-                alpha = label_img[:, :, 3:4].astype(np.float32) / 255.0
-                bg_region = self._dr_frame_buffer[by0 + ly:by0 + ly + lh, bx0 + lx:bx0 + lx + lw].astype(np.float32)
-                fg = label_img[:, :, :3].astype(np.float32)
-                composited = fg * alpha + bg_region * (1.0 - alpha)
-                self._dr_frame_buffer[by0 + ly:by0 + ly + lh, bx0 + lx:bx0 + lx + lw] = composited.astype(np.uint8)
+        # Draw labels: duration (left), peak frequency (center), RMS level (right)
+        margin = max(2, self._dr_osc_font_size_px // 4)
+        inner_left = border_width + margin
+        inner_right = box_width - border_width - margin
+
+        # Duration label — bottom-left
+        dur_text = self._dr_osc_format_duration(duration)
+        dur_img = self._dr_osc_get_label(dur_text)
+        dur_h, dur_w = dur_img.shape[:2]
+        ly = box_height - dur_h - border_width - margin
+
+        if inner_left + dur_w <= inner_right and ly >= 0:
+            self._dr_osc_composite_label(dur_img, bx0, by0, inner_left, ly)
+
+        # Peak frequency — bottom-center
+        peak_freq = self._dr_osc_estimate_peak_freq(waveform, self._es_audio.sample_rate)
+        if peak_freq > 0:
+            freq_text = self._dr_osc_format_freq(peak_freq)
+            freq_img = self._dr_osc_get_label(freq_text)
+            freq_h, freq_w = freq_img.shape[:2]
+            freq_x = (box_width - freq_w) // 2
+            freq_y = box_height - freq_h - border_width - margin
+            if freq_x >= inner_left + dur_w and freq_x + freq_w <= inner_right and freq_y >= 0:
+                self._dr_osc_composite_label(freq_img, bx0, by0, freq_x, freq_y)
+
+        # RMS level — bottom-right
+        rms_text = self._dr_osc_format_rms_db(waveform)
+        rms_img = self._dr_osc_get_label(rms_text)
+        rms_h, rms_w = rms_img.shape[:2]
+        rms_x = inner_right - rms_w
+        rms_y = box_height - rms_h - border_width - margin
+        if rms_x >= inner_left and rms_y >= 0:
+            self._dr_osc_composite_label(rms_img, bx0, by0, rms_x, rms_y)
