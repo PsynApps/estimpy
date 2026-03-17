@@ -241,7 +241,14 @@ def _get_files(args):
     if not input_files:
         sys.exit()
 
-    return es.utils.get_file_list(file_patterns=input_files)
+    files = es.utils.get_file_list(file_patterns=input_files)
+
+    if not files:
+        for pattern in input_files:
+            print(f'Error: No files found matching: {pattern}')
+        sys.exit(1)
+
+    return files
 
 
 def _load_audio(file, triphase=False):
