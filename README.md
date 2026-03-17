@@ -539,6 +539,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.title.width-factor-max                   | 0.9                                          |
 | visualization.style.video.position-line-color                | #ffffff                                      |
 | visualization.video.display.oscilloscope.enabled             | True                                         |
+| visualization.video.display.oscilloscope.show-labels         | True                                         |
 | visualization.video.display.size                             | 1920x1080                                    |
 | visualization.video.display.time.enabled                     | False                                        |
 | visualization.video.display.time.position                    | top                                          |
@@ -565,6 +566,7 @@ For reference, the default configuration options and values are as follows:
 | video.export.segment-length                                  | 3600                                         |
 | video.export.video-length-max                                | None                                         |
 | visualization.video.export.oscilloscope.enabled              | True                                         |
+| visualization.video.export.oscilloscope.show-labels          | True                                         |
 | visualization.video.export.size                              | 1920x1080                                    |
 | visualization.video.export.time.enabled                      | True                                         |
 | visualization.video.export.time.position                     | top                                          |

@@ -583,7 +583,7 @@ class OscilloscopeMixin:
         if not self._osc_show_labels:
             return
 
-        # Draw labels: duration (left), peak frequency (1/3), peak+RMS level (right)
+        # Draw labels: window length (left), peak frequency (1/3), peak+RMS level (right)
         margin = max(2, self._dr_osc_font_size_px // 4)
         inner_left = border_width + margin
         inner_right = box_width - border_width - margin

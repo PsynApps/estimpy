@@ -72,7 +72,7 @@ tests/
 - **`__init__.py`** — Re-exports the public API (`Visualization`, `VideoVisualization`, `VisualizationMode`, `show_image`, `set_optimal_nfft`), handles `config.updated` events (resolution parsing, font initialization, channel color derivation, colormap generation), and contains internal helpers (`_alpha_color`, `_derive_channel_colormap`, `_parse_resolution`, `_calculate_spectrogram_panel_height`).
 - **`base.py`** — `Visualization` class for static image rendering: matplotlib figure construction with amplitude + spectrogram panels per channel, layout, styling, axis formatting. Also contains `AxisScaleText`, `AxisTypes`, `VisualizationMode` enums, `show_image()`, and `set_optimal_nfft()`.
 - **`video.py`** — `VideoVisualization(Visualization, OscilloscopeMixin)` extends base with time-windowed sliding view, the shift-and-paint direct render pipeline (`prepare_direct_render()`, `render_frame_direct()`), and all shift/paint/overlay methods for per-frame updates.
-- **`oscilloscope.py`** — `OscilloscopeMixin` provides per-channel oscilloscope waveform overlays with trigger stabilization (zero-crossing and correlation-based), pulse detection via CV analysis, and duration label rendering. Used as a mixin because the methods share extensive instance state with `VideoVisualization`.
+- **`oscilloscope.py`** — `OscilloscopeMixin` provides per-channel oscilloscope waveform overlays with trigger stabilization (zero-crossing and correlation-based), pulse detection via CV analysis, and real-time readout labels (window length, peak frequency via zero-padded FFT, peak/RMS level in dBFS). Used as a mixin because the methods share extensive instance state with `VideoVisualization`.
 - **Dependencies:** matplotlib, PIL (ImageFont for direct text rendering), numpy, colorsys.
 - **Dependents:** export, player/window.
 
@@ -221,18 +221,19 @@ The benchmark command reuses the standard `write_video()` pipeline — it does n
 The direct render pipeline is the performance-critical path. It avoids matplotlib's per-frame overhead by painting pixels directly into a numpy buffer:
 
 ```
-1. RESTORE previous overlays (undo position lines, oscilloscope, time text)
+1. RESTORE previous dynamic overlays (undo oscilloscope, time text, SS badge)
 2. RESTORE axis underlay (undo axis tick/label overlay)
-3. SHIFT panel pixels left by scroll amount (memcpy)
-4. PAINT new strip: sample spectrogram colormap + amplitude envelope into exposed pixels
-5. SAVE axis underlay, APPLY axis overlay (alpha-composite tick marks/labels)
-6. SAVE overlay regions (snapshot pixels that will be overdrawn)
-7. DRAW oscilloscope boxes (per channel, if enabled)
-8. DRAW position lines (vertical line at current time)
-9. DRAW time text (pre-rendered PIL text images)
+3. RESTORE position line regions (undo position lines)
+4. SHIFT panel pixels left by scroll amount (memcpy)
+5. PAINT new strip: sample spectrogram colormap + amplitude envelope into exposed pixels
+6. SAVE position line regions, DRAW position lines (behind axes/labels)
+7. SAVE axis underlay, APPLY axis overlay (alpha-composite tick marks/labels)
+8. SAVE dynamic overlay regions (snapshot pixels that will be overdrawn)
+9. DRAW oscilloscope boxes (per channel, if enabled)
+10. DRAW time text (pre-rendered PIL text images)
 ```
 
-Each frame reverses steps 6-9 from the previous frame before painting new data, creating a layered compositing system without accumulating artifacts.
+Each frame reverses steps 8-10, then 7, then 6 from the previous frame before painting new data, creating a 4-layer compositing system (data → position lines → axes → dynamic overlays) without accumulating artifacts.
 
 ## Configuration System
 

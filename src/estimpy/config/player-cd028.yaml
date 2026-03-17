@@ -5,7 +5,7 @@ video:
     codec: libx264
     ffmpeg-extra-args:
       '-pix_fmt': 'yuv420p'
-      '-crf': 32
+      '-crf': 36
       '-maxrate': '500k'
       '-profile:v': 'baseline'
       '-level': 1.3

@@ -24,7 +24,7 @@
 - Configuration profiles for HEVC and ProRes VideoToolbox hardware encoding, and iPod Touch player
 - Configurable reassignment bypass for the player (`player.spectrogram-reassign`, default False) to speed up loading by using the standard spectrogram
 - Resolution-aware FFT sizing for all visualization modes (player, image, and video export), using coarse frequency pre-analysis (~20 FFTs) and output panel dimensions to determine the optimal FFT size
-- Oscilloscope waveform overlay for video display and export, showing trigger-stabilized raw audio waveform per channel with automatic pulse detection that switches window length between tonal and pulsed content using coefficient of variation analysis (`visualization.video.display.oscilloscope.enabled`, `visualization.video.export.oscilloscope.enabled`, `analysis.oscilloscope.pulse-detection.*`)
+- Oscilloscope waveform overlay for video display and export, showing trigger-stabilized raw audio waveform per channel with automatic pulse detection that switches window length between tonal and pulsed content using coefficient of variation analysis (`visualization.video.display.oscilloscope.enabled`, `visualization.video.export.oscilloscope.enabled`, `analysis.oscilloscope.pulse-detection.*`). Overlay includes real-time readouts for window length, peak frequency, and peak/RMS level in dBFS, with configurable visibility (`visualization.video.display.oscilloscope.show-labels`, `visualization.video.export.oscilloscope.show-labels`)
 - Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
 - Configurable channel identity labels (A, B, T) displayed on visualizations, centered across each channel's amplitude and spectrogram panels (`visualization.style.channels.labels.enabled`, `visualization.style.channels.labels.font-size`, `visualization.style.channels.chN.label`)
 - Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
@@ -87,6 +87,9 @@
 - Removed tkinter dependency (file dialogs replaced with Qt)
 
 ### Fixed
+- Fixed time position line z-order so it renders behind axes text, time text, channel labels, and oscilloscope overlays
+- Fixed oscilloscope label font scaling at low export DPI (labels were rendering at 1px; now correctly scale with output resolution)
+- Fixed silent exit when input files don't exist — CLI now reports an error message for each unmatched pattern
 - Fixed MP4/M4A title metadata tag (`\xa9nam2` → `\xa9nam`) that silently prevented reading/writing titles
 - Fixed orphaned spinner threads when audio file loading fails (e.g., non-audio files like Thumbs.db)
 - Fixed player crash on startup caused by oscilloscope state accessed before initialization

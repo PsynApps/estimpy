@@ -3,7 +3,7 @@ estimpy-version: 2.0.0
 video:
   export:
     ffmpeg-extra-args:
-      '-crf': 26
+      '-crf': 32
     segment-length: 1800
 visualization:
   image:
