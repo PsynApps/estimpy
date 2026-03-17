@@ -448,10 +448,10 @@ class OscilloscopeMixin:
         peak = np.max(np.abs(waveform))
         rms = np.sqrt(np.mean(waveform ** 2))
         if peak < 1e-10:
-            return 'Pk -\u221e \u00b7 RMS -\u221e dB'
+            return 'Peak -\u221e \u00b7 RMS -\u221e dB'
         peak_db = 20 * math.log10(peak)
         rms_db = 20 * math.log10(max(rms, 1e-10))
-        return f'Pk {peak_db:.1f} \u00b7 RMS {rms_db:.1f} dB'
+        return f'Peak {peak_db:.1f} \u00b7 RMS {rms_db:.1f} dB'
 
     def _dr_osc_draw(self, channel_id, current_time):
         """Draw the oscilloscope overlay for one channel."""
@@ -613,7 +613,7 @@ class OscilloscopeMixin:
             freq_text = self._dr_osc_format_freq(peak_freq)
             freq_img = self._dr_osc_get_label(freq_text)
             freq_h, freq_w = freq_img.shape[:2]
-            freq_x = (box_width - freq_w) // 2
+            freq_x = (box_width // 3) - (freq_w // 2)
             freq_y = box_height - freq_h - border_width - margin
             right_bound = level_x - margin if level_drawn else inner_right
             if (freq_x >= dur_x + dur_w + margin
