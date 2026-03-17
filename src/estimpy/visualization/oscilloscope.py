@@ -46,15 +46,22 @@ class OscilloscopeMixin:
         self._dr_osc_mode_hold_until = {ch: initial_hold for ch, _ in self._channel_layout}
         self._dr_osc_last_time = {}  # per-channel: last seen time for detecting seeks
 
-        # Oscilloscope label font setup — scale font size the same way resize_figure
-        # scales matplotlib text elements: proportional to output height vs canonical
-        # display height. This ensures labels remain readable at all resolutions.
-        fig_height = fig.canvas.get_width_height()[1]
+        # Oscilloscope label font setup — derive the pixel size using the same
+        # scaling that resize_figure applied to matplotlib text elements. Since
+        # resize_figure changes both the figure size and DPI, we recover the
+        # effective scale factor from any already-scaled text element rather than
+        # computing it from canvas dimensions alone.
+        fig_width_px, fig_height_px = fig.canvas.get_width_height()
         display_height = es.cfg['visualization.image.display.height']
-        height_scale = fig_height / display_height
-
+        display_dpi = 100  # _DISPLAY_DPI in base.py — the canonical starting DPI
+        fig_dpi = fig.get_dpi()
+        # resize_figure computes: height_scale_factor = (target_h / current_h) * (current_dpi / target_dpi)
+        # The net effect on font pixel size is: config_pt * height_scale_factor * (target_dpi / 72)
+        # Which simplifies to: config_pt * (fig_height_px / display_height) * (display_dpi / 72)
+        # because fig_height_px = target_h and the DPI factors cancel.
         osc_font_size_pt = es.cfg['visualization.style.oscilloscope.font-size']
-        self._dr_osc_font_size_px = max(1, int(round(osc_font_size_pt * height_scale * self._pt_to_px)))
+        self._dr_osc_font_size_px = max(1, int(round(
+            osc_font_size_pt * (fig_height_px / display_height) * (display_dpi / 72))))
         font_file = es.cfg['visualization.style.font.text.file']
         face_index = es.cfg['visualization.style.font.text.face-index']
         self._dr_osc_font = ImageFont.truetype(font_file, self._dr_osc_font_size_px, index=face_index)
