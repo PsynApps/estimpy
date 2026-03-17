@@ -423,6 +423,9 @@ class OscilloscopeMixin:
         n = len(waveform)
         if n < 4:
             return 0.0
+        rms = np.sqrt(np.mean(waveform ** 2))
+        if rms < 1e-6:
+            return 0.0
         # Zero-pad to at least 4x for sub-bin frequency resolution
         nfft = max(n * 4, 1024)
         windowed = waveform * np.hanning(n)
@@ -445,10 +448,10 @@ class OscilloscopeMixin:
         peak = np.max(np.abs(waveform))
         rms = np.sqrt(np.mean(waveform ** 2))
         if peak < 1e-10:
-            return 'Peak -\u221e dB \u00b7 RMS -\u221e dB'
+            return 'Pk -\u221e \u00b7 RMS -\u221e dB'
         peak_db = 20 * math.log10(peak)
         rms_db = 20 * math.log10(max(rms, 1e-10))
-        return f'Peak {peak_db:.0f} dB \u00b7 RMS {rms_db:.0f} dB'
+        return f'Pk {peak_db:.1f} \u00b7 RMS {rms_db:.1f} dB'
 
     def _dr_osc_draw(self, channel_id, current_time):
         """Draw the oscilloscope overlay for one channel."""
