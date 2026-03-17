@@ -33,6 +33,7 @@ class OscilloscopeMixin:
     def _dr_osc_init(self, fig):
         """Initialize oscilloscope state. Called from prepare_direct_render()."""
         self._osc_enabled = es.cfg['visualization.video.export.oscilloscope.enabled']
+        self._osc_show_labels = es.cfg['visualization.video.export.oscilloscope.show-labels']
         self._osc_manual_duration = None  # None = auto mode, float seconds = manual override
         self._dr_osc_boxes = {}
         self._dr_osc_prev_waveform = {}  # per-channel template for correlation trigger
@@ -579,7 +580,10 @@ class OscilloscopeMixin:
 
                 self._dr_frame_buffer[by0 + y_top_px:by0 + y_bot_px + 1, bx0 + x] = line_color
 
-        # Draw labels: duration (left), peak frequency (center), peak+RMS level (right)
+        if not self._osc_show_labels:
+            return
+
+        # Draw labels: duration (left), peak frequency (1/3), peak+RMS level (right)
         margin = max(2, self._dr_osc_font_size_px // 4)
         inner_left = border_width + margin
         inner_right = box_width - border_width - margin

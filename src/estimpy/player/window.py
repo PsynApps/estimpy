@@ -229,6 +229,7 @@ class PlayerWindow(QMainWindow):
             # One-time setup: capture chrome, axis overlays, initialize shift-and-paint state
             self._visualization.prepare_direct_render()
             self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
+            self._visualization._osc_show_labels = es.cfg['visualization.video.display.oscilloscope.show-labels']
             self._visualization._osc_manual_duration = (
                 None if self._osc_auto
                 else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
@@ -831,6 +832,7 @@ class PlayerWindow(QMainWindow):
 
         self._visualization.prepare_direct_render()
         self._visualization._osc_enabled = es.cfg['visualization.video.display.oscilloscope.enabled']
+        self._visualization._osc_show_labels = es.cfg['visualization.video.display.oscilloscope.show-labels']
         self._visualization._osc_manual_duration = (
             None if self._osc_auto
             else OSC_DURATIONS[self._osc_duration_index] / 1000.0)
