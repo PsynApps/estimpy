@@ -18,6 +18,8 @@ visualization:
     time:
       font-size: 48
   video:
+    display:
+      window-length: 10
     export:
       size: 1136x640
-    window-length: 10
+      window-length: 10

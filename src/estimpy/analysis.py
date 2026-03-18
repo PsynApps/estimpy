@@ -89,7 +89,9 @@ class Envelope:
         return self._times
 
     @classmethod
-    def pad_envelope_data(cls, envelope_data: np.ndarray, padding_data: np.ndarray = np.array([0])) -> np.ndarray:
+    def pad_envelope_data(cls, envelope_data: np.ndarray, padding_data: np.ndarray = None) -> np.ndarray:
+        if padding_data is None:
+            padding_data = np.array([0])
         if len(envelope_data.shape) == 1:
             return np.concatenate((padding_data, envelope_data, padding_data))
         else:

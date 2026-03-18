@@ -38,8 +38,6 @@ cfg = {}
 listeners = {}
 
 def add_event_listener(event: str, listener: typing.Callable):
-    global listeners
-
     if event not in listeners:
         listeners[event] = []
 
@@ -47,8 +45,6 @@ def add_event_listener(event: str, listener: typing.Callable):
 
 
 def trigger_event(event: str):
-    global listeners
-
     if event in listeners:
         # Remove any non-callable listeners from the list
         listeners[event] = [listener for listener in listeners[event] if callable(listener)]
@@ -132,7 +128,13 @@ def _check_ffprobe():
         raise Exception('FFprobe not found. Make sure FFprobe is installed and available on your system path.')
 
 
-def _check_dependencies() -> None:
+def check_dependencies() -> None:
+    """Verify that FFmpeg and FFprobe are available on the system PATH.
+
+    Called lazily before operations that need them (export, video encoding)
+    rather than at import time, so that non-export functionality (analysis,
+    visualization, player with pre-encoded audio) works without FFmpeg.
+    """
     _check_ffmpeg()
     _check_ffprobe()
 
@@ -251,8 +253,6 @@ def _load_config_file(path: str) -> None:
         except yaml.YAMLError as exc:
             raise Exception(f'Error loading configuration file "{path}": {exc}')
 
-
-_check_dependencies()
 
 load_config('default')
 

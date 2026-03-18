@@ -1,5 +1,3 @@
-import math
-
 import numpy as np
 import pytest
 
@@ -20,17 +18,6 @@ class TestFrameToTime:
     def test_fractional_frame(self, video_viz):
         assert video_viz._frame_to_time(15) == pytest.approx(0.5)
 
-
-class TestTimeToFrame:
-    def test_zero(self, video_viz):
-        assert video_viz._time_to_frame(0) == 0
-
-    def test_one_second(self, video_viz):
-        assert video_viz._time_to_frame(1.0) == 30
-
-    def test_fractional_floors(self, video_viz):
-        """Should floor partial frames."""
-        assert video_viz._time_to_frame(0.51) == math.floor(0.51 * 30)
 
 
 class TestGetWindowRange:

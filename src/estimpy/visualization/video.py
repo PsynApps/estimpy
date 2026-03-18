@@ -84,7 +84,6 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
         super().load(es_audio=es_audio)
 
-        self._animation = None
         self._frames = range(math.floor(es_audio.length * self.fps))
         self.__precolored_spectrograms = None
 
@@ -118,7 +117,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         for channel_id, _ in self._channel_layout:
             axes_style_cfg = self._get_amplitude_style_cfg(channel_id)
 
-            axes_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id)
+            axes_key = self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=channel_id)
 
             self._handles['axes'][axes_key].set_xlim(axes_xlim)
 
@@ -154,7 +153,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             round_bounds=True)
 
         for channel_id, _ in self._channel_layout:
-            axes_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id)
+            axes_key = self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=channel_id)
 
             self._handles['axes'][axes_key].set_xlim(axes_xlim)
 
@@ -198,9 +197,9 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         self._dr_data_axes_keys = []
         for channel_id, _ in self._channel_layout:
             self._dr_data_axes_keys.append(
-                self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id))
+                self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=channel_id))
             self._dr_data_axes_keys.append(
-                self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id))
+                self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=channel_id))
 
         # --- Capture 1: Chrome image (no dynamic elements) ---
         self._set_dynamic_elements_visible(False)
@@ -239,7 +238,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
         self._scrub_regions = {}
         for channel_id, _ in self._scrub_channel_layout:
-            key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE_SCRUB, channel=channel_id)
+            key = self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE_SCRUB, channel=channel_id)
             bbox = self._handles['axes'][key].get_position()
             x0 = int(round(bbox.x0 * fig_width))
             y0 = int(round((1 - bbox.y1) * fig_height))
@@ -368,8 +367,8 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         # Invert flags per panel
         self._dr_invert = {}
         for ch, inv in self._channel_layout:
-            self._dr_invert[self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=ch)] = inv
-            self._dr_invert[self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=ch)] = inv
+            self._dr_invert[self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=ch)] = inv
+            self._dr_invert[self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=ch)] = inv
 
         # Direct references to data arrays (avoid property lookups per frame)
         self._dr_peak_times = self.peak_envelope.times
@@ -501,8 +500,8 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
 
                     t0 = time.perf_counter()
                 for ch, _ in self._channel_layout:
-                    spec_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=ch)
-                    amp_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=ch)
+                    spec_key = self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=ch)
+                    amp_key = self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=ch)
                     x0, _, x1, _ = self._data_regions[spec_key]
                     pw = x1 - x0
                     sx = pw - shift_pixels
@@ -626,8 +625,8 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
     def _dr_render_full_panels(self, window_min, window_max):
         """Full-width render for first frame or fallback."""
         for ch, _ in self._channel_layout:
-            spec_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=ch)
-            amp_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=ch)
+            spec_key = self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=ch)
+            amp_key = self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=ch)
             x0, _, x1, _ = self._data_regions[spec_key]
             pw = x1 - x0
             self._dr_paint_spectrogram_strip(ch, spec_key, 0, pw, window_min, window_max)
@@ -965,7 +964,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         axes_style_cfg = self._get_amplitude_style_cfg(channel_id)
 
         ax = self._handles['figure'].add_subplot(gridspec)
-        self._handles['axes'][self._get_axis_handle_id(type=axis_type, channel=channel_id)] = ax
+        self._handles['axes'][self._get_axis_handle_id(axis_type=axis_type, channel=channel_id)] = ax
         self._format_amplitude_axes(ax=ax, channel_id=channel_id, invert=invert, hideaxis=scrub)
 
         ax.set_facecolor(axes_style_cfg['background-color'])
@@ -1000,7 +999,7 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
             return
 
         ax = self._handles['figure'].add_subplot(gridspec)
-        self._handles['axes'][self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id)] = ax
+        self._handles['axes'][self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=channel_id)] = ax
         self._format_spectrogram_axes(ax=ax, invert=invert)
 
         # If rendering a video, don't bother rendering the spectrogram since it will change with each frame
@@ -1044,14 +1043,10 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
         super()._initialize_handles()
 
         self._handles['position_lines'] = []
-        self._handles['video_frame'] = []
         self._handles['amplitude_peak_fills'] = {}
         self._handles['amplitude_rms_fills'] = {}
         self._handles['spectrogram_images'] = {}
 
-
-    def _time_to_frame(self, time):
-        return math.floor(time * self.fps)
 
     def _update_time_text(self):
         if self._handles['time'] is None:

@@ -71,10 +71,10 @@ def set_ramp_gain(gain: float) -> None:
 
 
 def initialize() -> None:
-    """Initialize volume and thread-time arrays for the maximum channel count."""
+    """Initialize volume and thread-time arrays for the maximum supported channel count."""
     global _volumes, _volume_thread_times
 
-    max_channels = 2
+    max_channels = 3  # stereo (2) + triphase (3)
 
     _volumes = [es.cfg['player.volume-start']] * max_channels
     _volume_thread_times = [0] * max_channels

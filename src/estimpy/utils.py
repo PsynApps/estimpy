@@ -4,6 +4,8 @@ import glob
 import itertools
 import numpy as np
 import os
+import random
+import string
 import sys
 import tempfile
 import threading
@@ -143,10 +145,17 @@ def get_output_file(output_path: str, input_file_name: str, file_format: str) ->
 
 
 def get_temp_file_path(temp_file_name: str = None) -> str:
-    temp_file_path = tempfile.gettempdir()
-    if temp_file_name is not None:
-        temp_file_path += f'{os.sep}{temp_file_name}'
-    return temp_file_path
+    """Return a path in the system temp directory, optionally for a named file.
+
+    When a file name is provided, a short random suffix is inserted before the
+    extension to avoid collisions between concurrent processes.
+    """
+    temp_dir = tempfile.gettempdir()
+    if temp_file_name is None:
+        return temp_dir
+    base, ext = os.path.splitext(temp_file_name)
+    suffix = ''.join(random.choices(string.ascii_lowercase + string.digits, k=6))
+    return os.path.join(temp_dir, f'{base}_{suffix}{ext}')
 
 
 def log10_quiet(x: int | float | np.ndarray | typing.Iterable, *args: typing.Any, **kwargs: typing.Any) -> np.ndarray:
@@ -157,10 +166,8 @@ def log10_quiet(x: int | float | np.ndarray | typing.Iterable, *args: typing.Any
     :param typing.Any args:
     :param typing.Any kwargs:
     """
-    old_settings = np.seterr(divide='ignore')
-    y = np.log10(x, *args, **kwargs)
-    np.seterr(**old_settings)
-    return y
+    with np.errstate(divide='ignore'):
+        return np.log10(x, *args, **kwargs)
 
 
 def seconds_to_string(seconds: int | float = 0):

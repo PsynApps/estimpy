@@ -322,6 +322,7 @@ def write_audio(es_audio: es.audio.Audio, output_path: str = None,
     """Export processed audio to a file via FFmpeg.
 
     Encodes the audio from ``es_audio.file`` (which may be a temp WAV from the
+
     processing chain) to the configured codec and format. After encoding, generates
     a visualization image and embeds it as album art along with metadata tags.
 
@@ -335,6 +336,7 @@ def write_audio(es_audio: es.audio.Audio, output_path: str = None,
     :param overwrite: Overwrite behavior override.
     :return dict: ``{file, encoding_time, file_size}`` on success, ``None`` on failure.
     """
+    es.check_dependencies()
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
 
     # When the output path points to a specific file, use its extension for codec/format
@@ -396,7 +398,8 @@ def write_audio(es_audio: es.audio.Audio, output_path: str = None,
         output_metadata = es.metadata.Metadata(file=output_file)
         output_metadata.set_metadata(es_audio.metadata.get_metadata())
 
-        image_data = open(image_file, 'rb').read()
+        with open(image_file, 'rb') as f:
+            image_data = f.read()
         output_metadata.set_tag('image', image_data)
 
         with es.utils.Spinner(f'Writing metadata... '):
@@ -479,12 +482,13 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
                 frame_start: int = None, segment_start: int = None,
                 image_file: str = None, overwrite: bool = None,
                 profiling: bool = False) -> dict | None:
+    es.check_dependencies()
     output_path = output_path if output_path is not None else es.cfg['files.output.path']
     video_format = video_format if video_format is not None else es.cfg['video.export.format']
     segment_start = segment_start if segment_start is not None else 1
 
     # Determine the number of frames per segment
-    frames_per_segment = es.cfg['video.export.segment-length'] * es.cfg['video.export.fps']
+    frames_per_segment = int(es.cfg['video.export.segment-length'] * es.cfg['video.export.fps'])
 
     video_file = es.utils.get_output_file(
         output_path=output_path,
@@ -661,7 +665,7 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             temp_file_name=f'{video_file_base}_{video_segment_id}.{video_format}'
         )
 
-        segment_length = frame_count * es.cfg["video.export.fps"]
+        segment_length = frame_count / es.cfg["video.export.fps"]
 
         # The last frame of the segment must be a keyframe to allow concatenation without re-encoding
         ffmpeg_keyframe_args = [
@@ -727,6 +731,10 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
 
         ffmpeg_process.stdin.close()
         ffmpeg_process.wait()
+
+        if ffmpeg_process.returncode != 0:
+            print(f'Error: FFmpeg exited with code {ffmpeg_process.returncode} during segment {video_segment_id}.')
+            return None
 
         frames_progress_bar.close()
 
@@ -846,7 +854,8 @@ def write_video(es_audio: es.audio.Audio, output_path: str = None, video_format:
             image_file = write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path(),
                                      triphase=es.cfg['visualization.video.export.triphase'])
             es.utils.add_temp_file(image_file)
-        image_data = open(image_file, 'rb').read()
+        with open(image_file, 'rb') as f:
+            image_data = f.read()
 
         video_metadata.set_tag('image', image_data)
 

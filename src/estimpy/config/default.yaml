@@ -1,5 +1,8 @@
 ---
+# Version of estimpy that this config profile was written for
 estimpy-version: 2.0.0
+# List of additional config profile names to load before this one (for profile chaining).
+# Profiles are applied in order; later values override earlier ones. Cycle detection prevents infinite loops.
 additional-config-profiles: ~
 analysis:
   oscilloscope:
@@ -107,6 +110,7 @@ files:
     # Prompt to overwrite existing files. Not relevant if overwrite-default is set to True.
     overwrite-prompt: True
 metadata:
+  # Default genre tag applied to exported files when no genre is specified in the source metadata
   default-genre: Estim
   # Pattern to extract metadata from file name
   file-path-pattern: (?P<artist>[^\\\/]*?) - (?P<title>.*)
@@ -288,7 +292,7 @@ visualization:
     oscilloscope:
       # Border width in pixels
       border-width: 10
-      # Font size for the duration label
+      # Font size for the readout labels (window length, peak frequency, level)
       font-size: 12
       # Height of box as fraction of combined amplitude+spectrogram panel height
       height-ratio: 0.5

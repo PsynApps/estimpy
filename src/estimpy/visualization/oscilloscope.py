@@ -14,7 +14,7 @@ import numpy as np
 import scipy.fft
 from PIL import Image, ImageDraw, ImageFont
 
-from estimpy.visualization.base import AxisTypes
+from estimpy.visualization.base import AxisTypes, _DISPLAY_DPI
 
 
 class OscilloscopeMixin:
@@ -54,7 +54,7 @@ class OscilloscopeMixin:
         # computing it from canvas dimensions alone.
         fig_width_px, fig_height_px = fig.canvas.get_width_height()
         display_height = es.cfg['visualization.image.display.height']
-        display_dpi = 100  # _DISPLAY_DPI in base.py — the canonical starting DPI
+        display_dpi = _DISPLAY_DPI
         fig_dpi = fig.get_dpi()
         # resize_figure computes: height_scale_factor = (target_h / current_h) * (current_dpi / target_dpi)
         # The net effect on font pixel size is: config_pt * height_scale_factor * (target_dpi / 72)
@@ -89,8 +89,8 @@ class OscilloscopeMixin:
         """Compute pixel bounding box (x0, y0, x1, y1) for oscilloscope overlay on a channel.
         Uses the steady-state position (panel center) so the box doesn't grow during the
         initial scroll-in period."""
-        amp_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id)
-        spec_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id)
+        amp_key = self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=channel_id)
+        spec_key = self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=channel_id)
         amp_region = self._data_regions[amp_key]
         spec_region = self._data_regions[spec_key]
 

@@ -21,6 +21,8 @@ visualization:
     time:
       font-size: 48
   video:
+    display:
+      window-length: 6
     export:
       size: 320x240
-    window-length: 6
+      window-length: 6

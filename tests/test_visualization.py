@@ -185,13 +185,13 @@ class TestSpectrogramYticks:
 
 class TestAxisHandleId:
     def test_with_channel(self):
-        assert Visualization._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=0) == 'amplitude_0'
+        assert Visualization._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=0) == 'amplitude_0'
 
     def test_without_channel(self):
-        assert Visualization._get_axis_handle_id(type=AxisTypes.TITLE) == 'title'
+        assert Visualization._get_axis_handle_id(axis_type=AxisTypes.TITLE) == 'title'
 
     def test_spectrogram_channel(self):
-        assert Visualization._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=2) == 'spectrogram_2'
+        assert Visualization._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=2) == 'spectrogram_2'
 
 
 class TestGetChannelStyleCfg:

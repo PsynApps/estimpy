@@ -14,7 +14,7 @@ def _parse_args(argv):
     """
     with mock.patch.object(sys, 'argv', ['estimpy'] + argv):
         # Replicate the subcommand-defaulting logic from main()
-        subcommands = {'play', 'show-image', 'save-image', 'save-audio', 'save-video', 'save-metadata'}
+        subcommands = {'play', 'show-image', 'save-image', 'save-audio', 'save-video', 'save-metadata', 'benchmark'}
         args = sys.argv[1:]
         has_subcommand = any(a in subcommands for a in args)
         if not has_subcommand and '-h' not in args and '--help' not in args:

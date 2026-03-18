@@ -193,7 +193,7 @@ If no command is given, the player is launched. If no files are given, a file di
 | `save-image`      | Save an image file with visualization of the input file(s). Output uses the same base name as the input file.      |
 | `save-video`      | Save a video file with an animated visualization. Output uses the input file as the audio track.                   |
 | `save-audio`      | Save processed audio file(s) with the audio processing chain applied (frequency transform, amplitude ramp, stereo stim). Output format is autodetected from the `-o` file extension or matches the input format. Generates a visualization image and embeds it as album art along with metadata tags. |
-| `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for mp3, mp4, m4a, and flac files. |
+| `save-metadata`   | Write the image visualization as album art to the audio file metadata. Supported for MP3, MP4, M4A, MOV, and FLAC files. |
 | `benchmark`       | Benchmark video encoding across all video profiles and display a comparison table of performance and file size. Supports `-o` to keep encoded files (named `benchmark-YYYYMMDDHHMMSS-profile.ext`) and `-c` to benchmark a specific combination of profiles instead of all video profiles (the `video-` prefix may be omitted). |
 
 ### Global options

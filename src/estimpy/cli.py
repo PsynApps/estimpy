@@ -102,7 +102,7 @@ def main():
     # save-metadata
     parser_save_metadata = subparsers.add_parser('save-metadata',
         help='Write album art to audio file metadata',
-        description='Modify the input file(s) to add or replace the album art metadata with the image visualization. Only supported for mp3, mp4, and m4a files.')
+        description='Modify the input file(s) to add or replace the album art metadata with the image visualization. Supported for MP3, MP4, M4A, MOV, and FLAC files.')
     parser_save_metadata.add_argument('files', nargs='*', default=None, help='Input audio file(s). Supports wildcards.')
     _add_global_arguments(parser_save_metadata)
     _add_save_arguments(parser_save_metadata)
@@ -201,8 +201,8 @@ def _handle_global_arguments(args):
         sys.exit()
 
     # Apply shortcut config overrides
-    if args.get('recursive') is not None:
-        es.cfg['files.input.recursive'] = args['recursive']
+    if args.get('recursive'):
+        es.cfg['files.input.recursive'] = True
 
     if args.get('output_path') is not None:
         es.cfg['files.output.path'] = args['output_path']

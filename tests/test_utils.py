@@ -78,5 +78,11 @@ class TestGetTempFilePath:
 
     def test_with_filename(self):
         result = get_temp_file_path('test_file.tmp')
-        assert result.endswith('test_file.tmp')
-        assert tempfile.gettempdir() in result
+        assert result.startswith(os.path.join(tempfile.gettempdir(), 'test_file_'))
+        assert result.endswith('.tmp')
+
+    def test_with_filename_unique(self):
+        """Successive calls should produce different paths."""
+        a = get_temp_file_path('test_file.tmp')
+        b = get_temp_file_path('test_file.tmp')
+        assert a != b

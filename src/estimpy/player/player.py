@@ -54,9 +54,10 @@ class Player:
         return self._audio_files
 
     def get_channel_volume(self, channel) -> float:
-        """Return the target volume (0-100) for a channel, or None if out of range."""
+        """Return the target volume (0-100) for a channel, or 0 if out of range."""
         if channel < self._es_audio.channels:
             return self._channel_volumes[channel]
+        return 0
 
     def get_current_file_index(self) -> int:
         """Return the index of the currently loaded file in the playlist."""
@@ -75,9 +76,10 @@ class Player:
         return es.player.audio.get_time() if self._playing else self._time
 
     def is_channel_muted(self, channel) -> bool:
-        """Return True if the given channel is muted, or None if out of range."""
+        """Return True if the given channel is muted, or False if out of range."""
         if channel < self._es_audio.channels:
             return self._channel_muted[channel]
+        return False
 
     def is_full_screen(self) -> bool:
         """Return True if the player window is in fullscreen mode."""
@@ -255,7 +257,7 @@ class Player:
         if es_audio:
             self._es_audio = es_audio
             self._current_file = None
-        elif -len(self._audio_files) <= file_index < len(self._audio_files):
+        elif file_index is not None and -len(self._audio_files) <= file_index < len(self._audio_files):
             es_audio = es.audio.Audio(file=self._audio_files[file_index])
             if es_audio:
                 self._es_audio = self._process_audio(es_audio)

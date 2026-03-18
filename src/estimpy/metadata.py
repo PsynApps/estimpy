@@ -263,7 +263,7 @@ class MetadataFormat(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def _set_file_tag_value(cls, file_tags, tag: str, value) -> MetadataImage | None:
+    def _set_file_tag_value(cls, file_tags, tag: str, value) -> None:
         pass
 
 
@@ -357,8 +357,7 @@ class MetadataFormatMP4(MetadataFormat, abc.ABC):
             if file_tag_field in file_tags:
                 del file_tags[file_tag_field]
 
-            if value is not None:
-                file_tags[file_tag_field] = value
+            file_tags[file_tag_field] = value
 
 
 class MetadataFormatFLAC(MetadataFormat, abc.ABC):
@@ -411,7 +410,8 @@ def write_metadata(es_audio, image_file: str = None):
         image_file = es.export.write_image(es_audio=es_audio, output_path=es.utils.get_temp_file_path())
         es.utils.add_temp_file(image_file)
 
-    image_data = open(image_file, 'rb').read()
+    with open(image_file, 'rb') as f:
+        image_data = f.read()
     es_audio.metadata.image = image_data
 
     with es.utils.Spinner(f'Writing metadata... '):

@@ -39,11 +39,11 @@ def compute_ramp_gain(t: float, t_start: float, t_end: float, level: float, shap
 
 
 class Audio:
-    def __init__(self, file: str = None, format: str = None, audio_data: np.ndarray = None,
+    def __init__(self, file: str = None, audio_format: str = None, audio_data: np.ndarray = None,
                  sample_rate: int = None, bit_depth: int = None, metadata: dict = None):
         """
         :param file:
-        :param format:
+        :param audio_format:
         :param audio_data:
         :param sample_rate:
         :param bit_depth:
@@ -52,8 +52,8 @@ class Audio:
         self._metadata = es.metadata.Metadata(metadata=metadata)
 
         if file is not None:
-            _, format = os.path.splitext(file)
-            format = format[1:]
+            _, audio_format = os.path.splitext(file)
+            audio_format = audio_format[1:]
 
             audio_segment = pydub.AudioSegment.from_file(file)
 
@@ -84,7 +84,7 @@ class Audio:
 
         self._file = file  # type: str
         self._source_file = file  # type: str
-        self._format = format  # type: str
+        self._format = audio_format  # type: str
 
         self._sample_rate = sample_rate  # type int
         self._bit_depth = bit_depth  # type: int
@@ -132,10 +132,9 @@ class Audio:
         if self._data is None:
             return None
         dtype = np.int16 if self._bit_depth <= 16 else np.int32
+        scale = 2 ** (self._bit_depth - 1)
         return np.ascontiguousarray(
-            (self._data * (2 ** (self._bit_depth - 1))).clip(
-                -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
-            ).astype(dtype)
+            (self._data * scale).clip(-scale, scale - 1).astype(dtype)
         )
 
     @property
@@ -215,6 +214,35 @@ class Audio:
 
         self.metadata.save()
 
+    def _clone_with_data(self, data: np.ndarray, temp_name: str) -> 'Audio':
+        """Create a new Audio instance with new data and a temp WAV file for FFmpeg.
+
+        Handles the common pattern of: convert normalized data to raw integers,
+        write to a temp WAV, and construct a new Audio with all the same metadata.
+
+        :param data: New normalized float32 audio data (channels, samples).
+        :param temp_name: Filename for the temp WAV file.
+        :return Audio: New Audio instance backed by the temp WAV.
+        """
+        temp_path = es.utils.get_temp_file_path(temp_file_name=temp_name)
+        dtype = np.int16 if self._bit_depth <= 16 else np.int32
+        scale = 2 ** (self._bit_depth - 1)
+        raw = (data * scale).clip(-scale, scale - 1).astype(dtype)
+        scipy.io.wavfile.write(temp_path, self.sample_rate, raw.T)
+        es.utils.add_temp_file(temp_path)
+
+        audio = Audio.__new__(Audio)
+        audio._metadata = self._metadata
+        audio._file = temp_path
+        audio._source_file = self._source_file
+        audio._format = 'wav'
+        audio._sample_rate = self._sample_rate
+        audio._bit_depth = self._bit_depth
+        audio._data = np.ascontiguousarray(data)
+        audio._channels = self._channels
+        audio._sample_count = self._sample_count
+        return audio
+
     def with_frequency_transform(self) -> 'Audio':
         """Create a new Audio with frequency content shifted and/or scaled.
 
@@ -282,28 +310,8 @@ class Audio:
 
             transformed_channels.append(channel_data)
 
-        transformed = np.ascontiguousarray(np.vstack(transformed_channels))
-
-        # Write transformed audio to a temp WAV file for use by FFmpeg during export
-        temp_path = es.utils.get_temp_file_path(temp_file_name='freq_transform_audio.wav')
-        dtype = np.int16 if self._bit_depth <= 16 else np.int32
-        raw = (transformed * (2 ** (self._bit_depth - 1))).clip(
-            -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
-        ).astype(dtype)
-        scipy.io.wavfile.write(temp_path, self.sample_rate, raw.T)
-        es.utils.add_temp_file(temp_path)
-
-        audio = Audio.__new__(Audio)
-        audio._metadata = self._metadata
-        audio._file = temp_path
-        audio._source_file = self._source_file
-        audio._format = 'wav'
-        audio._sample_rate = self._sample_rate
-        audio._bit_depth = self._bit_depth
-        audio._data = transformed
-        audio._channels = self._channels
-        audio._sample_count = self._sample_count
-        return audio
+        transformed = np.vstack(transformed_channels)
+        return self._clone_with_data(transformed, 'freq_transform_audio.wav')
 
     def with_stereo_stim(self) -> 'Audio':
         """Create a new Audio with stereo stim filters applied.
@@ -324,28 +332,7 @@ class Audio:
         # Design bandpass Butterworth filter (4th order, zero-phase doubles effective order to 8th)
         sos = scipy.signal.butter(4, [hp, lp], btype='bandpass', fs=self.sample_rate, output='sos')
         filtered = scipy.signal.sosfiltfilt(sos, self._data, axis=1).astype(np.float32)
-
-        # Write filtered audio to a temp WAV file for use by FFmpeg during export
-        temp_path = es.utils.get_temp_file_path(temp_file_name='ss_audio.wav')
-        dtype = np.int16 if self._bit_depth <= 16 else np.int32
-        raw = (filtered * (2 ** (self._bit_depth - 1))).clip(
-            -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
-        ).astype(dtype)
-        # scipy.io.wavfile expects (samples, channels) layout
-        scipy.io.wavfile.write(temp_path, self.sample_rate, raw.T)
-        es.utils.add_temp_file(temp_path)
-
-        audio = Audio.__new__(Audio)
-        audio._metadata = self._metadata
-        audio._file = temp_path
-        audio._source_file = self._source_file
-        audio._format = 'wav'
-        audio._sample_rate = self._sample_rate
-        audio._bit_depth = self._bit_depth
-        audio._data = np.ascontiguousarray(filtered)
-        audio._channels = self._channels
-        audio._sample_count = self._sample_count
-        return audio
+        return self._clone_with_data(filtered, 'ss_audio.wav')
 
     def with_ramp(self, t_start: float = 0.0) -> 'Audio':
         """Create a new Audio with an amplitude ramp applied.
@@ -367,33 +354,22 @@ class Audio:
         if level <= 0:
             return self
 
-        # Build gain envelope across all samples
+        # Build gain envelope across all samples (vectorized)
         t_end = self.length
-        times = np.linspace(t_start, t_end, self._sample_count, endpoint=False)
-        gains = np.array([compute_ramp_gain(t, t_start, t_end, level, shape)
-                          for t in times], dtype=np.float32)
+        start_gain = 1.0 - min(level, 100) / 100.0
+        times = np.linspace(t_start, t_end, self._sample_count, endpoint=False, dtype=np.float32)
+
+        # Compute normalized progress [0, 1] for samples within the ramp region
+        progress = np.clip((times - t_start) / (t_end - t_start), 0.0, 1.0)
+
+        if shape == 0:
+            eased = progress
+        else:
+            eased = (np.exp(shape * progress) - 1) / (math.exp(shape) - 1)
+
+        gains = np.where(times >= t_end, 1.0, start_gain + (1.0 - start_gain) * eased).astype(np.float32)
         ramped = self._data * gains[np.newaxis, :]
-
-        # Write ramped audio to a temp WAV file for use by FFmpeg during export
-        temp_path = es.utils.get_temp_file_path(temp_file_name='ramp_audio.wav')
-        dtype = np.int16 if self._bit_depth <= 16 else np.int32
-        raw = (ramped * (2 ** (self._bit_depth - 1))).clip(
-            -(2 ** (self._bit_depth - 1)), 2 ** (self._bit_depth - 1) - 1
-        ).astype(dtype)
-        scipy.io.wavfile.write(temp_path, self.sample_rate, raw.T)
-        es.utils.add_temp_file(temp_path)
-
-        audio = Audio.__new__(Audio)
-        audio._metadata = self._metadata
-        audio._file = temp_path
-        audio._source_file = self._source_file
-        audio._format = 'wav'
-        audio._sample_rate = self._sample_rate
-        audio._bit_depth = self._bit_depth
-        audio._data = np.ascontiguousarray(ramped)
-        audio._channels = self._channels
-        audio._sample_count = self._sample_count
-        return audio
+        return self._clone_with_data(ramped, 'ramp_audio.wav')
 
     def with_triphase(self) -> 'Audio':
         """Create a 3-channel Audio with channels [A, B, -(A+B)] for triphase visualization.
@@ -444,4 +420,4 @@ def resample_audio_data(audio_data: np.ndarray, sample_rate: int, new_sample_rat
     lcm = math.lcm(sample_rate, new_sample_rate)
 
     return np.ascontiguousarray(
-        scipy.signal.resample_poly(audio_data, up=lcm / sample_rate, down=lcm / new_sample_rate, axis=1))
+        scipy.signal.resample_poly(audio_data, up=lcm // sample_rate, down=lcm // new_sample_rate, axis=1))

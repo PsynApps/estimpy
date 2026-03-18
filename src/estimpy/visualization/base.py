@@ -215,7 +215,7 @@ class Visualization:
         axes_style_cfg = self._get_amplitude_style_cfg(channel_id)
 
         ax = self._handles['figure'].add_subplot(gridspec)
-        self._handles['axes'][self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id)] = ax
+        self._handles['axes'][self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=channel_id)] = ax
         self._format_amplitude_axes(ax=ax, channel_id=channel_id, invert=invert)
 
         ax.set_facecolor(axes_style_cfg['background-color'])
@@ -275,7 +275,7 @@ class Visualization:
             return
 
         ax = self._handles['figure'].add_subplot(gridspec)
-        self._handles['axes'][self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id)] = ax
+        self._handles['axes'][self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=channel_id)] = ax
         self._format_spectrogram_axes(ax=ax, invert=invert)
 
         axes_style_cfg = self._get_spectrogram_style_cfg(channel_id)
@@ -495,8 +495,8 @@ class Visualization:
                 continue
 
             # Compute vertical center across the amplitude+spectrogram pair in figure coordinates
-            amp_key = self._get_axis_handle_id(type=AxisTypes.AMPLITUDE, channel=channel_id)
-            spec_key = self._get_axis_handle_id(type=AxisTypes.SPECTROGRAM, channel=channel_id)
+            amp_key = self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE, channel=channel_id)
+            spec_key = self._get_axis_handle_id(axis_type=AxisTypes.SPECTROGRAM, channel=channel_id)
             amp_pos = self._handles['axes'][amp_key].get_position()
             spec_pos = self._handles['axes'][spec_key].get_position()
             y_center = (min(amp_pos.y0, spec_pos.y0) + max(amp_pos.y1, spec_pos.y1)) / 2
@@ -526,17 +526,18 @@ class Visualization:
             es.cfg['visualization.style.amplitude.channels'][0]
 
     @classmethod
-    def _get_axis_handle_id(cls, type: AxisTypes, channel: int = None):
-        return f'{type}_{channel}' if channel is not None else f'{type}'
+    def _get_axis_handle_id(cls, axis_type: AxisTypes = None, channel: int = None):
+        return f'{axis_type}_{channel}' if channel is not None else f'{axis_type}'
 
     @classmethod
-    def _get_spectrogram_scale_text(cls, frequency_max: float) -> str:
-        if frequency_max < 1000:
-            return f'{str(frequency_max)} Hz'
+    def _get_spectrogram_scale_text(cls, frequency: float) -> str:
+        if frequency < 1000:
+            freq_val = int(frequency) if frequency == int(frequency) else round(frequency, 1)
+            return f'{freq_val} Hz'
         else:
-            frequency_max /= 1000
-            frequency_max = int(frequency_max) if frequency_max == int(frequency_max) else round(frequency_max, 1)
-            return f'{frequency_max} kHz'
+            khz = frequency / 1000
+            khz_val = int(khz) if khz == int(khz) else round(khz, 1)
+            return f'{khz_val} kHz'
 
     @classmethod
     def _get_spectrogram_style_cfg(cls, channel_id: int) -> typing.Dict:
@@ -546,16 +547,17 @@ class Visualization:
 
     @classmethod
     def _get_spectrogram_yticks(cls, frequency_max: float):
-        if frequency_max < 1000:
-            return range(0, frequency_max, 250)
-        elif frequency_max < 2000:
-            return range(0, frequency_max, 500)
-        elif frequency_max < 10000:
-            return range(0, frequency_max, 1000)
-        elif frequency_max < 20000:
-            return range(0, frequency_max, 2500)
+        freq = int(frequency_max)
+        if freq < 1000:
+            return range(0, freq, 250)
+        elif freq < 2000:
+            return range(0, freq, 500)
+        elif freq < 10000:
+            return range(0, freq, 1000)
+        elif freq < 20000:
+            return range(0, freq, 2500)
         else:
-            return range(0, frequency_max, 5000)
+            return range(0, freq, 5000)
 
     @classmethod
     def _time_enabled(cls, mode: VisualizationMode = VisualizationMode.DISPLAY) -> bool:

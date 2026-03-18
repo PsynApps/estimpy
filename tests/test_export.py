@@ -189,9 +189,9 @@ class TestSegmentCalculations:
     """Tests for video segment/frame math used in write_video."""
 
     def test_frames_per_segment(self):
-        es.cfg['visualization.video.export.segment-length'] = 60
-        es.cfg['visualization.video.export.fps'] = 30
-        frames_per_segment = es.cfg['visualization.video.export.segment-length'] * es.cfg['visualization.video.export.fps']
+        es.cfg['video.export.segment-length'] = 60
+        es.cfg['video.export.fps'] = 30
+        frames_per_segment = int(es.cfg['video.export.segment-length'] * es.cfg['video.export.fps'])
         assert frames_per_segment == 1800
 
     def test_total_frames_from_length(self):
