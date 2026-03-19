@@ -156,6 +156,8 @@ class PlayerWindow(QMainWindow):
         self._ss_pre_audio = None
         self._ramp_active = False
         self._ramp_start_time = 0.0
+        if es.cfg['audio.ramp.level'] == 0:
+            es.cfg['audio.ramp.level'] = 20
         self._fps = es.cfg['video.export.fps']
         self._total_frames = max(1, math.floor(es_audio.length * self._fps))
         self._seeking = False
@@ -358,20 +360,20 @@ class PlayerWindow(QMainWindow):
 
         self._add_separator(playback_layout)
 
+        # Playlist button
+        self._btn_playlist = self._make_text_button(
+            '\u2630', 28, 'Playlist (P)',
+            lambda: self._toggle_playlist())
+        playback_layout.addWidget(self._btn_playlist)
+
+        self._add_separator(playback_layout)
+
         # Fullscreen button
         self._btn_fullscreen = self._make_text_button(
             '\u26F6', 28, 'Fullscreen (F)',
             lambda: self._player.toggle_full_screen())
         self._btn_fullscreen.setCheckable(True)
         playback_layout.addWidget(self._btn_fullscreen)
-
-        self._add_separator(playback_layout)
-
-        # Playlist button
-        self._btn_playlist = self._make_text_button(
-            '\u2630', 28, 'Playlist (P)',
-            lambda: self._toggle_playlist())
-        playback_layout.addWidget(self._btn_playlist)
 
         controls_area.addLayout(playback_layout)
         controls_area.addStretch(1)
@@ -380,21 +382,12 @@ class PlayerWindow(QMainWindow):
         right_rows = QVBoxLayout()
         right_rows.setSpacing(2)
 
-        # --- Row 1: volume + ramp ---
+        # --- Row 1: master volume, ramp, zoom, oscilloscope ---
         row1 = QHBoxLayout()
         row1.setSpacing(4)
 
-        # Volume controls
         self._volume_widgets = {}
         self._add_master_volume(row1)
-
-        # Per-channel volume container (rebuilt when channel count changes)
-        self._channel_vol_container = QWidget()
-        self._channel_vol_layout = QHBoxLayout(self._channel_vol_container)
-        self._channel_vol_layout.setContentsMargins(0, 0, 0, 0)
-        self._channel_vol_layout.setSpacing(4)
-        self._rebuild_channel_volumes()
-        row1.addWidget(self._channel_vol_container)
 
         self._add_separator(row1)
 
@@ -406,11 +399,11 @@ class PlayerWindow(QMainWindow):
 
         self._ramp_gain_label = QLabel('')
         self._ramp_gain_label.setFixedWidth(32)
-        self._ramp_gain_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._ramp_gain_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         row1.addWidget(self._ramp_gain_label)
 
         ramp_level_label = QLabel('Level')
-        ramp_level_label.setFixedWidth(30)
+        ramp_level_label.setFixedWidth(32)
         row1.addWidget(ramp_level_label)
 
         self._ramp_level_slider = QSlider(Qt.Orientation.Horizontal)
@@ -420,13 +413,13 @@ class PlayerWindow(QMainWindow):
         self._ramp_level_slider.valueChanged.connect(self._on_ramp_level_changed)
         row1.addWidget(self._ramp_level_slider)
 
-        self._ramp_level_value = QLabel(str(es.cfg['audio.ramp.level']))
-        self._ramp_level_value.setFixedWidth(22)
+        self._ramp_level_value = QLabel(f"{es.cfg['audio.ramp.level']}%")
+        self._ramp_level_value.setFixedWidth(28)
         self._ramp_level_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
         row1.addWidget(self._ramp_level_value)
 
         shape_label = QLabel('Shape')
-        shape_label.setFixedWidth(34)
+        shape_label.setFixedWidth(38)
         row1.addWidget(shape_label)
 
         self._ramp_shape_slider = QSlider(Qt.Orientation.Horizontal)
@@ -441,12 +434,32 @@ class PlayerWindow(QMainWindow):
         self._ramp_shape_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
         row1.addWidget(self._ramp_shape_value)
 
+        self._add_separator(row1)
+
+        # Zoom controls
+        self._add_zoom_controls(row1)
+
+        self._add_separator(row1)
+
+        # Oscilloscope duration controls
+        self._add_osc_controls(row1)
+
         right_rows.addLayout(row1)
 
-        # --- Row 2: triphase, SS, zoom, oscilloscope (right-justified) ---
+        # --- Row 2: per-channel volumes, triphase, stereostim (right-justified) ---
         row2 = QHBoxLayout()
         row2.setSpacing(4)
         row2.addStretch(1)
+
+        # Per-channel volume container (rebuilt when channel count changes)
+        self._channel_vol_container = QWidget()
+        self._channel_vol_layout = QHBoxLayout(self._channel_vol_container)
+        self._channel_vol_layout.setContentsMargins(0, 0, 0, 0)
+        self._channel_vol_layout.setSpacing(4)
+        self._rebuild_channel_volumes()
+        row2.addWidget(self._channel_vol_container)
+
+        self._add_separator(row2)
 
         # Triphase toggle button (wrapped in channel-colored container)
         self._triphase_container = QWidget()
@@ -461,25 +474,16 @@ class PlayerWindow(QMainWindow):
         self._btn_triphase.setEnabled(self._es_audio.channels == 2)
         triphase_layout.addWidget(self._btn_triphase)
         self._apply_channel_tint(self._triphase_container, channel_id=2)
+        self._apply_tinted_checked_style(self._btn_triphase, channel_id=2)
         row2.addWidget(self._triphase_container)
 
         # Stereo stim toggle button
         self._btn_ss = self._make_text_button(
-            'SS', 28, 'Stereo Stim (S)',
-            lambda: self._toggle_ss(), width=34)
+            'Stereostim', 28, 'Stereo Stim (S)',
+            lambda: self._toggle_ss(), width=74)
         self._btn_ss.setCheckable(True)
         self._btn_ss.setChecked(es.cfg['audio.stereo-stim.enabled'])
         row2.addWidget(self._btn_ss)
-
-        self._add_separator(row2)
-
-        # Zoom controls
-        self._add_zoom_controls(row2)
-
-        self._add_separator(row2)
-
-        # Oscilloscope duration controls
-        self._add_osc_controls(row2)
 
         right_rows.addLayout(row2)
 
@@ -517,13 +521,15 @@ class PlayerWindow(QMainWindow):
         return btn
 
     def _add_separator(self, layout):
-        """Add a vertical separator to a layout."""
+        """Add a vertical separator with surrounding margin to a layout."""
+        layout.addSpacing(4)
         sep = QWidget()
         sep.setFixedWidth(1)
         sep.setFixedHeight(28)
         sep.setObjectName('separator')
         sep.setStyleSheet('#separator { background-color: #555; }')
         layout.addWidget(sep)
+        layout.addSpacing(4)
 
     def _add_master_volume(self, layout):
         """Add master volume controls (label + mute + vol down + vol up)."""
@@ -551,16 +557,31 @@ class PlayerWindow(QMainWindow):
             'mute_btn': mute_btn,
         }
 
+    def _get_channel_color(self, channel_id):
+        """Return the configured color for a channel, falling back to channel 0."""
+        channel_cfg = es.cfg['visualization.style.channels']
+        if channel_id < len(channel_cfg):
+            return channel_cfg[channel_id]['color']
+        return channel_cfg[0]['color']
+
     def _apply_channel_tint(self, widget, channel_id):
         """Apply a subtle channel-colored background tint to a container widget."""
         from estimpy.visualization import _alpha_color
-        channel_cfg = es.cfg['visualization.style.channels']
-        if channel_id < len(channel_cfg):
-            color = channel_cfg[channel_id]['color']
-        else:
-            color = channel_cfg[0]['color']
-        bg = _alpha_color(color, '#1a1a1a', 0.25)
+        bg = _alpha_color(self._get_channel_color(channel_id), '#1a1a1a', 0.25)
         widget.setStyleSheet(f'background-color: {bg}; border-radius: 4px;')
+
+    def _apply_tinted_checked_style(self, button, channel_id):
+        """Set a per-button :checked style that blends with the channel tint behind it."""
+        from estimpy.visualization import _alpha_color
+        tint = _alpha_color(self._get_channel_color(channel_id), '#1a1a1a', 0.25)
+        checked_bg = _alpha_color('#ffffff', tint, 0.3)
+        button.setStyleSheet(f"""
+            QPushButton:checked {{
+                background-color: {checked_bg};
+                border: 2px solid #cccccc;
+                color: #ffffff;
+            }}
+        """)
 
     def _add_channel_volume(self, container_layout, channel_id, label_text):
         """Add per-channel volume controls (label + mute + slider + value label) in a tinted container."""
@@ -941,7 +962,7 @@ class PlayerWindow(QMainWindow):
     def _on_ramp_level_changed(self, value):
         """Handle ramp level slider change."""
         es.cfg['audio.ramp.level'] = value
-        self._ramp_level_value.setText(str(value))
+        self._ramp_level_value.setText(f'{value}%')
 
     def _on_ramp_shape_changed(self, value):
         """Handle ramp shape slider change."""
@@ -980,8 +1001,9 @@ class PlayerWindow(QMainWindow):
                 background-color: #4a4a4a;
             }
             QPushButton:checked {
-                background-color: #4a4a4a;
-                border-color: #888;
+                background-color: rgba(255, 255, 255, 0.3);
+                border: 2px solid #cccccc;
+                color: #ffffff;
             }
             QSlider::groove:horizontal {
                 border: 1px solid #444;
@@ -1041,8 +1063,11 @@ class PlayerWindow(QMainWindow):
             gain = es.audio.compute_ramp_gain(
                 audio_time, self._ramp_start_time, self._es_audio.length,
                 es.cfg['audio.ramp.level'], es.cfg['audio.ramp.shape'])
-            es.player.audio.set_ramp_gain(gain)
-            self._ramp_gain_label.setText(f'{int(gain * 100)}%')
+            if gain >= 1.0:
+                self._stop_ramp()
+            else:
+                es.player.audio.set_ramp_gain(gain)
+                self._ramp_gain_label.setText(f'{int(gain * 100)}%')
 
         # Sync volume sliders from player state
         self._sync_volume_sliders()
@@ -1075,10 +1100,12 @@ class PlayerWindow(QMainWindow):
     def _sync_volume_sliders(self):
         """Sync per-channel volume sliders and labels from current state.
 
-        Sliders show the target volume (what the user set).
-        Labels show "target (current)" while a volume ramp is in progress,
-        and just "target" once the ramp has settled.
+        Sliders show the target volume (what the user set). Labels show
+        "target (effective)" when the effective output differs from the target
+        due to a smoothing ramp or an active amplitude ramp, and just "target"
+        when they match.
         """
+        ramp_gain = es.player.audio.get_ramp_gain()
         for ch in range(self._es_audio.channels):
             target_vol = self._player.get_channel_volume(ch)
             if target_vol is not None and ch in self._volume_widgets:
@@ -1089,10 +1116,10 @@ class PlayerWindow(QMainWindow):
                     widgets['slider'].blockSignals(False)
                 if 'vol_label' in widgets:
                     current_vol = es.player.audio.get_current_volume(ch)
+                    effective = int(current_vol * ramp_gain)
                     target_int = int(target_vol)
-                    current_int = int(current_vol)
-                    if current_int != target_int:
-                        widgets['vol_label'].setText(f'{target_int} ({current_int})')
+                    if effective != target_int:
+                        widgets['vol_label'].setText(f'{target_int} ({effective})')
                     else:
                         widgets['vol_label'].setText(str(target_int))
 

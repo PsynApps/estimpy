@@ -20,7 +20,7 @@
 
 Estim is a hobby that uses specialized signal generators to produce powerful sensations. Many commercial units accept custom stimulation signals via audio input, and the enthusiast community has built a large library of custom sessions distributed as standard audio files. While this format is convenient and non-proprietary, it provides no way to understand the flow, intensity, or texture of a session before using it.
 
-**EstimPy** solves this by generating rich visualizations from audio data — per-channel amplitude envelopes and spectrograms that make the structure of a session immediately visible.
+**EstimPy** solves this by generating rich visualizations from audio data — per-channel amplitude envelopes and spectrograms that make the structure of a session immediately visible. In video form, the visualization shows what is coming which can be useful during play and entertaining for others to watch and understand what is happening to the user.
 
 ## Features
 
@@ -29,10 +29,9 @@ A Qt-based audio player with real-time animated visualization, designed for use 
 - **Per-channel volume control** with independent gain sliders and mute toggles
 - **Smooth intensity transitions** — all volume changes (start, pause, seek, slider adjustment) ramp smoothly to prevent sudden changes in output intensity
 - **Oscilloscope overlay** — per-channel waveform display with trigger-stabilized rendering, automatic tone/pulse detection, and real-time readout labels (window length, peak frequency, signal level)
-- **Triphase toggle** — instantly switch between stereo and 3-channel triphase visualization
+- **Triphase toggle** — switch between stereo and 3-channel triphase visualization
 - **Stereo stim toggle** — apply or remove safety bandpass filtering during playback
 - **Amplitude ramp** — start a gradual amplitude ramp during playback with adjustable level and curve shape
-- **Zoom controls** — adjust the sliding window length from 1 second to full file duration
 - **Playlist management** — add, remove, reorder, and select files; drag-and-drop support; M3U import/export
 - **Keyboard shortcuts** for all controls; fullscreen mode; click-to-seek on visualization panels
 
@@ -218,7 +217,7 @@ These options are only available on `save-video`:
   estimpy input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/191185ef-24fb-48af-a26d-2f17535ac0e7" width="720">
+  <img src="https://github.com/user-attachments/assets/d67fde73-db40-492d-bc82-bcb21da8bcef" width="720">
 </p>
 
 - **Launch the player with multiple files as a playlist**

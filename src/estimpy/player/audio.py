@@ -62,12 +62,18 @@ def set_ramp_gain(gain: float) -> None:
     """Set the ramp gain multiplier applied to all channel volumes.
 
     Called each frame by the player window to modulate volume in real-time
-    without reprocessing audio data.
+    without reprocessing audio data. Immediately applies the new gain to all
+    active channels so the volume change takes effect without waiting for a
+    volume ramp thread.
 
     :param gain: Gain multiplier (0.0 to 1.0).
     """
     global _ramp_gain
     _ramp_gain = max(0.0, min(1.0, gain))
+    # Apply immediately to all active channels at their current volume
+    if _is_playing and _channels:
+        for i in range(len(_channels)):
+            _set_channel_volume_unsafe(volume=_volumes[i], channel=i)
 
 
 def initialize() -> None:

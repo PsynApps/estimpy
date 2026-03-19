@@ -1,89 +1,63 @@
 # Changelog
 
-## [2.0.0] - 2026-03-10
+## [2.0.0] - 2026-03-18
 ### Added
-- Unified `estimpy` CLI replacing `estimpy-visualizer` and `estimpy-player` with subcommands: `play` (default), `show-image`, `save-image`, `save-video`, `save-metadata`
-- Positional file arguments (e.g., `estimpy play song.mp3` instead of `estimpy-player -i song.mp3`)
-- Configurable time text position (`top`/`bottom`) for image and video visualizations (`*.time.position`)
-
-- Reassigned spectrogram algorithm for sharper time-frequency localization, with configurable smoothing (`analysis.spectrogram.reassign`, `analysis.spectrogram.reassign-smoothing`)
-- Triphase visualization mode (`-t`/`--triphase`) showing the derived common electrode signal -(A+B) alongside the A and B channels, with per-mode config keys (`visualization.image.display.triphase`, `visualization.image.export.triphase`, `visualization.video.display.triphase`, `visualization.video.export.triphase`) defaulting to off for images and on for video
-- Triphase toggle in the player UI for instant switching between stereo and triphase visualization during playback, with pre-computed 3-channel analysis data for stereo files
-- Per-channel colormap derivation from a single base colormap (`visualization.style.spectrogram.color-map`), with the low-energy region automatically recolored to match each channel's base color
-- Configurable colormap recoloring radius (`visualization.style.spectrogram.match-channel-color-radius`) with perceptual brightness matching using Rec. 709 relative luminance
-- Playlist management UI in the player with add, remove, reorder, and file selection
-- Repeat mode button in the player (none/one/all), toggled with the R key
-- Fullscreen mode in the player, toggled via button, F key, Alt+Enter, or double-clicking the visualization (Escape to exit)
-- Zoom controls in the player for adjusting the sliding window length
-- Qt-based player window replacing the matplotlib-only interactive player
-- Direct frame rendering pipeline for video export, bypassing matplotlib's animation framework and piping raw frames to ffmpeg
-- Profiling mode for video export (`-p`/`--profiling`) to diagnose per-frame timing
-- Third channel style configuration (`visualization.style.amplitude.channels.ch2`)
-- Triphase subplot height ratios (`visualization.style.subplot-height-ratios.amplitude.triphase`, `visualization.style.subplot-height-ratios.spectrogram.triphase`)
-- Pillow added as a package dependency
+- Unified `estimpy` CLI replacing `estimpy-visualizer` and `estimpy-player` with subcommands: `play` (default), `show-image`, `save-image`, `save-video`, `save-audio`, `save-metadata`, `benchmark`
+- Positional file arguments (e.g., `estimpy play song.mp3`)
+- Qt-based interactive player with real-time animated visualization, replacing the matplotlib-only player
+- Direct frame rendering pipeline for video export, bypassing matplotlib's animation framework and piping raw frames to FFmpeg
+- Reassigned spectrogram algorithm for sharper time-frequency localization, with configurable smoothing
+- Triphase visualization mode (`-t`/`--triphase`) showing the derived common electrode signal -(A+B) alongside A and B channels, with per-mode config keys defaulting to off for images and on for video; instant toggle in the player UI
+- Per-channel colormap derivation from a single base colormap, with automatic recoloring to match each channel's color using perceptual brightness matching (Rec. 709 relative luminance)
+- Oscilloscope waveform overlay for video display and export with trigger-stabilized rendering, automatic tone/pulse detection (coefficient of variation analysis), real-time readouts (window length, peak frequency, signal level), configurable trigger correlation threshold, and manual duration controls in the player
+- Configurable channel identity labels (A, B, T) centered across each channel's amplitude and spectrogram panels
+- Stereo stim mode (`-ss`/`--stereo-stim`) applying a safety bandpass filter to remove DC offset, subsonic content, and high-frequency artifacts, with SS badge overlay on exported videos, player toggle (S key), and automatic audio re-encoding during video export
+- Amplitude ramp (`audio.ramp.level`, `audio.ramp.shape`) that gradually increases audio amplitude from a reduced level to full over the file duration, with configurable exponential easing; available as a real-time player control (G key)
+- Frequency transform (`audio.frequency.scale`, `audio.frequency.shift`) for shifting and/or scaling audio frequency content while preserving duration
+- `save-audio` CLI command for exporting processed audio with the full processing chain applied, automatic format detection from output extension or source codec, visualization album art generation, and metadata embedding
+- Audio export config profiles: `audio-mp3` (highest quality VBR), `audio-wav` (24-bit PCM), `audio-flac` (lossless)
+- Container-aware video audio encoding: incompatible codecs (e.g., FLAC in MP4) are automatically re-encoded as AAC; compatible audio is stream-copied
+- FLAC and MOV metadata support (read/write via mutagen)
+- Player features: per-channel volume with colored tints, playlist management (add/remove/reorder, M3U import/export), repeat mode (none/one/all), fullscreen, zoom, keyboard shortcuts, smooth volume ramping on all transitions
+- Player respects CLI audio processing parameters on load (frequency transform, ramp, stereo stim)
+- Resolution-aware FFT sizing using coarse frequency pre-analysis and output panel dimensions
+- User configuration directory (`~/.estimpy/`) for personal profile overrides
+- Composable configuration via `additional-config-profiles` with cycle detection
+- `estimpy-version` key in profiles for forward-compatible version identification
+- `benchmark` subcommand for comparing video encoding profiles
 - Configuration profiles for HEVC and ProRes VideoToolbox hardware encoding, and iPod Touch player
-- Configurable reassignment bypass for the player (`player.spectrogram-reassign`, default False) to speed up loading by using the standard spectrogram
-- Resolution-aware FFT sizing for all visualization modes (player, image, and video export), using coarse frequency pre-analysis (~20 FFTs) and output panel dimensions to determine the optimal FFT size
-- Oscilloscope waveform overlay for video display and export, showing trigger-stabilized raw audio waveform per channel with automatic pulse detection that switches window length between tonal and pulsed content using coefficient of variation analysis (`visualization.video.display.oscilloscope.enabled`, `visualization.video.export.oscilloscope.enabled`, `analysis.oscilloscope.pulse-detection.*`). Overlay includes real-time readouts for window length, peak frequency, and peak/RMS level in dBFS, with configurable visibility (`visualization.video.display.oscilloscope.show-labels`, `visualization.video.export.oscilloscope.show-labels`)
-- Manual oscilloscope duration controls in the player UI (auto/manual mode with configurable duration stepping)
-- Configurable channel identity labels (A, B, T) displayed on visualizations, centered across each channel's amplitude and spectrogram panels (`visualization.style.channels.labels.enabled`, `visualization.style.channels.labels.font-size`, `visualization.style.channels.chN.label`)
-- Channel-colored background tints on per-channel volume controls and triphase button in the player, visually linking controls to their channel identity
-- `benchmark` CLI subcommand for comparing video encoding profiles, reporting encoding time, speed, and file size across all `video-*` config profiles (`-o` to keep output files with timestamped filenames, `-c` to benchmark a specific profile combination with automatic `video-` prefix resolution)
-- MOV container metadata support (read/write via mutagen's MP4/QuickTime handler)
-- User configuration directory (`~/.estimpy/`) for personal profile overrides and custom profiles, loaded after builtin profiles of the same name
-- `additional-config-profiles` key in config profiles to automatically load other profiles after the current one, enabling composable configuration chains
-- `estimpy-version` key in all config profiles for forward-compatible version identification, with a warning when a profile targets a newer version than the running installation
-- Benchmark audio generator script (`tests/generate_benchmark.py`)
-- Stereo stim mode (`-ss`/`--stereo-stim`) applying a bandpass filter (configurable `audio.stereo-stim.high-pass` and `.low-pass`) to remove DC offset, subsonic content, and high-frequency artifacts before playback or export, with an SS badge overlay on exported videos, a toggle button (S key) in the player, and automatic audio re-encoding in the original codec during video export
-- Amplitude ramp (`audio.ramp.level`, `audio.ramp.shape`) that gradually increases audio amplitude from a reduced level at the start of the file to full amplitude at the end, with configurable exponential easing curve shape; applied to exported audio and available as a real-time player control (G key to start/restart, with level and shape sliders)
-- `save-audio` CLI command for exporting processed audio files with the full processing chain applied (frequency transform → amplitude ramp → stereo stim), with automatic format detection from output file extension or input file format, visualization album art generation, and metadata embedding
-- Audio export format autodetection: output codec and format are inferred from the `-o` file extension (e.g., `-o song.flac` encodes as FLAC without loading a profile), or from the source file's codec when no output is specified. Explicit `audio.export.codec`/`audio.export.format` config values override autodetection.
-- Audio export config profiles: `audio-mp3` (highest quality VBR), `audio-wav` (24-bit PCM), and `audio-flac` (lossless)
-- Container-aware video audio encoding: video export checks audio codec compatibility with the video container format (e.g., MP4). Incompatible codecs (like FLAC in MP4) are automatically re-encoded as AAC with a user-visible message. Unmodified audio with a compatible codec is stream-copied without re-encoding.
-- FLAC metadata support (read/write via mutagen) including Vorbis comments and embedded cover art
-- Frequency transform (`audio.frequency.scale`, `audio.frequency.shift`) for shifting and/or scaling audio frequency content, preserving duration. Scale uses FFT forward bin mapping to multiply all frequencies (preserves harmonic relationships); shift uses Hilbert SSB modulation to add a constant Hz offset (changes harmonic relationships). Both can be combined (scale applied first). Content pushed above Nyquist or below 0 Hz is discarded.
-- Player now respects CLI audio processing parameters: frequency transform and amplitude ramp are applied when loading files (including playlist navigation), and stereo stim activates the player's SS toggle with filtered audio. The player's real-time ramp (G key) layers on top of any CLI-applied ramp.
-- Automated test suite (342 tests) covering audio loading, DSP analysis, configuration, CLI, metadata, export, and utilities
+- Profiling mode for video export (`-p`/`--profiling`)
+- Configurable time text position (`top`/`bottom`)
+- Automated test suite (359 tests) covering audio, analysis, configuration, CLI, metadata, export, player, visualization, and utilities
 
 ### Changed
-- Video encoding config keys moved from `visualization.video.export.*` to `video.export.*` (codec, format, fps, segment-length, keyframe-interval, preview.*, reencode-segments, video-length-max, ffmpeg-extra-args). Visualization-appearance keys (size, triphase, time.*, title.*, oscilloscope.*, window-length) remain under `visualization.video.export.*`. All config profiles updated accordingly.
-- Audio processing chain reordered to frequency transform → ramp → stereo stim → triphase, ensuring stereo stim filtering is always the last safety step before the visualization-only triphase derivation
-- Deprecated `--dynamic-range`, `--frequency-min`, and `--frequency-max` CLI shortcut flags in favor of `-co` config option syntax; flags still work but print a deprecation warning
-- Audio data stored as float32 instead of float64, halving memory usage for all audio operations
-- Spectrogram computation uses float32/complex64 throughout, halving memory for all intermediate and final arrays
-- Reassigned spectrogram computed in chunks to limit peak memory usage, with histograms accumulated across batches
-- Raw audio data (`data_raw`) reconstructed on demand instead of stored as a duplicate copy
-- Default FFT length automatically sized based on output resolution and frequency content, replacing the previous fixed 1x window size default
-- Default window overlap increased to 75% (3/4 window size) for better temporal resolution
-- Envelope computation vectorized using NumPy stride tricks, replacing per-window Python loop
-- Spectral edge frequency max computation vectorized and subsampled for faster loading of long files
-- Spectrogram colormap configuration simplified from per-channel colormaps to a single base colormap with automatic per-channel derivation
-- Channel identity (color, label, and inverted) promoted to `visualization.style.channels.chN` with per-channel amplitude styling (`peak-color`, `rms-color`, `background-color`) falling back to the channel color when not explicitly set
-- Per-channel vertical inversion is now configurable (`visualization.style.channels.chN.inverted`, default `False`). Previously, ch1 was always inverted in stereo and triphase modes to mirror amplitude envelopes; this is now opt-in
-- Renamed `base-color` to `peak-color` in amplitude channel style configuration
-- Renamed `match-amplitude-color` to `match-channel-color` in spectrogram style configuration
-- Default channel colors updated (`#4799e8`, `#b775ff`)
-- Triphase amplitude panel scaled to +6 dB (linear 2.0) to reflect the analog summation range
-- Video export default CRF changed from 26 to 22, preset from `slow` to `medium`
-- FFmpeg concat step now filters out codec-specific args when stream-copying segments
-- Font rendering uses explicit font properties throughout for consistent cross-platform text appearance
-- Reworked most video configuration profiles to improve processing speed and consistency of quality
-- Switched audio playback dependency from `pygame` to `pygame-ce` (community edition)
-- File selection dialogs now use Qt (`QFileDialog`) instead of tkinter, removing the tkinter dependency
-- Player controls reordered: playback | repeat | fullscreen | playlist | stretch | oscilloscope | zoom | volume | triphase
-- Repeat config changed from boolean to string enum (`none`/`one`/`all`) with backward compatibility for boolean values
-- End-of-track handling now respects repeat mode: `one` loops the current file, `all` wraps around the playlist, `none` advances or stops
-- Refactored `visualization.py` into a `visualization/` subpackage with separate modules: `base.py` (static images), `video.py` (direct render pipeline), `oscilloscope.py` (waveform overlay mixin)
-- `write_video()` returns a result dict (`file`, `encoding_fps`, `total_frames`, `encoding_time`, `file_size`) instead of a plain file path, providing encoding statistics to callers
-- Font face index for TTC files now stored as derived config key (`visualization.style.font.text.face-index`) instead of a module-level variable
-- Audio export defaults changed from hardcoded `libmp3lame`/`mp3` to auto-detection (`audio.export.codec` and `audio.export.format` default to `~`/null), with context-aware resolution: output file extension → source file codec → `libmp3lame`/`mp3` fallback
-- Video export audio handling replaced inline codec logic with container-aware resolution: unmodified audio with a compatible codec is stream-copied; modified or incompatible audio is re-encoded using AAC (for MP4/MOV) with a user-visible message
+- Video encoding config keys moved from `visualization.video.export.*` to `video.export.*` (codec, format, fps, segment-length, etc.); visualization-appearance keys remain under `visualization.video.export.*`
+- Audio processing chain reordered: frequency transform → ramp → stereo stim → triphase (stereo stim is always the last safety step before triphase derivation)
+- Audio data stored as float32 (halved memory); spectrogram uses float32/complex64 throughout
+- Reassigned spectrogram computed in chunks to limit peak memory; raw audio reconstructed on demand
+- Default FFT length automatically sized based on output resolution and frequency content
+- Default window overlap increased to 75% for better temporal resolution
+- Envelope computation and spectral edge frequency vectorized for faster loading
+- Spectrogram colormap simplified to a single base colormap with automatic per-channel derivation
+- Channel identity (color, label, inverted) promoted to `visualization.style.channels.chN` with per-channel amplitude styling falling back to channel color
+- Per-channel vertical inversion now configurable (previously ch1 was always inverted in stereo)
+- Renamed `base-color` → `peak-color`, `match-amplitude-color` → `match-channel-color`
+- Default channel colors updated; triphase amplitude panel scaled to +6 dB
+- Video export default CRF 26 → 22, preset `slow` → `medium`; reworked encoding profiles
+- Switched audio playback from `pygame` to `pygame-ce`; file dialogs from tkinter to Qt
+- Player controls restructured into two-row layout: playback on the left spanning both rows, volume/ramp controls on top-right, toggle controls (triphase, SS, zoom, oscilloscope) on bottom-right
+- Player window auto-sizes to tightly bound the visualization canvas at the configured aspect ratio, constrained to screen dimensions
+- Repeat config changed from boolean to enum (`none`/`one`/`all`) with end-of-track handling per mode
+- Refactored `visualization.py` into `visualization/` subpackage: `base.py`, `video.py`, `oscilloscope.py`
+- `write_video()` returns a result dict with encoding statistics instead of a plain file path
+- Audio export format auto-detected from output extension or source codec; explicit config overrides
+- Font rendering uses explicit font properties for consistent cross-platform appearance
 
 ### Removed
 - Removed `estimpy-visualizer` and `estimpy-player` CLI entry points, replaced by unified `estimpy` command
 - Removed `-i`/`--input-files` flag (replaced by positional file arguments)
-- Removed shorthand flags (`-si`, `-wi`, `-wv`, `-wm`, `-drange`, `-fmin`, `-fmax`, `-rf`, `-rs`)
-- Removed legacy matplotlib-based interactive player (`VideoPlayerVisualization`), fully replaced by the Qt-based player
+- Removed all v1.x shorthand and deprecated flags (`-si`, `-wi`, `-wv`, `-wm`, `-drange`, `-fmin`, `-fmax`, `-rf`, `-rs`, `--dynamic-range`, `--frequency-min`, `--frequency-max`)
+- Removed legacy matplotlib-based interactive player, fully replaced by Qt-based player
 - Removed tkinter dependency (file dialogs replaced with Qt)
 
 ### Fixed

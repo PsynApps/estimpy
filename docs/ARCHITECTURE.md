@@ -1,6 +1,6 @@
 # EstimPy Architecture
 
-EstimPy is a Python toolkit for visualizing and playing back estim audio files. It provides a CLI (`estimpy`) that can launch an interactive real-time player, render static image visualizations, export animated videos, export processed audio files, and embed album art into audio file metadata. The core abstractions are: **Audio** (load and normalize audio data), **Analysis** (compute spectrograms and envelopes via DSP), **Visualization** (render panels using matplotlib and direct pixel manipulation), and **Player** (real-time playback with a Qt GUI). All behavior is driven by a hierarchical YAML configuration system with `default.yaml` as the single source of truth for defaults.
+EstimPy is a Python toolkit for visualizing and playing back estim audio files. It provides a CLI (`estimpy`) with subcommands to launch an interactive player, render static images, export animated videos, export processed audio, and manage audio file metadata. The core pipeline flows from **Audio** (load and normalize) through **Analysis** (compute spectrograms and envelopes) to **Visualization** (render panels via matplotlib and direct pixel manipulation), with a **Player** layer for real-time playback via a Qt GUI. All behavior is driven by a hierarchical YAML configuration system with `default.yaml` as the single source of truth for defaults.
 
 ## Directory Structure
 
@@ -8,14 +8,14 @@ EstimPy is a Python toolkit for visualizing and playing back estim audio files. 
 src/estimpy/
 ├── __init__.py              # Package init, config system, event bus, dependency checks
 ├── cli.py                   # CLI entry point — argument parsing and command routing
-├── audio.py                 # Audio loading, normalization, resampling
+├── audio.py                 # Audio loading, normalization, DSP processing chain
 ├── analysis.py              # DSP: spectrograms (standard + reassigned), envelopes
 ├── visualization/
 │   ├── __init__.py          # Re-exports, config event handler, colormap derivation
-│   ├── base.py              # Visualization class (static images), enums, show_image, set_optimal_nfft
+│   ├── base.py              # Visualization (static images), enums, show_image, set_optimal_nfft
 │   ├── video.py             # VideoVisualization: direct render pipeline, shift-and-paint
 │   └── oscilloscope.py      # OscilloscopeMixin: per-channel waveform overlay
-├── export.py                # File export: images (matplotlib), videos (ffmpeg pipe), audio (ffmpeg encode)
+├── export.py                # File export: images (matplotlib), videos (ffmpeg pipe), audio (ffmpeg)
 ├── metadata.py              # ID3/MP4/FLAC tag reading/writing via mutagen
 ├── utils.py                 # Shared helpers: file dialogs, spinners, temp files, formatting
 ├── player/
@@ -26,214 +26,34 @@ src/estimpy/
 │   └── playlist_window.py   # Playlist management dialog (add/remove/reorder, M3U)
 └── config/
     ├── default.yaml         # Canonical defaults (single source of truth)
-    └── *.yaml               # Named profiles: video codecs, resolutions, player presets
+    ├── video-*.yaml         # Video encoding profiles (hevc, av1, prores, vp9, resolutions, fps)
+    ├── audio-*.yaml         # Audio export profiles (mp3, wav, flac)
+    ├── image-*.yaml         # Image export profiles (4k-square, 8k-square, videopreview)
+    ├── player-*.yaml        # Player device profiles (cd028, ipodtouch, galaxytabs10ultra)
+    └── notitle.yaml         # Disables title overlay
 
 tests/
 ├── conftest.py              # Pytest fixtures: synthetic audio, config isolation
-├── generate_benchmark.py    # Generates benchmark.mp3 from source files in input/benchmark/ (--output-length, --segment-length, --output)
-├── test_audio.py            # Audio loading, normalization, triphase, resampling
+├── generate_benchmark.py    # Generates benchmark.mp3 from source files
 ├── test_analysis.py         # Envelope computation, spectrogram generation, FFT sizing
+├── test_audio.py            # Audio loading, normalization, triphase, resampling, DSP
+├── test_cli.py              # Argument parsing, config flag handling
 ├── test_config.py           # Config loading, updates, type casting, event system
+├── test_export.py           # Video/audio export, codec resolution, segment handling
+├── test_file_io.py          # File discovery, path resolution, extension handling
 ├── test_metadata.py         # Tag read/write, image format detection
-├── test_utils.py            # Formatting, file path helpers
+├── test_oscilloscope.py     # Trigger stabilization, mode detection, waveform extraction
+├── test_player.py           # Player state: playlist, volume, mute, repeat, track navigation
+├── test_utils.py            # Formatting, file path helpers, temp files
+├── test_video.py            # Direct render pipeline, frame buffer operations
+├── test_visualization.py    # Static visualization, axis layout, channel configuration
 └── input/
     ├── test.mp3             # Synthetic 1s test tone
     ├── benchmark.mp3        # 1-minute benchmark file (generated, committed)
     └── benchmark/           # Source audio files for benchmark generation (gitignored)
 ```
 
-**Why this layout:** The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `visualization/` and `player/` packages are separate subpackages because they have significant internal structure — visualization splits rendering concerns across static images, video pipeline, and oscilloscope overlay, while player manages GUI dependencies (PyQt6, pygame) with its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.
-
-## Key Modules & Their Roles
-
-### `__init__.py` — Configuration Hub
-- **Responsibility:** Load YAML configs into a flat `cfg` dict, provide an event system (`config.updated`), check system dependencies (ffmpeg/ffprobe), import all submodules.
-- **Key exports:** `cfg` (current config), `base_cfg` (file-loaded config), `load_config()`, `update_config_values()`, `add_event_listener()`, `trigger_event()`.
-- **Profile resolution:** Bare profile names are resolved against both the builtin config directory (`src/estimpy/config/`) and the user config directory (`~/.estimpy/`). When a profile exists in both locations, the builtin is loaded first and the user version overlays on top. Each profile may declare `additional-config-profiles` to chain further profiles after itself, with cycle detection to prevent infinite loops. The `estimpy-version` key is checked against the running version and produces a warning if the profile targets a newer release.
-- **Dependents:** Every other module accesses `es.cfg['key']` for configuration.
-
-### `audio.py` — Audio Data
-- **Responsibility:** Load audio files (via pydub/ffmpeg), normalize to float32 `[-1, 1]`, expose as numpy arrays shaped `(channels, samples)`.
-- **Key class:** `Audio` — properties: `data`, `data_raw`, `sample_rate`, `channels`, `length`, `metadata`. Methods: `with_frequency_transform()` (FFT bin mapping for scale, Hilbert SSB for shift), `with_ramp()` (amplitude ramp), `with_stereo_stim()` (bandpass safety filter), `with_triphase()` (derive 3rd channel as `-(A+B)`), `resample()`.
-- **Dependencies:** pydub, numpy, scipy (resampling, FFT, Hilbert transform, filtering).
-- **Dependents:** analysis, visualization, player, export, metadata.
-
-### `analysis.py` — DSP Engine
-- **Responsibility:** Compute spectrograms and amplitude envelopes from audio data.
-- **Key classes:**
-  - `Spectrogram` — FFT-based spectrogram with optional reassignment for sharper time-frequency localization. Supports auto-scaling frequency range via spectral edge detection.
-  - `Envelope` — Sliding-window peak and RMS amplitude envelopes using numpy stride tricks (zero-copy).
-- **Dependencies:** numpy, scipy.
-- **Dependents:** visualization (lazy-loaded via properties).
-- **Notable:** Reassigned spectrograms use three FFTs per frame, 2D histogram accumulation, and Nadaraya-Watson kernel smoothing. Processes in memory-bounded chunks (~500MB limit).
-
-### `visualization/` — Rendering Subpackage
-- **Responsibility:** All visual output — matplotlib figure creation, per-frame direct pixel rendering, oscilloscope overlay, colormap derivation, axis formatting.
-- **`__init__.py`** — Re-exports the public API (`Visualization`, `VideoVisualization`, `VisualizationMode`, `show_image`, `set_optimal_nfft`), handles `config.updated` events (resolution parsing, font initialization, channel color derivation, colormap generation), and contains internal helpers (`_alpha_color`, `_derive_channel_colormap`, `_parse_resolution`, `_calculate_spectrogram_panel_height`).
-- **`base.py`** — `Visualization` class for static image rendering: matplotlib figure construction with amplitude + spectrogram panels per channel, layout, styling, axis formatting. Also contains `AxisScaleText`, `AxisTypes`, `VisualizationMode` enums, `show_image()`, and `set_optimal_nfft()`.
-- **`video.py`** — `VideoVisualization(Visualization, OscilloscopeMixin)` extends base with time-windowed sliding view, the shift-and-paint direct render pipeline (`prepare_direct_render()`, `render_frame_direct()`), and all shift/paint/overlay methods for per-frame updates.
-- **`oscilloscope.py`** — `OscilloscopeMixin` provides per-channel oscilloscope waveform overlays with two-stage trigger stabilization, automatic tone/pulse mode detection, and real-time readout labels. **Trigger pipeline:** Each frame first attempts a cross-correlation trigger against the previous frame's waveform template for smooth tracking; if the correlation quality falls below a configurable threshold (`trigger-correlation-threshold`), it falls back to a hysteresis-armed rising zero-crossing trigger (`trigger-hysteresis`). **Mode detection:** Analyzes coefficient of variation across short sub-windows to automatically switch between tone mode (short window, ~10ms) and pulse mode (long window, ~500ms). **Labels:** Window length, peak frequency (via zero-padded FFT), and peak/RMS level in dBFS. Used as a mixin because the methods share extensive instance state with `VideoVisualization`.
-- **Dependencies:** matplotlib, PIL (ImageFont for direct text rendering), numpy, colorsys.
-- **Dependents:** export, player/window.
-
-### `export.py` — File Output
-- **Responsibility:** Write images via matplotlib, encode videos by piping raw RGB frames to ffmpeg, and export processed audio via ffmpeg encoding.
-- **Key functions:** `write_image()`, `write_video()`, `write_audio()`. Both `write_video()` and `write_audio()` return a result dict on success, `None` on failure. Shared helper `_build_ffmpeg_extra_args()` constructs ffmpeg argument lists from config key prefixes (`video.export.ffmpeg-extra-args.*`, `audio.export.ffmpeg-extra-args.*`).
-- **Audio codec resolution:** `_resolve_audio_codec()` uses a priority chain: explicit `audio.export.codec` config → output file extension (via `_EXTENSION_CODEC_MAP`) → source file codec detection (via ffprobe) → `libmp3lame` fallback. `_resolve_audio_format()` follows a similar chain for container format. `_resolve_audio_extra_args()` uses explicit config or auto-quality defaults per codec (`_AUTO_QUALITY_ARGS`). These functions are shared by both `write_audio()` and `write_video()`.
-- **Video audio handling:** `_resolve_video_audio_codec()` determines whether to stream-copy or re-encode audio for the video container. Unmodified audio with a container-compatible codec (checked via `_CONTAINER_SAFE_AUDIO_CODECS`) is stream-copied. Modified audio (stereo stim, ramp, frequency transform) or incompatible codecs trigger re-encoding with the container's default codec (AAC for MP4/MOV) and a user-visible message. `_is_audio_modified()` checks all four processing flags.
-- **Notable:** Video export uses segment-based encoding (configurable segment length, default 3600s) with resume support. Segments are concatenated with ffmpeg's concat demuxer. Supports preview frames with fade overlay. Audio export auto-detects codec and format from the output file extension or source file when not explicitly configured, generates a visualization image for album art, and embeds metadata. Metadata embedding is non-fatal for both video and audio — failures produce a warning rather than discarding the encoded file.
-- **Dependencies:** visualization (creates figures), subprocess (ffmpeg), tqdm (progress bars).
-
-### `metadata.py` — Audio Tags
-- **Responsibility:** Read/write ID3 (MP3), MP4/M4A/MOV, and FLAC tags. Extracts artist/title from filenames via regex.
-- **Key classes:** `Metadata`, `MetadataFormat` (abstract), `MetadataFormatMP3`, `MetadataFormatMP4`, `MetadataFormatFLAC`, `MetadataImage`.
-- **Dependencies:** mutagen (id3, mp4, flac).
-- **Dependents:** audio (auto-loads metadata), export (embeds album art in videos and audio), cli (save-metadata and save-audio commands).
-
-### `player/player.py` — Playback State Machine
-- **Responsibility:** Manage playlist, playback state, per-channel volume/mute, repeat modes (`none`/`one`/`all`), seeking, and applying the non-interactive audio processing chain (frequency transform, ramp) to files on load.
-- **Key class:** `Player` — orchestrates `player.audio` (sound) and `player.window` (GUI). The `_process_audio()` method applies frequency transform and ramp to each file when loaded; stereo stim is handled separately via the window's interactive SS toggle.
-- **Dependencies:** player.audio, player.window (lazy import to avoid circular dependency).
-
-### `player/audio.py` — Pygame Audio Engine
-- **Responsibility:** Low-level audio playback via pygame mixer with smooth volume ramping.
-- **Notable:** Uses 256-sample audio buffer for fine-grained volume control (~5.8ms granularity at 44.1kHz). Volume ramps run in daemon threads. Stop uses synchronous fade-to-zero (30 steps over 90ms) to prevent audio pops.
-- **Dependencies:** pygame-ce, numpy, threading.
-
-### `player/window.py` — Qt Player GUI
-- **Responsibility:** PyQt6 main window with visualization widget, playback controls, volume sliders, waveform scrubber, zoom controls, oscilloscope duration controls, keyboard shortcuts, fullscreen.
-- **Key classes:** `PlayerWindow(QMainWindow)`, `VisualizationWidget(QWidget)`.
-- **Notable:** Frame updates driven by QTimer. Overrides VideoVisualization settings to use display config (not export config). Supports triphase toggle, file drag-and-drop via playlist dialog. SS toggle saves/restores the pre-SS `Audio` object (not just a file path) so that processed audio (frequency transform, ramp) is preserved when toggling SS on/off.
-- **Dependencies:** PyQt6, visualization, player.
-
-## Data Flow
-
-### CLI Invocation: `estimpy play song.mp3`
-
-```mermaid
-sequenceDiagram
-    participant CLI as cli.py
-    participant Audio as audio.py
-    participant Analysis as analysis.py
-    participant Viz as visualization/
-    participant Window as player/window.py
-    participant Engine as player/audio.py
-
-    CLI->>Audio: Audio(file="song.mp3")
-    Note over Audio: pydub → numpy float32
-    CLI->>Audio: _process_audio(): freq transform, ramp
-    CLI->>Audio: with_stereo_stim() (if -ss)
-    CLI->>Engine: load(es_audio)
-    CLI->>Window: PlayerWindow(player, es_audio)
-    Window->>Viz: VideoVisualization(es_audio)
-    Viz->>Analysis: Spectrogram (lazy, on first access)
-    Viz->>Analysis: Envelope (lazy, on first access)
-    Note over Viz: make_figure() → prepare_direct_render()
-    Note over Viz: Capture chrome, axis overlays, init buffers
-
-    loop QTimer (30fps)
-        Window->>Viz: render_frame_direct(frame)
-        Note over Viz: shift panels, paint strip,<br/>draw oscilloscope, position lines
-        Viz-->>Window: RGB numpy array → QImage
-    end
-
-    Note over Engine: pygame mixer plays audio<br/>in parallel threads
-```
-
-### CLI Invocation: `estimpy save-video song.mp3`
-
-```mermaid
-sequenceDiagram
-    participant CLI as cli.py
-    participant Export as export.py
-    participant Viz as visualization/
-    participant FFmpeg as ffmpeg (subprocess)
-
-    CLI->>Export: write_video(es_audio)
-    Export->>Viz: VideoVisualization(es_audio)
-    Note over Viz: make_figure() → prepare_direct_render()
-    Export->>FFmpeg: Open pipe (rawvideo rgb24)
-
-    loop Each frame (segment-based)
-        Export->>Viz: render_frame_direct(frame)
-        Viz-->>Export: RGB numpy array
-        Export->>FFmpeg: pipe frame bytes
-    end
-
-    Export->>FFmpeg: Concatenate segments + audio
-    Export->>Export: Embed metadata + album art
-```
-
-### CLI Invocation: `estimpy save-audio song.mp3 -ss`
-
-```mermaid
-sequenceDiagram
-    participant CLI as cli.py
-    participant Audio as audio.py
-    participant Export as export.py
-    participant FFmpeg as ffmpeg (subprocess)
-    participant Viz as visualization/
-    participant Meta as metadata.py
-
-    CLI->>Audio: Audio(file="song.mp3")
-    Note over Audio: pydub → numpy float32
-    CLI->>Audio: with_frequency_transform() (if scale≠1 or shift≠0)
-    Note over Audio: STFT bin manipulation → temp WAV
-    CLI->>Audio: with_ramp() (if level > 0)
-    CLI->>Audio: with_stereo_stim() (if -ss)
-    Note over Audio: Bandpass filter → temp WAV
-    CLI->>Export: write_audio(es_audio)
-    Export->>FFmpeg: Encode audio (codec, format, sample-rate)
-    FFmpeg-->>Export: Output file
-    Export->>Viz: write_image() for album art
-    Export->>Meta: Embed metadata + album art
-```
-
-### CLI Invocation: `estimpy benchmark`
-
-```mermaid
-sequenceDiagram
-    participant CLI as cli.py
-    participant Config as __init__.py (config)
-    participant Export as export.py
-
-    CLI->>CLI: Load audio (once)
-    CLI->>CLI: Discover video-*.yaml profiles
-    CLI->>Config: Snapshot default config (deep copy)
-
-    loop Each profile
-        CLI->>Config: Restore snapshot
-        CLI->>Config: load_config(profile)
-        CLI->>Export: write_video(es_audio)
-        Note over Export: Full encode pipeline<br/>(same as save-video)
-        Export-->>CLI: video_file path
-        CLI->>CLI: Record time, FPS, file size
-        CLI->>CLI: Delete output (or keep if -o)
-    end
-
-    CLI->>CLI: Print summary table
-```
-
-The benchmark command reuses the standard `write_video()` pipeline — it does not implement a separate encoding path. Config isolation between runs is achieved by deep-copying the config dict before the loop and restoring it before each profile is loaded. The encoding FPS reported in the summary table comes from `write_video()`'s result dict, reflecting the actual frame rendering speed rather than total wall-clock time (which includes file loading, analysis, and metadata overhead). When `-c` is specified, only that combination of profiles is benchmarked as a single run instead of iterating all `video-*` profiles; profile names auto-resolve the `video-` prefix so users can pass either `hevc_videotoolbox` or `video-hevc_videotoolbox`. Output files saved with `-o` use timestamped names: `benchmark-YYYYMMDDHHMMSS-profile.ext`.
-
-### Direct Render Pipeline (per frame)
-
-The direct render pipeline is the performance-critical path. It avoids matplotlib's per-frame overhead by painting pixels directly into a numpy buffer:
-
-```
-1. RESTORE previous dynamic overlays (undo oscilloscope, time text, SS badge)
-2. RESTORE axis underlay (undo axis tick/label overlay)
-3. RESTORE position line regions (undo position lines)
-4. SHIFT panel pixels left by scroll amount (memcpy)
-5. PAINT new strip: sample spectrogram colormap + amplitude envelope into exposed pixels
-6. SAVE position line regions, DRAW position lines (behind axes/labels)
-7. SAVE axis underlay, APPLY axis overlay (alpha-composite tick marks/labels)
-8. SAVE dynamic overlay regions (snapshot pixels that will be overdrawn)
-9. DRAW oscilloscope boxes (per channel, if enabled)
-10. DRAW time text (pre-rendered PIL text images)
-```
-
-Each frame reverses steps 8-10, then 7, then 6 from the previous frame before painting new data, creating a 4-layer compositing system (data → position lines → axes → dynamic overlays) without accumulating artifacts.
+The top-level modules map 1:1 to pipeline stages (load → analyze → visualize → export). The `visualization/` and `player/` packages are separate subpackages because they have significant internal structure — visualization splits rendering concerns across static images, video pipeline, and oscilloscope overlay, while player manages GUI dependencies (PyQt6, pygame) with its own internal layering (state management, audio engine, window). Config profiles live alongside the code they configure so they ship with the package.
 
 ## Configuration System
 
@@ -250,15 +70,201 @@ analysis:                             # analysis.spectrogram.reassign: True
 
 **Design rules:**
 - `default.yaml` is the **single source of truth** for all default values. Code uses `es.cfg['key']` (bracket access, raises KeyError if missing) — never `es.cfg.get('key', fallback)`.
-- Named profiles (e.g., `video-4k.yaml`, `video-av1.yaml`, `audio-flac.yaml`) override specific keys when loaded via `-c profile_name`.
-- CLI `--config-option key value` overrides individual keys at runtime.
-- The `config.updated` event notifies listeners (e.g., `analysis._on_config_updated()`) when config changes. Derived values (like `analysis.window-overlap` computed from `analysis.window-size`) are set in these handlers.
+- Named profiles (e.g., `video-4k.yaml`, `audio-flac.yaml`) override specific keys when loaded via `-c profile_name`.
+- CLI `-co key value` overrides individual keys at runtime.
+- The `config.updated` event notifies listeners when config changes. Derived values (like `analysis.window-overlap` computed from `analysis.window-size`, or `visualization.video.display.width`/`.height` parsed from `.size`) are set in these handlers.
+
+**Profile resolution:** Bare profile names are resolved against both the builtin config directory (`src/estimpy/config/`) and the user config directory (`~/.estimpy/`). When a profile exists in both locations, the builtin is loaded first and the user version overlays on top. Each profile may declare `additional-config-profiles` to chain further profiles after itself, with cycle detection. The `estimpy-version` key is checked against the running version and produces a warning if the profile targets a newer release.
 
 **Namespace conventions:**
-- `video.export.*` — encoding mechanics (codec, format, fps, segment-length, keyframe-interval, preview, reencode-segments, video-length-max, ffmpeg-extra-args). These control how ffmpeg produces the video container.
-- `visualization.video.export.*` — visual appearance of exported video (size, triphase, time, title, oscilloscope, window-length). These control what the video looks like.
+- `video.export.*` — encoding mechanics (codec, format, fps, segment-length, keyframe-interval, preview, ffmpeg-extra-args). Controls how FFmpeg produces the video container.
+- `visualization.video.export.*` — visual appearance of exported video (size, triphase, time, title, oscilloscope, window-length). Controls what the video looks like.
 - `audio.export.*` — audio encoding mechanics (codec, format, sample-rate, ffmpeg-extra-args).
 - The distinction: keys that exist under both `visualization.video.display.*` and `visualization.video.export.*` are visual (stay under `visualization.*`). Keys only under `export` are encoding mechanics (live at `video.export.*` or `audio.export.*`).
+
+## Key Modules
+
+### `__init__.py` — Package Init & Config Hub
+- **Responsibility:** Load YAML configs into a flat `cfg` dict, provide an event system (`config.updated`), verify FFmpeg/FFprobe availability, import all submodules.
+- **Key exports:** `cfg` (current config), `base_cfg` (file-loaded snapshot), `load_config()`, `update_config_values()`, `add_event_listener()`, `trigger_event()`, `check_dependencies()`.
+- **Dependency checks:** `check_dependencies()` is public and called lazily by `export.write_video()` and `export.write_audio()` rather than at import time, so non-export operations work without FFmpeg installed.
+- **Import order:** `utils, metadata, audio, analysis, player, visualization, export` — `player` before `visualization` matters for circular import avoidance (see Known Limitations).
+
+### `audio.py` — Audio Data & Processing Chain
+- **Responsibility:** Load audio files (via pydub/FFmpeg), normalize to float32 `[-1, 1]`, expose as numpy arrays shaped `(channels, samples)`, and provide the audio processing chain.
+- **Key class:** `Audio` — properties: `data`, `data_raw` (reconstructed on demand), `sample_rate`, `channels`, `length`, `metadata`. Processing methods return new `Audio` instances: `with_frequency_transform()` (FFT bin mapping for scale, Hilbert SSB for shift), `with_ramp()` (amplitude ramp with exponential easing), `with_stereo_stim()` (bandpass safety filter), `with_triphase()` (derive 3rd channel as `-(A+B)`), `resample()`.
+- **Processing order:** frequency transform → ramp → stereo stim → triphase. Stereo stim is always the last safety step before the visualization-only triphase derivation.
+- **Dependencies:** pydub, numpy, scipy (resampling, FFT, Hilbert transform, filtering).
+
+### `analysis.py` — DSP Engine
+- **Responsibility:** Compute spectrograms and amplitude envelopes from audio data.
+- **Key classes:**
+  - `Spectrogram` — FFT-based spectrogram with optional reassignment for sharper time-frequency localization. Auto-scales frequency range via spectral edge detection.
+  - `Envelope` — Sliding-window peak and RMS amplitude envelopes using numpy stride tricks (zero-copy).
+- **Notable:** Reassigned spectrograms use three FFTs per frame, 2D histogram accumulation, and Nadaraya-Watson kernel smoothing. Processes in memory-bounded chunks (~500MB limit). Default FFT length is automatically sized based on output resolution and frequency content.
+
+### `visualization/` — Rendering Subpackage
+All visual output — matplotlib figure creation, per-frame direct pixel rendering, oscilloscope overlay, colormap derivation, and axis formatting.
+
+- **`__init__.py`** — Re-exports the public API (`Visualization`, `VideoVisualization`, `VisualizationMode`, `show_image`, `set_optimal_nfft`), handles `config.updated` events (resolution parsing, font initialization, channel color derivation, colormap generation).
+- **`base.py`** — `Visualization` class for static image rendering: matplotlib figure with amplitude + spectrogram panels per channel, layout, styling, axis formatting. Also contains `AxisScaleText`, `AxisTypes` (AMPLITUDE, AMPLITUDE_SCRUB, TITLE, SPECTROGRAM), `VisualizationMode` enums, `show_image()`, and `set_optimal_nfft()`. Analysis data (spectrograms, envelopes) is lazy-loaded via `@property` — computed once on first access and reused.
+- **`video.py`** — `VideoVisualization(Visualization, OscilloscopeMixin)` extends the base with time-windowed sliding view and the shift-and-paint direct render pipeline (`prepare_direct_render()`, `render_frame_direct()`). This is the performance-critical path — see Direct Render Pipeline below.
+- **`oscilloscope.py`** — `OscilloscopeMixin` provides per-channel waveform overlays (~630 lines). **Trigger pipeline:** Each frame first attempts a cross-correlation trigger against the previous frame's waveform template; if correlation quality falls below a configurable threshold (`analysis.oscilloscope.trigger-correlation-threshold`), it falls back to a hysteresis-armed rising zero-crossing trigger (`analysis.oscilloscope.trigger-hysteresis`). **Mode detection:** Analyzes coefficient of variation across short sub-windows to automatically switch between tone mode (~10ms window) and pulse mode (~500ms window). **Labels:** Window length, peak frequency (via zero-padded FFT), and peak/RMS level in dBFS. Implemented as a mixin because it shares extensive instance state with `VideoVisualization` (frame buffer, data regions, channel layout, font state).
+- **Dependencies:** matplotlib, PIL (ImageFont for direct text rendering), numpy, colorsys.
+
+### `export.py` — File Output
+- **Responsibility:** Write images via matplotlib, encode videos by piping raw RGB frames to FFmpeg, and export processed audio via FFmpeg encoding. Both `write_video()` and `write_audio()` call `es.check_dependencies()` before starting, return a result dict on success or `None` on failure.
+- **Audio codec resolution:** Priority chain: explicit config → output file extension → source file codec (via ffprobe) → `libmp3lame` fallback. Shared by both audio and video export.
+- **Video audio handling:** Unmodified audio with a container-compatible codec is stream-copied. Modified audio (stereo stim, ramp, frequency transform) or incompatible codecs are re-encoded as the container's default codec (AAC for MP4/MOV).
+- **Notable:** Video export uses segment-based encoding (configurable length, default 3600s) with resume support. Segments are concatenated with FFmpeg's concat demuxer. Audio export auto-detects codec/format, generates a visualization image for album art, and embeds metadata. Metadata embedding is non-fatal — failures produce a warning rather than discarding the encoded file.
+
+### `metadata.py` — Audio Tags
+- **Responsibility:** Read/write ID3 (MP3), MP4/M4A/MOV, and FLAC tags. Extracts artist/title from filenames via regex when tags are absent.
+- **Key classes:** `Metadata`, `MetadataFormat` (abstract), `MetadataFormatMP3`, `MetadataFormatMP4`, `MetadataFormatFLAC`, `MetadataImage`.
+- **Dependencies:** mutagen (id3, mp4, flac).
+
+### `player/` — Interactive Playback
+
+**`player.py` — Playback State Machine:**
+Manages playlist, playback state, per-channel volume/mute, repeat modes (`none`/`one`/`all`), and seeking. On file load, `_process_audio()` applies frequency transform and ramp; stereo stim is handled separately via the window's interactive toggle. When CLI `-ss` is set, `Player.__init__` applies stereo stim and stores the pre-SS `Audio` so toggling SS off in the player restores the processed (but unfiltered) audio.
+
+**`audio.py` — Pygame Audio Engine:**
+Low-level playback via pygame-ce mixer with smooth volume ramping. Uses a 256-sample audio buffer for fine-grained volume control (~5.8ms granularity at 44.1kHz). Volume ramps run in daemon threads. Stop uses synchronous fade-to-zero (30 steps over 90ms) to prevent audio pops. Uses module-level globals for mixer state.
+
+**`window.py` — Qt Player GUI:**
+PyQt6 main window with `VisualizationWidget(QWidget)` for the visualization canvas. Frame updates driven by QTimer at 30fps. Overrides `VideoVisualization` settings to use display config (not export config).
+
+Control layout is two rows: playback buttons (prev, skip-back, play/pause, stop, skip-forward, next, repeat, fullscreen, playlist) span the left side across both rows. The right side has volume/ramp controls (master volume, per-channel volumes with channel-colored tints, ramp button/sliders) on the top row and toggle controls (triphase, SS, zoom, oscilloscope) right-justified on the bottom row.
+
+The window auto-sizes to tightly bound the visualization canvas at the configured aspect ratio, constrained to 95% of screen dimensions. A seek slider with time label spans the full width above the controls.
+
+**`playlist_window.py` — Playlist Dialog:**
+Add, remove, reorder files; drag-and-drop; M3U import/export.
+
+## Data Flow
+
+### `estimpy play song.mp3`
+
+```mermaid
+sequenceDiagram
+    participant CLI as cli.py
+    participant Player as player/player.py
+    participant Audio as audio.py
+    participant Engine as player/audio.py
+    participant Window as player/window.py
+    participant Viz as visualization/
+    participant Analysis as analysis.py
+
+    CLI->>Player: Player(audio_files=["song.mp3"])
+    Player->>Audio: Audio(file="song.mp3")
+    Note over Audio: pydub → numpy float32
+    Player->>Audio: _process_audio(): freq transform, ramp
+    Player->>Audio: with_stereo_stim() (if -ss)
+    Player->>Engine: load(es_audio)
+    Player->>Window: PlayerWindow(player, es_audio)
+    Window->>Viz: VideoVisualization(es_audio)
+    Viz->>Analysis: Spectrogram (lazy, on first access)
+    Viz->>Analysis: Envelope (lazy, on first access)
+    Note over Viz: make_figure() → prepare_direct_render()
+    Note over Viz: Capture chrome, axis overlays, init buffers
+
+    loop QTimer (30fps)
+        Window->>Viz: render_frame_direct(frame)
+        Note over Viz: shift panels, paint strip,<br/>draw oscilloscope, position lines
+        Viz-->>Window: RGB numpy array → QImage
+    end
+
+    Note over Engine: pygame mixer plays audio<br/>in parallel threads
+```
+
+### `estimpy save-video song.mp3`
+
+```mermaid
+sequenceDiagram
+    participant CLI as cli.py
+    participant Audio as audio.py
+    participant Export as export.py
+    participant Viz as visualization/
+    participant FFmpeg as ffmpeg (subprocess)
+
+    CLI->>Audio: _load_audio(): load + processing chain
+    CLI->>Export: write_video(es_audio)
+    Export->>Viz: VideoVisualization(es_audio)
+    Note over Viz: make_figure() → prepare_direct_render()
+    Export->>FFmpeg: Open pipe (rawvideo rgb24)
+
+    loop Each frame (segment-based)
+        Export->>Viz: render_frame_direct(frame)
+        Viz-->>Export: RGB numpy array
+        Export->>FFmpeg: pipe frame bytes
+    end
+
+    Export->>FFmpeg: Concatenate segments + audio
+    Export->>Export: Embed metadata + album art
+```
+
+### `estimpy save-audio song.mp3 -ss`
+
+```mermaid
+sequenceDiagram
+    participant CLI as cli.py
+    participant Audio as audio.py
+    participant Export as export.py
+    participant FFmpeg as ffmpeg (subprocess)
+    participant Meta as metadata.py
+
+    CLI->>Audio: _load_audio(): load + processing chain
+    Note over Audio: freq transform → ramp → stereo stim
+    CLI->>Export: write_audio(es_audio)
+    Export->>FFmpeg: Encode audio (codec, format, sample-rate)
+    FFmpeg-->>Export: Output file
+    Export->>Export: write_image() for album art
+    Export->>Meta: Embed metadata + album art
+```
+
+### `estimpy benchmark`
+
+```mermaid
+sequenceDiagram
+    participant CLI as cli.py
+    participant Config as __init__.py (config)
+    participant Export as export.py
+
+    CLI->>CLI: Load audio (once)
+    CLI->>CLI: Discover video-*.yaml profiles
+    CLI->>Config: Snapshot config (deep copy)
+
+    loop Each profile
+        CLI->>Config: Restore snapshot
+        CLI->>Config: load_config(profile)
+        CLI->>Export: write_video(es_audio)
+        Export-->>CLI: Result dict (fps, time, size)
+        CLI->>CLI: Delete output (or keep if -o)
+    end
+
+    CLI->>CLI: Print summary table
+```
+
+The benchmark command reuses the standard `write_video()` pipeline. Config isolation between runs is achieved by deep-copying the config dict before the loop and restoring it before each profile load. When `-c` is specified, only that profile combination is benchmarked; profile names auto-resolve the `video-` prefix. Output files saved with `-o` use timestamped names.
+
+### Direct Render Pipeline (per frame)
+
+The direct render pipeline avoids matplotlib's per-frame overhead by painting pixels directly into a numpy buffer:
+
+```
+1. RESTORE previous dynamic overlays (undo oscilloscope, time text, SS badge)
+2. RESTORE axis underlay (undo axis tick/label overlay)
+3. RESTORE position line regions (undo position lines)
+4. SHIFT panel pixels left by scroll amount (memcpy)
+5. PAINT new strip: sample spectrogram colormap + amplitude envelope into exposed pixels
+6. SAVE position line regions, DRAW position lines (behind axes/labels)
+7. SAVE axis underlay, APPLY axis overlay (alpha-composite tick marks/labels)
+8. SAVE dynamic overlay regions (snapshot pixels that will be overdrawn)
+9. DRAW oscilloscope boxes (per channel, if enabled)
+10. DRAW time text (pre-rendered PIL text images)
+```
+
+Each frame reverses steps 8-10, then 7, then 6 from the previous frame before painting new data, creating a 4-layer compositing system (data → position lines → axes → dynamic overlays) without accumulating artifacts.
 
 ## Extension Points
 
@@ -270,8 +276,8 @@ analysis:                             # analysis.spectrogram.reassign: True
 **Adding a new visualization panel:**
 1. Add an `AxisTypes` enum value in `visualization/base.py`.
 2. Add height ratio config in `default.yaml` under `visualization.style.subplot-height-ratios`.
-3. Create the subplot in `Visualization._make_figure_subplots()` in `visualization/base.py`.
-4. For video mode: add strip-painting logic in `VideoVisualization` (`visualization/video.py`) following the amplitude/spectrogram pattern.
+3. Create the subplot in `Visualization._make_figure_subplots()`.
+4. For video mode: add strip-painting logic in `VideoVisualization` following the amplitude/spectrogram pattern.
 
 **Adding a new config option:**
 1. Add the key with its default value in `default.yaml`. This is the only place defaults should exist.
@@ -280,37 +286,35 @@ analysis:                             # analysis.spectrogram.reassign: True
 
 **Adding a new audio format for metadata:**
 1. Add the format to `MetadataFileFormats` enum in `metadata.py`.
-2. Subclass `MetadataFormat` and implement `_tag_fields()`, `_load_file_tags()`, `_set_file_tag_value()`, `_get_metadata_image()` (see `MetadataFormatFLAC` for a clean example).
+2. Subclass `MetadataFormat` and implement `_tag_fields()`, `_load_file_tags()`, `_set_file_tag_value()`, `_get_metadata_image()`.
 3. Add branches for the new format in `Metadata.load()` and `Metadata.save()`.
 
 **Adding a new config profile:**
-1. Create a `.yaml` file in `src/estimpy/config/` with only the keys you want to override.
-2. Users load it via `estimpy -c profile_name` (file extension is optional).
+1. Create a `.yaml` file in `src/estimpy/config/` with only the keys to override.
+2. Users load it via `estimpy -c profile_name` (file extension optional).
 
 ## Key Design Decisions
 
-**Direct pixel rendering instead of matplotlib animation:** The `render_frame_direct()` pipeline (in `visualization/video.py`) was built because matplotlib's `FuncAnimation` is far too slow for real-time 30fps playback and produces unnecessarily large video files. The direct pipeline captures the static "chrome" (axes, labels, borders) once, then shifts and paints only the data pixels each frame. This achieves ~10-50x speedup over matplotlib's per-frame redraw.
+**Direct pixel rendering instead of matplotlib animation:** matplotlib's `FuncAnimation` is far too slow for real-time 30fps playback and produces unnecessarily large video files. The direct pipeline captures the static "chrome" (axes, labels, borders) once from matplotlib, then shifts and paints only the data pixels each frame. This achieves ~10-50x speedup over matplotlib's per-frame redraw.
 
-**Flat config dictionary:** YAML is nested for readability, but `es.cfg` is flattened with dot-delimited keys (`visualization.style.amplitude.padding`). This makes config access a simple dict lookup without nested traversal, and allows CLI overrides with a single `key value` syntax.
+**Flat config dictionary:** YAML is nested for readability, but `es.cfg` is flattened with dot-delimited keys. This makes config access a simple dict lookup without nested traversal, and allows CLI overrides with a single `key value` syntax.
 
 **Pygame-ce for audio, PyQt6 for GUI:** Two event loops coexist. Pygame handles audio mixing (per-channel stereo panning, volume ramping in threads) while PyQt6 handles the window. This avoids reimplementing audio mixing in Qt and leverages pygame's mature SDL2 mixer.
 
-**Reassigned spectrogram with Nadaraya-Watson smoothing:** Standard spectrograms blur energy across time-frequency bins. Reassignment sharpens localization by moving energy to its "true" center, but creates sparse, noisy output. The NW kernel smoothing fills gaps while preserving magnitude — a critical detail for estim audio where precise frequency content matters.
+**Reassigned spectrogram with Nadaraya-Watson smoothing:** Standard spectrograms blur energy across time-frequency bins. Reassignment sharpens localization by moving energy to its "true" center, but creates sparse, noisy output. The NW kernel smoothing fills gaps while preserving magnitude — important for estim audio where precise frequency content matters.
 
-**Lazy analysis computation:** `Visualization.spectrogram` and `.peak_envelope` / `.rms_envelope` are computed on first access via `@property`. This means the expensive DSP work only happens once, and the same analysis data is reused across all frames and rendering modes.
+**Triphase as a virtual 3rd channel:** Instead of a separate rendering path, triphase mode (`-(A+B)`) creates a 3-channel `Audio` object. The rest of the pipeline handles it generically through `_channel_layout`, which simply reports 3 channels instead of 2.
 
-**Triphase as a virtual 3rd channel:** Instead of a separate rendering path, triphase mode (`-(A+B)`) creates a 3-channel `Audio` object. The rest of the pipeline (analysis, visualization) handles it generically through `_channel_layout`, which simply reports 3 channels instead of 2.
+**Oscilloscope as a mixin class:** The oscilloscope's methods share extensive instance state with `VideoVisualization` — frame buffer, data regions, amplitude colors, spectrogram times, channel layout, and font state. A standalone class would require passing 10+ parameters to every call. The mixin keeps oscilloscope code cleanly separated while giving it natural access to the host's state.
 
-**Oscilloscope as a mixin class:** The oscilloscope overlay (`OscilloscopeMixin` in `visualization/oscilloscope.py`) is a mixin rather than a standalone class or utility module because its methods share extensive instance state with `VideoVisualization` — the frame buffer, data regions, amplitude colors, spectrogram times, channel layout, and font state. A standalone approach would require passing 10+ parameters to every function call. The mixin keeps the oscilloscope code cleanly separated (~630 lines) while giving it natural access to the host's instance state.
+**Volume ramping in daemon threads:** Abrupt volume changes cause audible clicks. Every volume change (including stop) ramps smoothly over configurable durations via background threads. The 256-sample audio buffer ensures volume changes take effect within ~6ms.
 
-**Volume ramping in daemon threads:** Abrupt volume changes cause audible clicks. Every volume change (including stop) ramps smoothly over configurable durations using background threads that call `pygame.mixer.Channel.set_volume()` at 20ms intervals. The small 256-sample audio buffer ensures volume changes take effect within ~6ms.
+## Known Limitations
 
-## Known Limitations / Technical Debt
+**Global mutable state in `player/audio.py`.** The pygame audio engine uses module-level globals (`_is_playing`, `_channels`, `_volumes`, etc.) instead of a class instance. This precludes multiple simultaneous players.
 
-**Global mutable state in `player/audio.py`.** The pygame audio engine uses module-level globals (`_is_playing`, `_channels`, `_volumes`, etc.) instead of a class instance. This precludes multiple simultaneous players and makes the module harder to reason about.
+**Config system has no schema validation.** Invalid keys are caught at `update_config_values()` time, but type mismatches between YAML values and code expectations are only caught at point of use.
 
-**Config system has no schema validation.** Invalid keys are caught at `update_config_values()` time, but type mismatches between YAML values and code expectations (e.g., a string where an int is expected) are only caught at point of use. A schema or typed config class would catch errors earlier.
+**Circular import avoidance via lazy import.** `Player.__init__()` imports `PlayerWindow` inside the constructor because `player` is imported before `visualization` in `__init__.py`. This works but is fragile — import order changes can surface as circular import errors.
 
-**Circular import avoidance via lazy import.** `Player.__init__()` does `from estimpy.player.window import PlayerWindow` inside the constructor because `player` is imported before `visualization` in `__init__.py` (see Directory Structure above). This works but is fragile — import order matters and changes to it can surface as circular import errors.
-
-**Video export memory usage scales with segment length.** Each segment creates a new `VideoVisualization` that holds the full spectrogram in memory. For very long files, this can consume significant RAM despite the chunked reassignment computation.
+**Video export memory usage scales with segment length.** Each segment holds the full spectrogram in memory. For very long files, this can consume significant RAM despite the chunked reassignment computation.
