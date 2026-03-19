@@ -3,71 +3,62 @@
 **EstimPy** is a Python library that generates visualizations of Estim audio files.
 
 <div align="center">
-<a href="https://youtu.be/7zNsNnao8KU" target="_blank"><img src="https://github.com/user-attachments/assets/a74e0039-8cca-4149-bdbb-3a97e2659ba7"></a>  
+<a href="https://youtu.be/T0NwOUIXx0A" target="_blank"><img src="https://github.com/user-attachments/assets/d71ad527-e206-498c-9de6-8fec1453a808"></a> 
 </div>
 
 ## Table of Contents
-- [Visualization library](#visualization-library)
 - [Motivation](#motivation)
 - [Features](#features)
 - [Disclaimer](#disclaimer)
+- [Visualization examples](#visualization-examples)
 - [Getting started](#getting-started)
-- [Installation](#installation)
 - [Usage](#usage)
-  - [Commands](#commands)
-  - [Global options](#global-options)
-  - [Examples](#examples)
 - [Configuration](#configuration)
 - [Development](#development)
 
-## Visualization library
-[**Click here**](https://www.youtube.com/@Psynapster/videos) to access a library of pre-rendered high-resolution (8k 60fps) visualizations of some popular Estim audio files.
-
 ## Motivation
 
-Estim is a hobby which uses specialized signal generators to produce powerful sensations which can be pleasurable or painful depending on the intensity and characteristics of the stimulation signal delivered. The perception of these signals varies widely across individuals, so many hobbyists have to experiment with a range of devices, patterns, and intensities of stimulation to match their preferences.
+Estim is a hobby that uses specialized signal generators to produce powerful sensations. Many commercial units accept custom stimulation signals via audio input, and the enthusiast community has built a large library of custom sessions distributed as standard audio files. While this format is convenient and non-proprietary, it provides no way to understand the flow, intensity, or texture of a session before using it.
 
-Many commercial Estim units support custom stimulation signals using audio input in addition to an included small library of simple stimulation patterns. Over time, the Estim enthusiast community has created a large repository of custom sessions distributed as basic audio files. While this format is convenient because it is non-proprietary and easy to use, it does not provide an easy mechanism to understand the nuances of a session.
-
-**EstimPy** helps users understand the flow, intensity, and texture of Estim audio sessions by generating intuitive visualizations from the audio data.
+**EstimPy** solves this by generating rich visualizations from audio data — per-channel amplitude envelopes and spectrograms that make the structure of a session immediately visible.
 
 ## Features
-- **Visualization analyses**: Visualizations are generated for each channel of audio data
-  - **Amplitude Envelopes**: Generates peak and RMS amplitude envelopes, showing how intensity changes over time
-  - **Spectrogram**: Visualizes the frequency content of the audio, showing how texture changes over time
-  - **Reassigned spectrogram**: Uses reassignment for sharper time-frequency localization, with configurable smoothing
-  - **Triphase mode**: Derives and visualizes the common electrode signal -(A+B) alongside the A and B channels for 3-electrode estim setups
-  - **Per-channel colormap derivation**: Automatically recolors the low-energy region of a single base colormap to match each channel's amplitude color
-- **Image visualization**: Generates a single-image visualization of a full audio file
-  - **Image file export**: Image visualization can be saved to an image file
-  - **Album art embedding**: Image visualization can be directly embedded in the metadata of the audio file
-    - During playback, album art is often rendered at the same width as the time position slider. Using the image visualization as album art, the file can be easily navigated and upcoming changes in the session can be anticipated.
-    - Supported for MP3, MP4, M4A, MOV, and FLAC files
-  - **Interactive display**: Image visualization can be rendered on an interactive plot to allow detailed inspection of the audio file
-- **Animated visualization**: Generates an animated sliding visualization of the audio file
-  - **Oscilloscope overlay**: Per-channel waveform display with trigger-stabilized rendering. Uses cross-correlation tracking for smooth frame-to-frame alignment, with zero-crossing fallback for signal transitions. Automatically detects tonal vs. pulsed content and adjusts the display window length accordingly. Shows real-time readout labels for window length, peak frequency, and signal level.
-  - **Video file export**: Animated visualization can be saved to a video file using a direct frame rendering pipeline
-  - **Interactive player**: Animated visualization used within the Qt-based audio file player
-- **Audio export**: Exports processed audio files with the full processing chain applied (frequency transform, amplitude ramp, stereo stim filtering), generates a visualization image, and embeds it as album art with metadata tags
-  - **Automatic format detection**: Output format is inferred from the output file extension, or matches the input format when no output file is specified. Supports MP3, WAV, FLAC, M4A/AAC, OGG, and Opus.
-  - **Included profiles**: `audio-mp3` (highest quality VBR), `audio-wav` (24-bit PCM), and `audio-flac` (lossless) config profiles for common export scenarios
-- **Audio player**: Plays Estim audio files for use with estim devices (***HIGHLY EXPERIMENTAL!***)
-  - **Real-time visualization**: Based on the animated visualization
-  - **Separate channel output control**: Allows signal gain of each channel to be independently controlled
-  - **Smooth intensity transitions**: Ensures that any changes in playback will transition smoothly to avoid sudden changes in output intensity
-    - This only affects changes in playback caused by interacting with the player (i.e. start, unpause, relocate time position, amplitude adjustment)
-    - This will NOT alter sudden changes which are encoded directly in the audio data
-  - **Playlist management**: Add, remove, reorder, and select files within the player UI
-  - **Triphase toggle**: Instantly switch between stereo and triphase visualization during playback
-  - **Stereo stim protection toggle**: Apply or remove safety filtering during playback
-  - **Zoom controls**: Adjust the sliding window length during playback
-- **Frequency transform**: Shift and/or scale the frequency content of audio files via STFT-based bin manipulation, preserving duration
-  - **Frequency scale** (`audio.frequency.scale`): Multiplicative scaling of all frequency components. A value of 2 doubles all frequencies. Preserves harmonic relationships. Default 1 (no change).
-  - **Frequency shift** (`audio.frequency.shift`): Additive shift of all frequency components in Hz. A value of 250 raises everything by 250 Hz. Does not preserve harmonic relationships. Default 0 (no change).
-  - Both can be combined (scale is applied first, then shift). Content pushed above Nyquist or below 0 Hz is discarded.
-- **Stereo stim**: Optional safety filter chain for direct-output stereostim devices, applying a bandpass filter (default 20 Hz–12 kHz) to remove DC offset, subsonic content, and high-frequency content. Visualizations and exported media reflect the filtered audio. Indicated by an "SS" badge on exported videos.
-- **Amplitude ramp**: Gradually increases audio amplitude from a reduced level at the start of the file to full amplitude at the end. Configurable reduction level (`audio.ramp.level`, 0–100%) and curve shape (`audio.ramp.shape`): 0 for linear, negative values (−10 to 0) for a fast initial rise that slows toward the end, positive values (0 to 10) for a slow initial rise that accelerates toward the end. Applied to exported audio; also available as a real-time player control (G key) with adjustable level and shape sliders.
-- **Highly configurable**: Nearly all parameters related to the rendering and export of visualizations are determined from an easily customizable configuration file
+
+### Interactive player
+A Qt-based audio player with real-time animated visualization, designed for use with estim devices.
+- **Per-channel volume control** with independent gain sliders and mute toggles
+- **Smooth intensity transitions** — all volume changes (start, pause, seek, slider adjustment) ramp smoothly to prevent sudden changes in output intensity
+- **Oscilloscope overlay** — per-channel waveform display with trigger-stabilized rendering, automatic tone/pulse detection, and real-time readout labels (window length, peak frequency, signal level)
+- **Triphase toggle** — instantly switch between stereo and 3-channel triphase visualization
+- **Stereo stim toggle** — apply or remove safety bandpass filtering during playback
+- **Amplitude ramp** — start a gradual amplitude ramp during playback with adjustable level and curve shape
+- **Zoom controls** — adjust the sliding window length from 1 second to full file duration
+- **Playlist management** — add, remove, reorder, and select files; drag-and-drop support; M3U import/export
+- **Keyboard shortcuts** for all controls; fullscreen mode; click-to-seek on visualization panels
+
+### Visualization
+Per-channel analysis panels rendered for both static images and animated video:
+- **Amplitude envelopes** — peak and RMS envelopes showing how intensity changes over time
+- **Spectrogram** — frequency content with reassigned spectrogram for sharper time-frequency localization
+- **Triphase mode** — derives and visualizes the common electrode signal -(A+B) for 3-electrode setups
+- **Per-channel colormaps** — automatically recolors the base colormap to match each channel's identity color
+- **Configurable styling** — colors, fonts, panel ratios, dynamic range, frequency bounds, axis visibility, and more
+
+### Export
+- **Video export** — animated sliding visualization rendered via a direct pixel pipeline and encoded with FFmpeg. Supports hardware-accelerated codecs, configurable resolution up to 8K, 120fps, segment-based encoding with resume, and preview frames with fade transitions.
+- **Image export** — static full-file visualization saved as PNG or embedded as album art in audio file metadata (MP3, MP4, M4A, MOV, FLAC). Album art doubles as a visual navigation aid in media players.
+- **Audio export** — re-encode audio with the full processing chain applied (frequency transform, ramp, stereo stim). Output format is autodetected from the file extension or matches the input. Generates a visualization image and embeds it as album art with metadata tags. Included profiles for MP3, WAV, and FLAC export.
+
+### Audio processing
+- **Frequency transform** — shift and/or scale frequency content while preserving duration. Scale multiplies all frequencies (preserving harmonics); shift adds a constant offset in Hz (changing intervals). Both can be combined.
+- **Stereo stim filtering** — bandpass safety filter (default 20 Hz–12 kHz) for direct-output stereostim devices, removing DC offset, subsonic content, and high-frequency content.
+- **Amplitude ramp** — gradually increases amplitude from a reduced level at the start of the file to full amplitude at the end, with configurable reduction level and exponential curve shape.
+
+### Configuration
+- YAML-based configuration system with composable profiles and per-key CLI overrides
+- Included profiles for video codecs (HEVC, AV1, VP9, ProRes), resolutions (4K, 8K), frame rates (60/120fps), audio formats (MP3, WAV, FLAC), and player device presets
+- User configuration directory (`~/.estimpy/`) for persistent customization
+- Benchmark command for comparing video encoding performance across profiles
 
 ## Disclaimer
 
@@ -75,29 +66,20 @@ Many commercial Estim units support custom stimulation signals using audio input
 
 ## Visualization examples
 
-### Default layout and behavior ###
+### Layout
 
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/50511517-f586-4435-acc3-f6d015462080" width="1080">
-</p>
-
-Both image and animated visualizations use the same basic layout to visualize each channel of audio data
-- Peak and RMS amplitude envelopes
-  - The peak amplitude envelope is shown behind the RMS amplitude envelope
-  - Envelope amplitude display range always spans from -Inf to 0 dB
-- Spectrogram
-  - The default dynamic range for all spectrograms is 90 dB
-  - The minimum frequency displayed is 0
-  - The maximum frequency displayed is autodetected (unless overridden)
+Each channel of audio is visualized with two panels:
+- **Amplitude envelope** — peak (behind) and RMS (foreground), scaled from -∞ to 0 dB
+- **Spectrogram** — 90 dB dynamic range, autodetected frequency ceiling
 
 #### 1-channel (mono) audio file ####
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/0afe2b4e-cbee-44fd-af8f-75be93cf5790" width="480">
+  <img src="https://github.com/user-attachments/assets/d575237b-583b-4181-afcd-46e888a311af" width="480">
 </p>
 
 #### 2-channel (stereo) audio file ####
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/403624b1-284f-4682-af1d-012376500565" width="480">
+  <img src="https://github.com/user-attachments/assets/9fa6770a-ed43-4a7e-ab77-ba84a58c2220" width="480">
 </p>
 
 ---
@@ -210,11 +192,6 @@ If no command is given, the player is launched. If no files are given, a file di
 | `-col`, `--config-option-list`                     | List all configuration options and their current values and exit.                                                      |
 | `-ss`, `--stereo-stim`                 | Apply stereo stim filters (bandpass 20 Hz–12 kHz) for safer use with direct-output stereostim devices.      |
 
-> **Deprecated flags** (still functional, will be removed in a future version):
-> `--dynamic-range DB` → use `-co visualization.style.spectrogram.dynamic-range DB`
-> `--frequency-min HZ` → use `-co analysis.spectrogram.frequency-min HZ`
-> `--frequency-max HZ` → use `-co analysis.spectrogram.frequency-max HZ`
-
 ### Save options
 
 These options are available on `save-image`, `save-audio`, `save-video`, and `save-metadata`:
@@ -241,7 +218,7 @@ These options are only available on `save-video`:
   estimpy input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/61907a99-b35d-4d3e-aac4-50c9226306a8" width="720">
+  <img src="https://github.com/user-attachments/assets/191185ef-24fb-48af-a26d-2f17535ac0e7" width="720">
 </p>
 
 - **Launch the player with multiple files as a playlist**
@@ -255,7 +232,7 @@ These options are only available on `save-video`:
   ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/52f9ecfc-0269-49b3-bf7b-95f0e9ca3782" width="480">
+  <img src="https://github.com/user-attachments/assets/8e6d3767-387c-450e-bd31-83aecbe2a2fc" width="480">
 </p>
 
 - **Save image visualization to an image file**
@@ -263,7 +240,7 @@ These options are only available on `save-video`:
   estimpy save-image input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/629bc729-280a-43ce-9866-f30f8719275a" width="480">
+  <img src="https://github.com/user-attachments/assets/9fa6770a-ed43-4a7e-ab77-ba84a58c2220" width="480">
 </p>
 
 - **Save image visualization to the metadata of an audio file**
@@ -271,7 +248,7 @@ These options are only available on `save-video`:
   estimpy save-metadata input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/c7762554-dd73-4d5f-a988-2fb1a0a60ba6" width="480">
+  <img src="https://github.com/user-attachments/assets/b976c3da-815a-4a8b-ba3b-66fbac5867fc" width="480">
 </p>
 
 - **Save image visualization to the metadata of all supported files in a path recursively**
@@ -284,24 +261,14 @@ These options are only available on `save-video`:
   estimpy save-audio input.mp3 -ss
   ```
 
-- **Save processed audio as FLAC** (autodetected from output extension)
-  ```
-  estimpy save-audio input.mp3 -o output.flac
-  ```
-
 - **Save processed audio as FLAC with amplitude ramp** (using config profile)
   ```
   estimpy save-audio input.mp3 -c audio-flac -co audio.ramp.level 50
   ```
 
-- **Double the carrier frequency for stereostim use**
+- **Double, then shift all frequencies up by 250 Hz and apply stereostim processing**
   ```
-  estimpy save-audio input.mp3 -ss -co audio.frequency.scale 2
-  ```
-
-- **Shift all frequencies up by 250 Hz**
-  ```
-  estimpy save-audio input.mp3 -co audio.frequency.shift 250
+  estimpy save-audio input.mp3 -ss -co audio.frequency.scale 2 audio.frequency.shift 250
   ```
 
 - **Save animated visualization to a video file**
@@ -309,14 +276,14 @@ These options are only available on `save-video`:
   estimpy save-video input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/a74e0039-8cca-4149-bdbb-3a97e2659ba7">
+  <img src="https://github.com/user-attachments/assets/d71ad527-e206-498c-9de6-8fec1453a808">
 </p>
 
 - **Save animated visualization to a 8k 60fps video file**
   ```
   estimpy save-video input.mp3 -c video-8k video-60fps
   ```
-  **<a href="https://youtu.be/7zNsNnao8KU" target="_blank">Example high-resolution video (via YouTube)</a>**
+  **<a href="https://youtu.be/T0NwOUIXx0A" target="_blank">Example high-resolution video (via YouTube)</a>**
 
 - **Benchmark all video encoding profiles**
   ```

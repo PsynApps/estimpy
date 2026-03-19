@@ -186,10 +186,29 @@ class PlayerWindow(QMainWindow):
         # Render initial frame
         self._render_frame_at_time(0)
 
-        # Set initial window size
-        width = es.cfg['visualization.video.display.width']
-        height = es.cfg['visualization.video.display.height']
-        self.resize(width, height + self._controls.sizeHint().height())
+        # Size the window so the visualization widget tightly bounds the canvas
+        # without letterbox margins. Start from the configured display size, then
+        # constrain to the available screen area if needed (preserving aspect ratio).
+        viz_width = es.cfg['visualization.video.display.width']
+        viz_height = es.cfg['visualization.video.display.height']
+        viz_aspect = viz_width / viz_height
+        controls_height = self._controls.sizeHint().height()
+        margins = self.contentsMargins()
+        chrome_height = controls_height + margins.top() + margins.bottom()
+
+        # Constrain to screen (leave some breathing room)
+        screen = self.screen().availableGeometry()
+        max_width = int(screen.width() * 0.95)
+        max_viz_height = int(screen.height() * 0.95) - chrome_height
+
+        if viz_width > max_width:
+            viz_width = max_width
+            viz_height = int(viz_width / viz_aspect)
+        if viz_height > max_viz_height:
+            viz_height = max_viz_height
+            viz_width = int(viz_height * viz_aspect)
+
+        self.resize(viz_width, viz_height + chrome_height)
 
     def _init_visualization(self, es_audio):
         """Create visualization and run chrome capture for direct rendering."""
@@ -283,91 +302,91 @@ class PlayerWindow(QMainWindow):
 
         controls_layout.addLayout(seek_row)
 
-        # --- Button/controls row ---
-        button_row = QHBoxLayout()
-        button_row.setSpacing(4)
+        # --- Controls area: playback buttons (left, vertically centered) + two rows (right) ---
+        controls_area = QHBoxLayout()
+        controls_area.setSpacing(4)
 
         style = self.style()
         btn_size = 32
         btn_size_play = 40
 
-        # Playback buttons
+        # --- Left side: playback buttons, vertically centered to span both rows ---
+        playback_layout = QHBoxLayout()
+        playback_layout.setSpacing(4)
+
         self._btn_prev = self._make_icon_button(
             QStyle.StandardPixmap.SP_MediaSkipBackward, btn_size,
             'Previous file (PageUp)', lambda: self._player.previous_file())
-        button_row.addWidget(self._btn_prev)
+        playback_layout.addWidget(self._btn_prev)
 
         self._btn_skip_back = self._make_icon_button(
             QStyle.StandardPixmap.SP_MediaSeekBackward, btn_size,
             f'Skip back {es.cfg["player.skip-length"]}s (Left)',
             lambda: self._player.set_time(self._player.get_time() - es.cfg['player.skip-length']))
-        button_row.addWidget(self._btn_skip_back)
+        playback_layout.addWidget(self._btn_skip_back)
 
         self._btn_play_pause = self._make_icon_button(
             QStyle.StandardPixmap.SP_MediaPlay, btn_size_play,
             'Play/Pause (Space)', lambda: self._player.toggle_playing())
-        button_row.addWidget(self._btn_play_pause)
+        playback_layout.addWidget(self._btn_play_pause)
 
         self._btn_stop = self._make_icon_button(
             QStyle.StandardPixmap.SP_MediaStop, btn_size,
             'Stop', lambda: self._player.stop())
-        button_row.addWidget(self._btn_stop)
+        playback_layout.addWidget(self._btn_stop)
 
         self._btn_skip_fwd = self._make_icon_button(
             QStyle.StandardPixmap.SP_MediaSeekForward, btn_size,
             f'Skip forward {es.cfg["player.skip-length"]}s (Right)',
             lambda: self._player.set_time(self._player.get_time() + es.cfg['player.skip-length']))
-        button_row.addWidget(self._btn_skip_fwd)
+        playback_layout.addWidget(self._btn_skip_fwd)
 
         self._btn_next = self._make_icon_button(
             QStyle.StandardPixmap.SP_MediaSkipForward, btn_size,
             'Next file (PageDown)', lambda: self._player.next_file())
-        button_row.addWidget(self._btn_next)
+        playback_layout.addWidget(self._btn_next)
 
-        self._add_separator(button_row)
+        self._add_separator(playback_layout)
 
-        # --- Repeat button ---
+        # Repeat button
         self._btn_repeat = self._make_text_button(
             '\u21BB', 28, 'Repeat: Off (R)',
             lambda: self._cycle_repeat(), width=36)
         self._btn_repeat.setCheckable(True)
         self._update_repeat_button()
-        button_row.addWidget(self._btn_repeat)
+        playback_layout.addWidget(self._btn_repeat)
 
-        self._add_separator(button_row)
+        self._add_separator(playback_layout)
 
-        # --- Fullscreen button ---
+        # Fullscreen button
         self._btn_fullscreen = self._make_text_button(
             '\u26F6', 28, 'Fullscreen (F)',
             lambda: self._player.toggle_full_screen())
         self._btn_fullscreen.setCheckable(True)
-        button_row.addWidget(self._btn_fullscreen)
+        playback_layout.addWidget(self._btn_fullscreen)
 
-        self._add_separator(button_row)
+        self._add_separator(playback_layout)
 
-        # --- Playlist button ---
+        # Playlist button
         self._btn_playlist = self._make_text_button(
             '\u2630', 28, 'Playlist (P)',
             lambda: self._toggle_playlist())
-        button_row.addWidget(self._btn_playlist)
+        playback_layout.addWidget(self._btn_playlist)
 
-        button_row.addStretch(1)
+        controls_area.addLayout(playback_layout)
+        controls_area.addStretch(1)
 
-        # --- Oscilloscope duration controls ---
-        self._add_osc_controls(button_row)
+        # --- Right side: two rows ---
+        right_rows = QVBoxLayout()
+        right_rows.setSpacing(2)
 
-        self._add_separator(button_row)
+        # --- Row 1: volume + ramp ---
+        row1 = QHBoxLayout()
+        row1.setSpacing(4)
 
-        # --- Zoom controls ---
-        self._add_zoom_controls(button_row)
-
-        self._add_separator(button_row)
-
-        # --- Volume controls ---
+        # Volume controls
         self._volume_widgets = {}
-
-        # Master volume (buttons only)
-        self._add_master_volume(button_row)
+        self._add_master_volume(row1)
 
         # Per-channel volume container (rebuilt when channel count changes)
         self._channel_vol_container = QWidget()
@@ -375,56 +394,61 @@ class PlayerWindow(QMainWindow):
         self._channel_vol_layout.setContentsMargins(0, 0, 0, 0)
         self._channel_vol_layout.setSpacing(4)
         self._rebuild_channel_volumes()
-        button_row.addWidget(self._channel_vol_container)
+        row1.addWidget(self._channel_vol_container)
 
-        self._add_separator(button_row)
+        self._add_separator(row1)
 
-        # --- Ramp controls ---
+        # Ramp controls
         self._btn_ramp = self._make_text_button(
             'Start Ramp', 28, 'Start amplitude ramp (G)',
             lambda: self._start_ramp(), width=90)
-        button_row.addWidget(self._btn_ramp)
+        row1.addWidget(self._btn_ramp)
 
         self._ramp_gain_label = QLabel('')
         self._ramp_gain_label.setFixedWidth(32)
         self._ramp_gain_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        button_row.addWidget(self._ramp_gain_label)
+        row1.addWidget(self._ramp_gain_label)
 
         ramp_level_label = QLabel('Level')
         ramp_level_label.setFixedWidth(30)
-        button_row.addWidget(ramp_level_label)
+        row1.addWidget(ramp_level_label)
 
         self._ramp_level_slider = QSlider(Qt.Orientation.Horizontal)
         self._ramp_level_slider.setRange(0, 100)
         self._ramp_level_slider.setValue(es.cfg['audio.ramp.level'])
         self._ramp_level_slider.setFixedWidth(60)
         self._ramp_level_slider.valueChanged.connect(self._on_ramp_level_changed)
-        button_row.addWidget(self._ramp_level_slider)
+        row1.addWidget(self._ramp_level_slider)
 
         self._ramp_level_value = QLabel(str(es.cfg['audio.ramp.level']))
         self._ramp_level_value.setFixedWidth(22)
         self._ramp_level_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        button_row.addWidget(self._ramp_level_value)
+        row1.addWidget(self._ramp_level_value)
 
         shape_label = QLabel('Shape')
         shape_label.setFixedWidth(34)
-        button_row.addWidget(shape_label)
+        row1.addWidget(shape_label)
 
         self._ramp_shape_slider = QSlider(Qt.Orientation.Horizontal)
         self._ramp_shape_slider.setRange(-10, 10)
         self._ramp_shape_slider.setValue(int(es.cfg['audio.ramp.shape']))
         self._ramp_shape_slider.setFixedWidth(60)
         self._ramp_shape_slider.valueChanged.connect(self._on_ramp_shape_changed)
-        button_row.addWidget(self._ramp_shape_slider)
+        row1.addWidget(self._ramp_shape_slider)
 
         self._ramp_shape_value = QLabel(str(int(es.cfg['audio.ramp.shape'])))
         self._ramp_shape_value.setFixedWidth(18)
         self._ramp_shape_value.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        button_row.addWidget(self._ramp_shape_value)
+        row1.addWidget(self._ramp_shape_value)
 
-        self._add_separator(button_row)
+        right_rows.addLayout(row1)
 
-        # --- Triphase toggle button (wrapped in channel-colored container) ---
+        # --- Row 2: triphase, SS, zoom, oscilloscope (right-justified) ---
+        row2 = QHBoxLayout()
+        row2.setSpacing(4)
+        row2.addStretch(1)
+
+        # Triphase toggle button (wrapped in channel-colored container)
         self._triphase_container = QWidget()
         triphase_layout = QHBoxLayout(self._triphase_container)
         triphase_layout.setContentsMargins(4, 2, 4, 2)
@@ -437,17 +461,30 @@ class PlayerWindow(QMainWindow):
         self._btn_triphase.setEnabled(self._es_audio.channels == 2)
         triphase_layout.addWidget(self._btn_triphase)
         self._apply_channel_tint(self._triphase_container, channel_id=2)
-        button_row.addWidget(self._triphase_container)
+        row2.addWidget(self._triphase_container)
 
-        # --- Stereo stim toggle button ---
+        # Stereo stim toggle button
         self._btn_ss = self._make_text_button(
             'SS', 28, 'Stereo Stim (S)',
             lambda: self._toggle_ss(), width=34)
         self._btn_ss.setCheckable(True)
         self._btn_ss.setChecked(es.cfg['audio.stereo-stim.enabled'])
-        button_row.addWidget(self._btn_ss)
+        row2.addWidget(self._btn_ss)
 
-        controls_layout.addLayout(button_row)
+        self._add_separator(row2)
+
+        # Zoom controls
+        self._add_zoom_controls(row2)
+
+        self._add_separator(row2)
+
+        # Oscilloscope duration controls
+        self._add_osc_controls(row2)
+
+        right_rows.addLayout(row2)
+
+        controls_area.addLayout(right_rows)
+        controls_layout.addLayout(controls_area)
         layout.addWidget(self._controls)
 
     def _make_icon_button(self, icon_pixmap, size, tooltip, callback):

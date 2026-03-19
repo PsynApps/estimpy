@@ -18,12 +18,10 @@ Thumbs.db
 # Development-only directories/files
 .venv/
 /assets/
-/export/
 /tests/input/*
 !/tests/input/test.mp3
 !/tests/input/benchmark.mp3
 !/tests/input/benchmark/
 /tests/input/benchmark/*
 /tests/output/
-todo.txt
 *.swp

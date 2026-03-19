@@ -154,12 +154,6 @@ def _add_global_arguments(parser):
         help='Override specific configuration option(s). Options follow the structure from default.yaml using dots in place of indents with values after a space.')
     parser.add_argument('-col', '--config-option-list', action='store_true',
         help='List all valid config options and exit.')
-    parser.add_argument('--dynamic-range', type=int, metavar='DB',
-        help='[Deprecated: use -co visualization.style.spectrogram.dynamic-range DB] Dynamic range to display on spectrogram (in decibels).')
-    parser.add_argument('--frequency-min', type=int, metavar='HZ',
-        help='[Deprecated: use -co analysis.spectrogram.frequency-min HZ] Minimum frequency to display on spectrogram.')
-    parser.add_argument('--frequency-max', type=int, metavar='HZ',
-        help='[Deprecated: use -co analysis.spectrogram.frequency-max HZ] Maximum frequency to display on spectrogram. If not defined, spectrogram will be autoscaled.')
     parser.add_argument('-ss', '--stereo-stim', action='store_true',
         help='Apply stereo stim filters (bandpass 20 Hz–12 kHz) to make audio safer for direct-output stereostim devices.')
 
@@ -206,18 +200,6 @@ def _handle_global_arguments(args):
 
     if args.get('output_path') is not None:
         es.cfg['files.output.path'] = args['output_path']
-
-    if args.get('dynamic_range') is not None:
-        print('Warning: --dynamic-range is deprecated. Use: -co visualization.style.spectrogram.dynamic-range VALUE')
-        es.cfg['visualization.style.spectrogram.dynamic-range'] = args['dynamic_range']
-
-    if args.get('frequency_min') is not None:
-        print('Warning: --frequency-min is deprecated. Use: -co analysis.spectrogram.frequency-min VALUE')
-        es.cfg['analysis.spectrogram.frequency-min'] = args['frequency_min']
-
-    if args.get('frequency_max') is not None:
-        print('Warning: --frequency-max is deprecated. Use: -co analysis.spectrogram.frequency-max VALUE')
-        es.cfg['analysis.spectrogram.frequency-max'] = args['frequency_max']
 
     # Apply stereo stim mode
     if args.get('stereo_stim'):

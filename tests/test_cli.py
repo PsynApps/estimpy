@@ -100,18 +100,6 @@ class TestArgParsing:
         parsed = _parse_args(['play', '-co', 'player.volume-start', '75'])
         assert parsed['config_option'] == ['player.volume-start', '75']
 
-    def test_dynamic_range(self):
-        parsed = _parse_args(['play', '--dynamic-range', '60'])
-        assert parsed['dynamic_range'] == 60
-
-    def test_frequency_min(self):
-        parsed = _parse_args(['play', '--frequency-min', '100'])
-        assert parsed['frequency_min'] == 100
-
-    def test_frequency_max(self):
-        parsed = _parse_args(['play', '--frequency-max', '5000'])
-        assert parsed['frequency_max'] == 5000
-
     def test_save_output_path(self):
         parsed = _parse_args(['save-image', '-o', '/tmp/output'])
         assert parsed['output_path'] == '/tmp/output'
@@ -164,21 +152,6 @@ class TestConfigHandling:
         _handle_global_arguments(args)
         assert es.cfg['files.input.recursive'] is True
 
-    def test_dynamic_range_sets_config(self):
-        args = _parse_args(['play', '--dynamic-range', '60'])
-        _handle_global_arguments(args)
-        assert es.cfg['visualization.style.spectrogram.dynamic-range'] == 60
-
-    def test_frequency_min_sets_config(self):
-        args = _parse_args(['play', '--frequency-min', '100'])
-        _handle_global_arguments(args)
-        assert es.cfg['analysis.spectrogram.frequency-min'] == 100
-
-    def test_frequency_max_sets_config(self):
-        args = _parse_args(['play', '--frequency-max', '5000'])
-        _handle_global_arguments(args)
-        assert es.cfg['analysis.spectrogram.frequency-max'] == 5000
-
     def test_config_option_applies_override(self):
         args = _parse_args(['play', '-co', 'player.volume-start', '75'])
         _handle_global_arguments(args)
@@ -200,23 +173,3 @@ class TestConfigHandling:
         assert es.cfg['visualization.image.display.title.enabled'] is False
         assert es.cfg['visualization.video.display.title.enabled'] is False
 
-    def test_deprecated_dynamic_range_warns(self, capsys):
-        args = _parse_args(['play', '--dynamic-range', '60'])
-        _handle_global_arguments(args)
-        assert es.cfg['visualization.style.spectrogram.dynamic-range'] == 60
-        captured = capsys.readouterr()
-        assert 'deprecated' in captured.out.lower()
-
-    def test_deprecated_frequency_min_warns(self, capsys):
-        args = _parse_args(['play', '--frequency-min', '100'])
-        _handle_global_arguments(args)
-        assert es.cfg['analysis.spectrogram.frequency-min'] == 100
-        captured = capsys.readouterr()
-        assert 'deprecated' in captured.out.lower()
-
-    def test_deprecated_frequency_max_warns(self, capsys):
-        args = _parse_args(['play', '--frequency-max', '5000'])
-        _handle_global_arguments(args)
-        assert es.cfg['analysis.spectrogram.frequency-max'] == 5000
-        captured = capsys.readouterr()
-        assert 'deprecated' in captured.out.lower()
