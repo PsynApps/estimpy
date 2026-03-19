@@ -45,6 +45,7 @@ Many commercial Estim units support custom stimulation signals using audio input
     - Supported for MP3, MP4, M4A, MOV, and FLAC files
   - **Interactive display**: Image visualization can be rendered on an interactive plot to allow detailed inspection of the audio file
 - **Animated visualization**: Generates an animated sliding visualization of the audio file
+  - **Oscilloscope overlay**: Per-channel waveform display with trigger-stabilized rendering. Uses cross-correlation tracking for smooth frame-to-frame alignment, with zero-crossing fallback for signal transitions. Automatically detects tonal vs. pulsed content and adjusts the display window length accordingly. Shows real-time readout labels for window length, peak frequency, and signal level.
   - **Video file export**: Animated visualization can be saved to a video file using a direct frame rendering pipeline
   - **Interactive player**: Animated visualization used within the Qt-based audio file player
 - **Audio export**: Exports processed audio files with the full processing chain applied (frequency transform, amplitude ramp, stereo stim filtering), generates a visualization image, and embeds it as album art with metadata tags
@@ -317,14 +318,6 @@ These options are only available on `save-video`:
   ```
   **<a href="https://youtu.be/7zNsNnao8KU" target="_blank">Example high-resolution video (via YouTube)</a>**
 
-- **Save image visualization to an image file with custom configuration options**
-  ```
-  estimpy save-image input.mp3 -co visualization.image.export.size 1920x1080 visualization.style.channels.ch0.color #93c3ff visualization.style.channels.ch1.color #ea96fe visualization.style.spectrogram.channels.ch0.color-map cividis visualization.style.spectrogram.channels.ch1.color-map viridis visualization.style.title.background-color #666666 visualization.style.font.text.family Stencil
-  ```
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/11858185-c7f8-4084-8eb3-450d4bcb6ae9" width="720">
-</p>
-
 - **Benchmark all video encoding profiles**
   ```
   estimpy benchmark
@@ -437,6 +430,7 @@ For reference, the default configuration options and values are as follows:
 | analysis.oscilloscope.pulse-detection.enabled                | True                                         |
 | analysis.oscilloscope.pulse-detection.window-length          | 500                                          |
 | analysis.oscilloscope.silence-threshold                      | 0.01                                         |
+| analysis.oscilloscope.trigger-correlation-threshold          | 0.3                                          |
 | analysis.oscilloscope.trigger-hysteresis                     | 0.05                                         |
 | analysis.oscilloscope.window-length                          | 10                                           |
 | analysis.spectrogram.frequency-min                           | 0                                            |

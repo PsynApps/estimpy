@@ -353,7 +353,7 @@ class OscilloscopeMixin:
                 corr_offset, corr_quality = self._dr_osc_find_trigger_correlation(
                     buffer[:search_range + display_samples], prev_template)
 
-            if corr_quality > 0.3:
+            if corr_quality > es.cfg['analysis.oscilloscope.trigger-correlation-threshold']:
                 trigger_idx = corr_offset
             else:
                 # Signal changed too much -- fall back to zero-crossing

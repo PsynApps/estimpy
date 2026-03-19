@@ -23,7 +23,26 @@ analysis:
       window-length: 500
     # Minimum RMS energy threshold (fraction of full scale) below which flat line is shown
     silence-threshold: 0.01
-    # Hysteresis threshold for trigger detection (fraction of peak amplitude)
+    # Trigger stabilization uses a two-stage approach:
+    #   1. Correlation trigger (primary): Cross-correlates the previous frame's
+    #      waveform against the new audio buffer to find the best alignment.
+    #      This gives smooth, stable tracking when the signal shape is consistent.
+    #   2. Zero-crossing trigger (fallback): Arms when the signal drops below
+    #      a negative hysteresis threshold, then fires on the next rising
+    #      zero-crossing. Used when correlation quality is too low (signal onset,
+    #      major timbre changes, or the first frame where no template exists).
+    #
+    # Minimum normalized cross-correlation score (0.0-1.0) required to use the
+    # correlation trigger. When the score falls below this threshold, the trigger
+    # falls back to zero-crossing detection. Lower values give smoother waveform
+    # tracking but may lock onto the wrong cycle (e.g. showing two overlapping
+    # traces for complex harmonics). Higher values fall back to zero-crossing
+    # more often, which can cause frame-to-frame jitter.
+    trigger-correlation-threshold: 0.3
+    # Hysteresis threshold for the zero-crossing fallback trigger (fraction of
+    # peak amplitude). The signal must first drop below -hysteresis × peak before
+    # a rising zero-crossing is accepted. Prevents false triggers from noise near
+    # zero. Only used when the correlation trigger score is below the threshold above.
     trigger-hysteresis: 0.05
   spectrogram:
     # The minimum frequency to show on the spectrogram
