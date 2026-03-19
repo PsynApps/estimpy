@@ -155,6 +155,7 @@ class Visualization:
 
         # Use hardcoded size and dpi to ensure relative scaling of fonts, lines, ticks, etc. is correct
         self._handles['figure'] = matplotlib.pyplot.figure(num=1, clear=True)
+        self._handles['figure'].set_facecolor('black')
         self._handles['figure'].set_dpi(_DISPLAY_DPI)
         self._handles['figure'].set_size_inches(es.cfg['visualization.image.display.width'] / _DISPLAY_DPI,
                                                 es.cfg['visualization.image.display.height'] / _DISPLAY_DPI)
@@ -227,25 +228,57 @@ class Visualization:
             ax.fill(self.rms_envelope.times, self.rms_envelope.envelope_data[channel_id, :],
                     color=axes_style_cfg['rms-color'])
 
+    def _add_spacer_subplot(self, gridspec: matplotlib.gridspec.GridSpec):
+        """Add an invisible black spacer axis for margin between channels."""
+        ax = self._handles['figure'].add_subplot(gridspec)
+        ax.set_facecolor('black')
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.axis('off')
+        self._last_spacer_ax = ax
+
     def _add_figure_subplots(self, gridspec: matplotlib.gridspec.GridSpec) -> int:
         i_subplot = 0
+        margin = es.cfg['visualization.style.channels.margin']
 
         # Title
         if self._title_enabled(mode=self._mode):
             self._add_title_subplot(gridspec=gridspec[i_subplot])
-
             i_subplot += 1
 
-        for channel_id, invert in self._channel_layout:
+        channels = self._channel_layout
+        for i, (channel_id, invert) in enumerate(channels):
             if invert:
                 self._add_amplitude_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot], invert=True)
+                top_type = AxisTypes.AMPLITUDE
                 i_subplot += 1
                 self._add_spectrogram_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot], invert=True)
+                bottom_type = AxisTypes.SPECTROGRAM
                 i_subplot += 1
             else:
                 self._add_spectrogram_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot])
+                top_type = AxisTypes.SPECTROGRAM
                 i_subplot += 1
                 self._add_amplitude_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot])
+                bottom_type = AxisTypes.AMPLITUDE
+                i_subplot += 1
+
+            # Frame each channel section with borders in the channel's RMS color
+            border_color = self._get_amplitude_style_cfg(channel_id)['peak-color']
+            top_ax = self._handles['axes'][
+                self._get_axis_handle_id(axis_type=top_type, channel=channel_id)]
+            top_ax.spines['top'].set_visible(True)
+            top_ax.spines['top'].set_color(border_color)
+            top_ax.spines['top'].set_linewidth(2)
+            bottom_ax = self._handles['axes'][
+                self._get_axis_handle_id(axis_type=bottom_type, channel=channel_id)]
+            bottom_ax.spines['bottom'].set_visible(True)
+            bottom_ax.spines['bottom'].set_color(border_color)
+            bottom_ax.spines['bottom'].set_linewidth(2)
+            self._last_channel_bottom_ax = bottom_ax
+
+            if margin > 0:
+                self._add_spacer_subplot(gridspec=gridspec[i_subplot])
                 i_subplot += 1
 
         return i_subplot
@@ -427,12 +460,29 @@ class Visualization:
         ratio_key = self._layout_ratio_key
         spec_ratio = es.cfg[f'visualization.style.subplot-height-ratios.spectrogram.{ratio_key}']
         amp_ratio = es.cfg[f'visualization.style.subplot-height-ratios.amplitude.{ratio_key}']
+        margin_frac = es.cfg['visualization.style.channels.margin']
 
-        for ch_id, invert in self._channel_layout:
+        channels = self._channel_layout
+        # Use None as a placeholder for margin spacers, then convert the
+        # fraction-of-total-height into a ratio consistent with the other entries
+        for i, (ch_id, invert) in enumerate(channels):
             if invert:
                 gridspec_params['height_ratios'] += [amp_ratio, spec_ratio]
             else:
                 gridspec_params['height_ratios'] += [spec_ratio, amp_ratio]
+            if margin_frac > 0:
+                gridspec_params['height_ratios'].append(None)  # placeholder
+
+        # Convert margin fraction to a ratio value: if the non-margin content
+        # occupies (1 - n*margin_frac) of the frame, each margin_frac of the
+        # frame corresponds to ratio = content_sum * margin_frac / (1 - n*margin_frac)
+        n_margins = gridspec_params['height_ratios'].count(None)
+        if n_margins > 0:
+            content_sum = sum(r for r in gridspec_params['height_ratios'] if r is not None)
+            margin_ratio = content_sum * margin_frac / (1 - n_margins * margin_frac)
+            gridspec_params['height_ratios'] = [
+                margin_ratio if r is None else r for r in gridspec_params['height_ratios']
+            ]
 
         gridspec_params['nrows'] = len(gridspec_params['height_ratios'])
 
@@ -448,6 +498,8 @@ class Visualization:
             'text': [],  # type: typing.List[matplotlib.pyplot.Text]
             'time': None,  # type: matplotlib.pyplot.Text
         }
+        self._last_spacer_ax = None
+        self._last_channel_bottom_ax = None
 
     def _make_figure_subplots(self):
         gridspec_params = self._get_gridspec_params()

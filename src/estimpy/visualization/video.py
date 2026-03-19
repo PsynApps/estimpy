@@ -986,10 +986,24 @@ class VideoVisualization(Visualization, OscilloscopeMixin):
     def _add_figure_subplots(self, gridspec: matplotlib.gridspec.GridSpec) -> int:
         i_subplot = super()._add_figure_subplots(gridspec=gridspec)
 
-        # Additional amplitude subplots if rendering a video to show envelopes for full file for scrubbing purposes
-        for channel_id, invert in self._scrub_channel_layout:
+        # Additional amplitude subplots for full-file scrubbing, framed with
+        # separator lines to distinguish the scrub bar from the channel panels
+        separator_color = '#444444'
+        separator_width = 2
+        scrub_channels = self._scrub_channel_layout
+        for idx, (channel_id, invert) in enumerate(scrub_channels):
             self._add_amplitude_subplot(channel_id=channel_id, gridspec=gridspec[i_subplot],
                                         invert=invert, scrub=True)
+            ax_key = self._get_axis_handle_id(axis_type=AxisTypes.AMPLITUDE_SCRUB, channel=channel_id)
+            ax = self._handles['axes'][ax_key]
+            if idx == 0:
+                ax.spines['top'].set_visible(True)
+                ax.spines['top'].set_color(separator_color)
+                ax.spines['top'].set_linewidth(separator_width)
+            if idx == len(scrub_channels) - 1:
+                ax.spines['bottom'].set_visible(True)
+                ax.spines['bottom'].set_color(separator_color)
+                ax.spines['bottom'].set_linewidth(separator_width)
             i_subplot += 1
 
         return i_subplot

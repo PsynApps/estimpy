@@ -164,20 +164,25 @@ def _calculate_spectrogram_panel_height(figure_height: float, n_channels: int,
 
     spec_ratio = es.cfg[f'visualization.style.subplot-height-ratios.spectrogram.{ratio_key}']
     amp_ratio = es.cfg[f'visualization.style.subplot-height-ratios.amplitude.{ratio_key}']
+    margin_frac = es.cfg['visualization.style.channels.margin']
 
-    total_ratio = n_display * (spec_ratio + amp_ratio)
+    # Content ratios (everything except margins)
+    content_ratio = n_display * (spec_ratio + amp_ratio)
 
     if title_enabled:
-        total_ratio += es.cfg['visualization.style.subplot-height-ratios.title']
+        content_ratio += es.cfg['visualization.style.subplot-height-ratios.title']
 
     if include_scrub:
         n_scrub = min(n_channels, 2)
-        total_ratio += n_scrub * (amp_ratio / 2)
+        content_ratio += n_scrub * (amp_ratio / 2)
 
-    if total_ratio <= 0:
+    if content_ratio <= 0:
         return figure_height
 
-    return figure_height * spec_ratio / total_ratio
+    # Margins consume n_display * margin_frac of the total frame height,
+    # so the content occupies the remaining fraction
+    content_frac = 1 - n_display * margin_frac
+    return figure_height * content_frac * spec_ratio / content_ratio
 
 
 def _parse_resolution(resolution) -> typing.Tuple[int, int]:

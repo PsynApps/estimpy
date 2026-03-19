@@ -3,7 +3,7 @@
 **EstimPy** is a Python library that generates visualizations of Estim audio files.
 
 <div align="center">
-<a href="https://youtu.be/T0NwOUIXx0A" target="_blank"><img src="https://github.com/user-attachments/assets/d71ad527-e206-498c-9de6-8fec1453a808"></a> 
+<a href="https://youtu.be/HRMY7qzNL80" target="_blank"><img src="https://github.com/user-attachments/assets/3ac14f86-2fff-4ed6-aa89-619e9f877902"></a> 
 </div>
 
 ## Table of Contents
@@ -40,7 +40,6 @@ Per-channel analysis panels rendered for both static images and animated video:
 - **Amplitude envelopes** — peak and RMS envelopes showing how intensity changes over time
 - **Spectrogram** — frequency content with reassigned spectrogram for sharper time-frequency localization
 - **Triphase mode** — derives and visualizes the common electrode signal -(A+B) for 3-electrode setups
-- **Per-channel colormaps** — automatically recolors the base colormap to match each channel's identity color
 - **Configurable styling** — colors, fonts, panel ratios, dynamic range, frequency bounds, axis visibility, and more
 
 ### Export
@@ -73,12 +72,12 @@ Each channel of audio is visualized with two panels:
 
 #### 1-channel (mono) audio file ####
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d575237b-583b-4181-afcd-46e888a311af" width="480">
+  <img src="https://github.com/user-attachments/assets/e5f6ed40-12f3-44f2-ae15-b4f025d13c5d" width="480">
 </p>
 
 #### 2-channel (stereo) audio file ####
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/9fa6770a-ed43-4a7e-ab77-ba84a58c2220" width="480">
+  <img src="https://github.com/user-attachments/assets/962f6a32-951a-4aa0-bd89-41791df54423" width="480">
 </p>
 
 ---
@@ -217,7 +216,7 @@ These options are only available on `save-video`:
   estimpy input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d67fde73-db40-492d-bc82-bcb21da8bcef" width="720">
+  <img src="https://github.com/user-attachments/assets/765e9189-a0a5-443f-af58-1bba8dd7aaf9" width="720">
 </p>
 
 - **Launch the player with multiple files as a playlist**
@@ -231,7 +230,7 @@ These options are only available on `save-video`:
   ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/8e6d3767-387c-450e-bd31-83aecbe2a2fc" width="480">
+  <img src="https://github.com/user-attachments/assets/e4c287ee-a2b3-483b-9a38-432ab29b28a4" width="480">
 </p>
 
 - **Save image visualization to an image file**
@@ -239,7 +238,7 @@ These options are only available on `save-video`:
   estimpy save-image input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/9fa6770a-ed43-4a7e-ab77-ba84a58c2220" width="480">
+  <img src="https://github.com/user-attachments/assets/962f6a32-951a-4aa0-bd89-41791df54423" width="480">
 </p>
 
 - **Save image visualization to the metadata of an audio file**
@@ -247,7 +246,7 @@ These options are only available on `save-video`:
   estimpy save-metadata input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/b976c3da-815a-4a8b-ba3b-66fbac5867fc" width="480">
+  <img src="https://github.com/user-attachments/assets/c017be14-7c47-49a0-8ad0-55bb2fadfcd2" width="480">
 </p>
 
 - **Save image visualization to the metadata of all supported files in a path recursively**
@@ -275,14 +274,14 @@ These options are only available on `save-video`:
   estimpy save-video input.mp3
   ```
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d71ad527-e206-498c-9de6-8fec1453a808">
+  <img src="https://github.com/user-attachments/assets/3ac14f86-2fff-4ed6-aa89-619e9f877902">
 </p>
 
 - **Save animated visualization to a 8k 60fps video file**
   ```
   estimpy save-video input.mp3 -c video-8k video-60fps
   ```
-  **<a href="https://youtu.be/T0NwOUIXx0A" target="_blank">Example high-resolution video (via YouTube)</a>**
+  **<a href="https://youtu.be/HRMY7qzNL80" target="_blank">Example high-resolution video (via YouTube)</a>**
 
 - **Benchmark all video encoding profiles**
   ```
@@ -461,6 +460,7 @@ For reference, the default configuration options and values are as follows:
 | visualization.style.channels.ch2.label                       | T                                            |
 | visualization.style.channels.labels.enabled                  | True                                         |
 | visualization.style.channels.labels.font-size                | 64                                           |
+| visualization.style.channels.margin                          | 0.03                                         |
 | visualization.style.axes.color                               | #ffffff                                      |
 | visualization.style.axes.font-size                           | 16                                           |
 | visualization.style.axes.text-padding                        | 1                                            |

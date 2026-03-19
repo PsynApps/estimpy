@@ -268,22 +268,6 @@ visualization:
       tick-length: 5
       # Width of axis ticks
       tick-width: 1
-    # Font configuration
-    font:
-      # Configuration for symbol fonts
-      symbols:
-        # The font family name to use for symbols. Accepts multiple comma-delimited names and will use the first font found.
-        family: Segoe UI Symbol, DejaVu Sans
-      # Configuration for text fonts
-      text:
-        # Color of the text border
-        border-color: '#000000'
-        # Width of the text border
-        border-width: 1
-        # The font family name to use for text. Accepts multiple comma-delimited names and will use the first font found.
-        family: Helvetica Neue, Helvetica, Arial, sans-serif
-        # The font weight to use for text
-        weight: bold
     # Per-channel identity configuration (color and label)
     channels:
       ch0:
@@ -301,12 +285,32 @@ visualization:
         color: '#e06cb7'
         inverted: False
         label: T
+      # Black margin below each channel section, expressed as a fraction of the
+      # total visualization height. Visually separates channels from each other
+      # and from the scrub bar. Set to 0 to disable.
+      margin: 0.03
       # Configuration for channel labels displayed on spectrogram panels
       labels:
         # Show channel labels on spectrogram panels
         enabled: True
         # Font size of channel labels
         font-size: 64
+    # Font configuration
+    font:
+      # Configuration for symbol fonts
+      symbols:
+        # The font family name to use for symbols. Accepts multiple comma-delimited names and will use the first font found.
+        family: Segoe UI Symbol, DejaVu Sans
+      # Configuration for text fonts
+      text:
+        # Color of the text border
+        border-color: '#000000'
+        # Width of the text border
+        border-width: 1
+        # The font family name to use for text. Accepts multiple comma-delimited names and will use the first font found.
+        family: Helvetica Neue, Helvetica, Arial, sans-serif
+        # The font weight to use for text
+        weight: bold
     # Configuration for the oscilloscope waveform overlay
     oscilloscope:
       # Border width in pixels
